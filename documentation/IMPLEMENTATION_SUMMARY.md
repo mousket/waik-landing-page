@@ -94,33 +94,33 @@ Follow the detailed instructions in `GOOGLE_SHEETS_SETUP.md`. Here's the quick v
    - Copy the Web App URL
 
 3. **You'll get 3 URLs** that look like:
-   ```
+   \`\`\`
    https://script.google.com/macros/s/AKfycby.../exec
-   ```
+   \`\`\`
 
 ### Step 2: Configure Environment Variables (2 minutes)
 
 1. **Create `.env.local`** file in your project root:
-   ```bash
+   \`\`\`bash
    cp .env.example .env.local
-   ```
+   \`\`\`
 
 2. **Add your 3 Google Sheets URLs** to `.env.local`:
-   ```env
+   \`\`\`env
    NEXT_PUBLIC_SITE_URL=https://waik.care
    NEXT_PUBLIC_GOOGLE_SHEETS_VANGUARD_URL=https://script.google.com/macros/s/YOUR_ID_HERE/exec
    NEXT_PUBLIC_GOOGLE_SHEETS_DEMO_URL=https://script.google.com/macros/s/YOUR_ID_HERE/exec
    NEXT_PUBLIC_GOOGLE_SHEETS_NEWSLETTER_URL=https://script.google.com/macros/s/YOUR_ID_HERE/exec
-   ```
+   \`\`\`
 
 3. **NEVER commit `.env.local`** to git (it's already in .gitignore)
 
 ### Step 3: Test Everything (5 minutes)
 
 1. **Restart your dev server**:
-   ```bash
+   \`\`\`bash
    pnpm dev
-   ```
+   \`\`\`
 
 2. **Test each form**:
    - Click "Request a Demo" in header → Fill & submit
@@ -136,11 +136,11 @@ Follow the detailed instructions in `GOOGLE_SHEETS_SETUP.md`. Here's the quick v
 When ready to deploy:
 
 1. **Push to GitHub**:
-   ```bash
+   \`\`\`bash
    git add .
    git commit -m "Add Google Sheets integration and forms"
    git push
-   ```
+   \`\`\`
 
 2. **Add environment variables to Vercel**:
    - Go to Vercel project → Settings → Environment Variables
@@ -268,4 +268,3 @@ You're building something special. WAiK is going to make a real difference in se
 Questions? Check the code comments or the detailed setup guide.
 
 **Good luck, Gerard! Let's make WAiK a success!** 💪
-

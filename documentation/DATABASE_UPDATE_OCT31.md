@@ -134,38 +134,38 @@ When logged in as admin:
 
 ### **Test 1: Staff View**
 
-```bash
+\`\`\`bash
 1. Go to http://localhost:3000/waik-demo-start/login
 2. Login as: waik-demo-staff / waik1+demo-staff!@#
 3. View dashboard
 4. Expected: See exactly 3 incidents (inc-1, inc-2, inc-3)
 5. Note: No access to inc-4 through inc-8
-```
+\`\`\`
 
 ### **Test 2: Admin View**
 
-```bash
+\`\`\`bash
 1. Logout
 2. Login as: waik-demo-admin / waik1+demo-admin!@#
 3. View dashboard
 4. Expected: See all 8 incidents
 5. Try filters: Status, Priority
 6. Try search: "Harold" (should find inc-4)
-```
+\`\`\`
 
 ### **Test 3: API Verification**
 
 **Staff API:**
-```bash
+\`\`\`bash
 GET /api/staff/incidents?staffId=user-1
 Response: 3 incidents (inc-1, inc-2, inc-3)
-```
+\`\`\`
 
 **Admin API:**
-```bash
+\`\`\`bash
 GET /api/incidents
 Response: 8 incidents (inc-1 through inc-8)
-```
+\`\`\`
 
 ---
 
@@ -197,18 +197,18 @@ Response: 8 incidents (inc-1 through inc-8)
 
 ### **Before (3 incidents, all Sarah's)**
 
-```
+\`\`\`
 Staff Dashboard: 3 incidents
 Admin Dashboard: 3 incidents
-```
+\`\`\`
 **Problem**: Doesn't demonstrate admin's ability to oversee multiple staff
 
 ### **After (8 incidents, 3 staff members)**
 
-```
+\`\`\`
 Staff Dashboard: 3 incidents (Sarah's only)
 Admin Dashboard: 8 incidents (all staff)
-```
+\`\`\`
 **Solution**: Clearly shows admin's facility-wide oversight capability
 
 ---
@@ -257,10 +257,10 @@ Admin Dashboard: 8 incidents (all staff)
 ## 🚀 **Next Steps**
 
 1. **Restart your dev server** to load new data:
-   ```bash
+   \`\`\`bash
    # Ctrl+C to stop
    npm run dev
-   ```
+   \`\`\`
 
 2. **Test both roles**:
    - Login as staff → see 3 incidents
@@ -274,4 +274,3 @@ Admin Dashboard: 8 incidents (all staff)
 **Updated By**: AI Assistant  
 **Reason**: User feedback - needed better role differentiation  
 **Result**: ✅ Demo now properly showcases staff vs admin capabilities
-

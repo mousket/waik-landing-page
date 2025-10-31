@@ -116,9 +116,9 @@ We created 5 comprehensive documentation files for you:
 ## 🎯 **How to Test the Fixes**
 
 ### **1. Access the Demo**
-```
+\`\`\`
 http://localhost:3000/waik-demo-start/login
-```
+\`\`\`
 
 ### **2. Login Credentials**
 
@@ -158,14 +158,14 @@ http://localhost:3000/waik-demo-start/login
 ### **5. Check Console Logs**
 
 Open browser console and look for `[v0]` messages like:
-```
+\`\`\`
 [v0] Handling response for question index: 2
 [v0] Moving to next question: 3 out of 8
 [v0] About to speak question: 3
 [v0] Started speaking question: 3
 [v0] Finished speaking question: 3
 [v0] About to start listening after question: 3
-```
+\`\`\`
 
 This shows the voice flow is working perfectly! ✅
 
@@ -230,4 +230,3 @@ See the other documentation files:
 - Bug details → `BUG_FIXES.md`
 
 All in the `/documentation` folder! 📁
-

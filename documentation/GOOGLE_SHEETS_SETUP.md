@@ -33,21 +33,21 @@ Do this for **EACH** of the 3 spreadsheets you created:
 
 **For Vanguard Applications:**
 In the first row (A1-G1), add these column headers:
-```
+\`\`\`
 Timestamp | Full Name | Role | Facility Name | Email | Phone | Form Type
-```
+\`\`\`
 
 **For Demo Requests:**
 In the first row (A1-F1), add these column headers:
-```
+\`\`\`
 Timestamp | Full Name | Email | Facility Name | Phone | Form Type
-```
+\`\`\`
 
 **For Newsletter Subscriptions:**
 In the first row (A1-C1), add these column headers:
-```
+\`\`\`
 Timestamp | Email | Form Type
-```
+\`\`\`
 
 #### B. Add the Google Apps Script
 
@@ -57,7 +57,7 @@ Timestamp | Email | Form Type
 4. Click **Save** (💾 icon)
 
 **Script for Vanguard Applications:**
-```javascript
+\`\`\`javascript
 function doPost(e) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -112,10 +112,10 @@ View all applications: ${SpreadsheetApp.getActiveSpreadsheet().getUrl()}
 function doGet() {
   return ContentService.createTextOutput('WAiK Vanguard Form Handler is working!');
 }
-```
+\`\`\`
 
 **Script for Demo Requests:**
-```javascript
+\`\`\`javascript
 function doPost(e) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -166,10 +166,10 @@ View all demo requests: ${SpreadsheetApp.getActiveSpreadsheet().getUrl()}
 function doGet() {
   return ContentService.createTextOutput('WAiK Demo Request Handler is working!');
 }
-```
+\`\`\`
 
 **Script for Newsletter Subscriptions:**
-```javascript
+\`\`\`javascript
 function doPost(e) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -226,7 +226,7 @@ View all subscriptions: ${SpreadsheetApp.getActiveSpreadsheet().getUrl()}
 function doGet() {
   return ContentService.createTextOutput('WAiK Newsletter Handler is working!');
 }
-```
+\`\`\`
 
 #### C. Deploy the Script as a Web App
 
@@ -243,9 +243,9 @@ function doGet() {
    - Click **Advanced** → **Go to [Your Project Name] (unsafe)**
    - Click **Allow**
 6. **Copy the Web App URL** - it will look like:
-   ```
+   \`\`\`
    https://script.google.com/macros/s/AKfycby.../exec
-   ```
+   \`\`\`
 7. **SAVE THIS URL!** You'll need it in the next step
 
 #### D. Test Your Web App
@@ -261,14 +261,14 @@ function doGet() {
 1. In your project, create a `.env.local` file (copy from `.env.example`)
 2. Add your three Web App URLs:
 
-```env
+\`\`\`env
 NEXT_PUBLIC_SITE_URL=https://waik.care
 
 # Paste your Web App URLs here
 NEXT_PUBLIC_GOOGLE_SHEETS_VANGUARD_URL=https://script.google.com/macros/s/YOUR_VANGUARD_ID/exec
 NEXT_PUBLIC_GOOGLE_SHEETS_DEMO_URL=https://script.google.com/macros/s/YOUR_DEMO_ID/exec
 NEXT_PUBLIC_GOOGLE_SHEETS_NEWSLETTER_URL=https://script.google.com/macros/s/YOUR_NEWSLETTER_ID/exec
-```
+\`\`\`
 
 3. **IMPORTANT**: Never commit `.env.local` to git (it's already in `.gitignore`)
 
@@ -277,9 +277,9 @@ NEXT_PUBLIC_GOOGLE_SHEETS_NEWSLETTER_URL=https://script.google.com/macros/s/YOUR
 ### Part 4: Test Your Forms
 
 1. Restart your development server:
-   ```bash
+   \`\`\`bash
    pnpm dev
-   ```
+   \`\`\`
 
 2. Test each form on your landing page:
    - **Vanguard Program**: Scroll to the Vanguard section and submit the form

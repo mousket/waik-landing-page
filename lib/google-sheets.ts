@@ -101,4 +101,3 @@ export function isValidPhone(phone: string): boolean {
   // Check if it's 10 or 11 digits (with or without country code)
   return cleaned.length === 10 || cleaned.length === 11
 }
-

@@ -4,7 +4,7 @@
 
 If this is your first time running the project:
 
-```bash
+\`\`\`bash
 # Navigate to project folder
 cd /Users/gerardbeaubrun/Documents/projects/WAik/waik_landing_page/waik-landing-page
 
@@ -13,7 +13,7 @@ npm install --legacy-peer-deps
 
 # Start the dev server
 npm run dev
-```
+\`\`\`
 
 Visit **http://localhost:3000** - you should see the landing page! ✅
 
@@ -52,25 +52,25 @@ For each sheet:
 
 In your project folder, run:
 
-```bash
+\`\`\`bash
 cp .env.example .env.local
-```
+\`\`\`
 
 Then edit `.env.local` and paste your 3 URLs:
 
-```env
+\`\`\`env
 NEXT_PUBLIC_SITE_URL=https://waik.care
 NEXT_PUBLIC_GOOGLE_SHEETS_VANGUARD_URL=https://script.google.com/macros/s/YOUR_VANGUARD_ID/exec
 NEXT_PUBLIC_GOOGLE_SHEETS_DEMO_URL=https://script.google.com/macros/s/YOUR_DEMO_ID/exec
 NEXT_PUBLIC_GOOGLE_SHEETS_NEWSLETTER_URL=https://script.google.com/macros/s/YOUR_NEWSLETTER_ID/exec
-```
+\`\`\`
 
 ### 4️⃣ Test It! (3 min)
 
-```bash
+\`\`\`bash
 npm run dev
 # or if you have pnpm: pnpm dev
-```
+\`\`\`
 
 Then test:
 - Click "Request a Demo" button
@@ -90,4 +90,3 @@ For detailed instructions, see `GOOGLE_SHEETS_SETUP.md`
 For troubleshooting, see `IMPLEMENTATION_SUMMARY.md`
 
 **Let's goooo! 💪**
-

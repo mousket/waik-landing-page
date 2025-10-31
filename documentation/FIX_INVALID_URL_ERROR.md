@@ -2,14 +2,14 @@
 
 ## ⚠️ The Error You're Seeing
 
-```
+\`\`\`
 ⨯ TypeError: Invalid URL
    at ignore-listed frames {
  code: 'ERR_INVALID_URL',
  input: '3000/waik-logo.png',
  base: 'localhost:3000',
 }
-```
+\`\`\`
 
 ---
 
@@ -18,16 +18,16 @@
 Your `.env.local` or `.env` file has **incorrect URL format** for `NEXT_PUBLIC_SITE_URL`.
 
 **Wrong:**
-```env
+\`\`\`env
 NEXT_PUBLIC_SITE_URL=localhost:3000           ❌
 NEXT_PUBLIC_SITE_URL=3000                     ❌
 NEXT_PUBLIC_SITE_URL=localhost                ❌
-```
+\`\`\`
 
 **Correct:**
-```env
+\`\`\`env
 NEXT_PUBLIC_SITE_URL=http://localhost:3000    ✅
-```
+\`\`\`
 
 The URL **MUST include the protocol** (`http://` or `https://`).
 
@@ -41,9 +41,9 @@ The URL **MUST include the protocol** (`http://` or `https://`).
 2. Find the line with `NEXT_PUBLIC_SITE_URL`
 3. Change it to:
 
-```env
+\`\`\`env
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
+\`\`\`
 
 4. Save the file
 5. Restart your dev server
@@ -52,13 +52,13 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 If you don't need custom environment variables:
 
-```bash
+\`\`\`bash
 # Delete the file
 rm .env.local
 
 # Restart server
 npm run dev
-```
+\`\`\`
 
 The code will automatically use `http://localhost:3000` as the default.
 
@@ -67,25 +67,25 @@ The code will automatically use `http://localhost:3000` as the default.
 ## 🔧 Complete Fix Steps
 
 1. **Kill all Next.js processes:**
-   ```bash
+   \`\`\`bash
    pkill -9 node
-   ```
+   \`\`\`
 
 2. **Fix your .env.local file:**
-   ```env
+   \`\`\`env
    # Correct format with http:// protocol
    NEXT_PUBLIC_SITE_URL=http://localhost:3000
-   ```
+   \`\`\`
 
 3. **Clean the Next.js cache:**
-   ```bash
+   \`\`\`bash
    rm -rf .next
-   ```
+   \`\`\`
 
 4. **Start fresh:**
-   ```bash
+   \`\`\`bash
    npm run dev
-   ```
+   \`\`\`
 
 ---
 
@@ -93,7 +93,7 @@ The code will automatically use `http://localhost:3000` as the default.
 
 Create or update your `.env.local` file to look like this:
 
-```env
+\`\`\`env
 # Site URL - MUST include http:// or https://
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
@@ -101,7 +101,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_GOOGLE_SHEETS_VANGUARD_URL=https://script.google.com/macros/s/YOUR_ID/exec
 NEXT_PUBLIC_GOOGLE_SHEETS_DEMO_URL=https://script.google.com/macros/s/YOUR_ID/exec
 NEXT_PUBLIC_GOOGLE_SHEETS_NEWSLETTER_URL=https://script.google.com/macros/s/YOUR_ID/exec
-```
+\`\`\`
 
 ---
 
@@ -109,22 +109,22 @@ NEXT_PUBLIC_GOOGLE_SHEETS_NEWSLETTER_URL=https://script.google.com/macros/s/YOUR
 
 Next.js uses `new URL()` to construct the metadata base URL:
 
-```typescript
+\`\`\`typescript
 // In app/layout.tsx
 metadataBase: new URL(siteUrl)
-```
+\`\`\`
 
 The `URL()` constructor requires a **valid protocol** (http:// or https://).
 
 **Invalid:**
-```typescript
+\`\`\`typescript
 new URL("localhost:3000")  // ❌ Error: Invalid URL
-```
+\`\`\`
 
 **Valid:**
-```typescript
+\`\`\`typescript
 new URL("http://localhost:3000")  // ✅ Works!
-```
+\`\`\`
 
 ---
 
@@ -132,10 +132,10 @@ new URL("http://localhost:3000")  // ✅ Works!
 
 After fixing, you should see:
 
-```bash
+\`\`\`bash
 ✓ Ready in ~700ms
 GET / 200 in ~1500ms
-```
+\`\`\`
 
 **No more "Invalid URL" errors!** ✅
 
@@ -144,12 +144,12 @@ GET / 200 in ~1500ms
 ## 🚨 Port 3000 Already in Use?
 
 If you see:
-```
+\`\`\`
 Port 3000 is in use by process XXXXX
-```
+\`\`\`
 
 **Kill it:**
-```bash
+\`\`\`bash
 # Find what's using port 3000
 lsof -ti:3000
 
@@ -158,12 +158,12 @@ kill -9 $(lsof -ti:3000)
 
 # Or kill all node processes
 pkill -9 node
-```
+\`\`\`
 
 Then restart:
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 ---
 
@@ -176,4 +176,3 @@ npm run dev
 
 **Last Updated**: October 31, 2025  
 **Fix Time**: < 2 minutes ⚡
-

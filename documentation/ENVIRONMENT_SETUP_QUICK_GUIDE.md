@@ -44,10 +44,10 @@ For the production domain `waik.care`, go to Vercel:
 
 If you want to override the localhost URL:
 
-```bash
+\`\`\`bash
 # In project root
 echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" > .env.local
-```
+\`\`\`
 
 ---
 
@@ -55,9 +55,9 @@ echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" > .env.local
 
 Run locally to test:
 
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 The site will automatically use:
 - `http://localhost:3000` for metadata
@@ -91,4 +91,3 @@ The site will automatically use:
 ## **Need Help?**
 
 See the full documentation in `ENVIRONMENT_VARIABLES.md`
-

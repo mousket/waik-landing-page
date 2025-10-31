@@ -47,7 +47,7 @@ After detailed analysis of `app/staff/report/page.tsx`, we identified multiple t
 **Changes**:
 
 1. **Added Delays for State Transitions**
-   ```typescript
+   \`\`\`typescript
    // After speaking question, wait 300ms before listening
    utterance.onend = () => {
      setIsSpeaking(false)
@@ -63,10 +63,10 @@ After detailed analysis of `app/staff/report/page.tsx`, we identified multiple t
        callback()
      }, 200)
    }
-   ```
+   \`\`\`
 
 2. **Improved Speech Recognition Start Logic**
-   ```typescript
+   \`\`\`typescript
    const startListening = () => {
      // Better checks before starting
      if (!recognitionRef.current || isPaused) return
@@ -82,10 +82,10 @@ After detailed analysis of `app/staff/report/page.tsx`, we identified multiple t
        }
      }
    }
-   ```
+   \`\`\`
 
 3. **Explicit Recognition Stop Before Speaking**
-   ```typescript
+   \`\`\`typescript
    utterance.onstart = () => {
      setIsSpeaking(true)
      // Stop listening while we're speaking
@@ -97,7 +97,7 @@ After detailed analysis of `app/staff/report/page.tsx`, we identified multiple t
        }
      }
    }
-   ```
+   \`\`\`
 
 4. **Comprehensive Logging**
    - Added `[v0]` prefixed console logs throughout
@@ -136,9 +136,9 @@ After detailed analysis of `app/staff/report/page.tsx`, we identified multiple t
 #### **User Concern**
 
 User saw API calls like:
-```
+\`\`\`
 GET /api/staff/incidents?staffId=user-1 200 in 5ms
-```
+\`\`\`
 
 And was concerned whether data was actually being returned from the database.
 

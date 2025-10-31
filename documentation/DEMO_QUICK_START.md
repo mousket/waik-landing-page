@@ -2,9 +2,9 @@
 
 ## **Access the Demo**
 
-```
+\`\`\`
 http://localhost:3000/waik-demo-start/login
-```
+\`\`\`
 
 ---
 
@@ -112,9 +112,8 @@ See full documentation in:
 ---
 
 **Ready to test?** Start your dev server:
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 Then go to: http://localhost:3000/waik-demo-start/login
-

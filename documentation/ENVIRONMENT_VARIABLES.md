@@ -16,16 +16,16 @@ The site uses `NEXT_PUBLIC_SITE_URL` for metadata (OpenGraph, Twitter cards, etc
 
 Create a `.env.local` file in the project root (this file is gitignored):
 
-```bash
+\`\`\`bash
 # .env.local
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
+\`\`\`
 
 **Steps:**
-```bash
+\`\`\`bash
 # In project root
 echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" > .env.local
-```
+\`\`\`
 
 ---
 
@@ -35,7 +35,7 @@ echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" > .env.local
 
 Update `app/layout.tsx` to use Vercel's automatic environment variable:
 
-```typescript
+\`\`\`typescript
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL 
   || (process.env.VERCEL_URL 
     ? `https://${process.env.VERCEL_URL}` 
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   // ...
 }
-```
+\`\`\`
 
 **How it works:**
 - `VERCEL_URL` is automatically set by Vercel for preview deployments
@@ -78,16 +78,16 @@ Go to Vercel Dashboard → waik-landing-page → Settings → Environment Variab
 ### **Project Files:**
 
 **`.env.local`** (create this, it's gitignored)
-```bash
+\`\`\`bash
 # Local development only
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
+\`\`\`
 
 **`.env.example`** (committed to git - template for team)
-```bash
+\`\`\`bash
 # Copy this to .env.local and fill in the values
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
+\`\`\`
 
 ### **Vercel Dashboard Settings:**
 
@@ -124,7 +124,7 @@ Priority order (highest to lowest):
 
 ## **Quick Setup Commands**
 
-```bash
+\`\`\`bash
 # 1. Create local environment file
 echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" > .env.local
 
@@ -134,7 +134,7 @@ echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" > .env.example
 # 3. Verify it works
 npm run dev
 # Should use localhost:3000
-```
+\`\`\`
 
 ---
 
@@ -148,7 +148,7 @@ npm run dev
 
 ## **Testing**
 
-```bash
+\`\`\`bash
 # Local
 npm run dev
 # Should use: http://localhost:3000
@@ -158,7 +158,7 @@ npm run dev
 
 # Preview (after deploy to non-main branch)
 # Should use: https://waik-git-branch-name.vercel.app
-```
+\`\`\`
 
 ---
 
@@ -175,4 +175,3 @@ Follow this same pattern:
 - Add to Vercel Dashboard for preview/production
 - Prefix with `NEXT_PUBLIC_` if needed in browser code
 - Document in this file!
-

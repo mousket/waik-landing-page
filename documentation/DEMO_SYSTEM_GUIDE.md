@@ -18,9 +18,9 @@ The demo system simulates a full incident reporting and management platform with
 ## 🚪 **Access Points**
 
 ### **Demo Login Page**
-```
+\`\`\`
 http://localhost:3000/waik-demo-start/login
-```
+\`\`\`
 
 ### **Test Credentials**
 
@@ -39,7 +39,7 @@ http://localhost:3000/waik-demo-start/login
 ### **Data Models**
 
 #### **Users**
-```typescript
+\`\`\`typescript
 {
   id: string
   username: string
@@ -49,10 +49,10 @@ http://localhost:3000/waik-demo-start/login
   email: string
   createdAt: string
 }
-```
+\`\`\`
 
 #### **Incidents**
-```typescript
+\`\`\`typescript
 {
   id: string
   title: string
@@ -68,10 +68,10 @@ http://localhost:3000/waik-demo-start/login
   questions: Question[]
   summary?: string | null
 }
-```
+\`\`\`
 
 #### **Questions**
-```typescript
+\`\`\`typescript
 {
   id: string
   incidentId: string
@@ -80,10 +80,10 @@ http://localhost:3000/waik-demo-start/login
   askedAt: string
   answer?: Answer
 }
-```
+\`\`\`
 
 #### **Answers**
-```typescript
+\`\`\`typescript
 {
   id: string
   questionId: string
@@ -92,7 +92,7 @@ http://localhost:3000/waik-demo-start/login
   answeredAt: string
   method: "text" | "voice"
 }
-```
+\`\`\`
 
 ### **Sample Data**
 
@@ -151,46 +151,46 @@ The database comes pre-loaded with **8 sample incidents across 3 staff members**
 All APIs are located in `app/api/`
 
 ### **Authentication**
-```
+\`\`\`
 POST /api/auth/login
 Body: { username: string, password: string }
 Response: { success: boolean, user: User | null, message: string }
-```
+\`\`\`
 
 ### **Incidents**
-```
+\`\`\`
 GET /api/incidents
 Response: Incident[]
-```
+\`\`\`
 
-```
+\`\`\`
 GET /api/incidents/:id
 Response: Incident
-```
+\`\`\`
 
-```
+\`\`\`
 PATCH /api/incidents/:id
 Body: Partial<Incident>
 Response: Incident
-```
+\`\`\`
 
 ### **Staff-Specific**
-```
+\`\`\`
 GET /api/staff/incidents?staffId={userId}
 Response: { incidents: Incident[] }
-```
+\`\`\`
 
 ### **Questions & Answers**
-```
+\`\`\`
 GET /api/incidents/:id/questions
 Response: Question[]
-```
+\`\`\`
 
-```
+\`\`\`
 POST /api/incidents/:id/answers
 Body: { questionId: string, answerText: string, answeredBy: string, method: "text" | "voice" }
 Response: { success: boolean, answer: Answer }
-```
+\`\`\`
 
 ---
 
@@ -254,7 +254,7 @@ The voice reporting system (`app/staff/report/page.tsx`) uses:
 
 ### **Conversation Flow**
 
-```
+\`\`\`
 Question 0: Readiness check
   ↓
 Question 1: Resident info (name, age, gender, room)
@@ -272,7 +272,7 @@ Question 6: Why did this happen? (your assessment)
 Question 7: Prevention recommendations
   ↓
 Completion: Auto-redirect to dashboard
-```
+\`\`\`
 
 ### **Features**
 - ✅ Pause/resume functionality
@@ -304,7 +304,7 @@ Completion: Auto-redirect to dashboard
 
 ### **Available Functions** (`lib/db.ts`)
 
-```typescript
+\`\`\`typescript
 // Get entire database
 getDb(): Database
 
@@ -322,7 +322,7 @@ addIncident(incident): Incident
 // Questions & Answers
 addQuestionToIncident(incidentId, question): boolean
 answerQuestion(incidentId, questionId, answer): boolean
-```
+\`\`\`
 
 ### **Data Persistence**
 
@@ -389,11 +389,11 @@ answerQuestion(incidentId, questionId, answer): boolean
 **Check**:
 1. Open browser console
 2. Look for logs like:
-   ```
+   \`\`\`
    [v0] Handling response for question index: 2
    [v0] Moving to next question: 3 out of 8
    [v0] About to speak question: 3
-   ```
+   \`\`\`
 3. If you see these logs but still stuck, there may be a browser-specific issue
 
 ---
@@ -430,9 +430,9 @@ All dashboards and pages are fully responsive:
 ### **Quick Test Flow**
 
 1. **Start the server**
-   ```bash
+   \`\`\`bash
    npm run dev
-   ```
+   \`\`\`
 
 2. **Test Staff Flow**
    - Go to `http://localhost:3000/waik-demo-start/login`
@@ -538,4 +538,3 @@ All major operations log to console with `[v0]` prefix:
 **Last Updated**: October 31, 2025  
 **Version**: 1.0  
 **Status**: Demo System Fully Functional ✅
-
