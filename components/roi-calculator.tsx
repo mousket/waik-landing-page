@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
 
 export function ROICalculator() {
-  const [nurses, setNurses] = useState<number>(15)
+  const [nurses, setNurses] = useState<number>(10)
   const [turnoverRate, setTurnoverRate] = useState<number>(30)
 
   const replacementCost = 56300
