@@ -1,12 +1,16 @@
 "use client"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { VoiceWaveAnimation } from "./voice-wave-animation"
 import { AnimatedCounter } from "./animated-counter"
 import { ScrollReveal } from "./scroll-reveal"
+import { DemoModal } from "./demo-modal"
 
 export function Hero() {
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
   return (
     <section className="relative overflow-hidden py-24 md:py-40">
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
@@ -28,17 +32,20 @@ export function Hero() {
                 <Button
                   size="lg"
                   className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6 shadow-xl shadow-primary/30 transition-all hover:shadow-2xl hover:shadow-primary/40 hover:scale-105"
+                  onClick={() => setIsDemoModalOpen(true)}
                 >
                   Request a Demo
                   <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="gap-2 text-lg px-8 py-6 border-2 bg-transparent transition-all hover:bg-primary/5 hover:border-primary hover:scale-105"
-                >
-                  Apply for Vanguard Pilot
-                </Button>
+                <Link href="#vanguard">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="gap-2 text-lg px-8 py-6 border-2 bg-transparent transition-all hover:bg-primary/5 hover:border-primary hover:scale-105"
+                  >
+                    Apply for Vanguard Pilot
+                  </Button>
+                </Link>
               </div>
             </div>
           </ScrollReveal>
@@ -75,6 +82,8 @@ export function Hero() {
           </ScrollReveal>
         </div>
       </div>
+
+      <DemoModal isOpen={isDemoModalOpen} onClose={() => setIsDemoModalOpen(false)} />
     </section>
   )
 }
