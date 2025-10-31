@@ -17,16 +17,30 @@ const inter = Inter({
 
 // Automatically detect the correct URL for different environments
 const getSiteUrl = () => {
+  // Helper function to validate URL
+  const isValidUrl = (url: string): boolean => {
+    if (!url || url.trim() === "") return false
+    try {
+      new URL(url)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   // 1. Explicit environment variable (set in Vercel or .env.local)
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
+  if (process.env.NEXT_PUBLIC_SITE_URL && isValidUrl(process.env.NEXT_PUBLIC_SITE_URL)) {
     return process.env.NEXT_PUBLIC_SITE_URL
   }
-  
+
   // 2. Vercel preview/production deployments (automatic)
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
+  if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim() !== "") {
+    const vercelUrl = `https://${process.env.VERCEL_URL}`
+    if (isValidUrl(vercelUrl)) {
+      return vercelUrl
+    }
   }
-  
+
   // 3. Local development fallback
   return "http://localhost:3000"
 }
