@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,6 +26,25 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
     type: "success" | "error" | null
     message: string
   }>({ type: null, message: "" })
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup timeout on unmount or when modal closes
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [])
+
+  // Clear timeout when modal closes
+  useEffect(() => {
+    if (!isOpen && timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +64,7 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
       if (result.success) {
         setSubmitStatus({ type: "success", message: result.message })
         // Reset form after 2 seconds and close modal
-        setTimeout(() => {
+        timeoutRef.current = setTimeout(() => {
           setFormData({
             fullName: "",
             email: "",
@@ -55,6 +74,7 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
           })
           setSubmitStatus({ type: null, message: "" })
           onClose()
+          timeoutRef.current = null
         }, 2000)
       } else {
         setSubmitStatus({ type: "error", message: result.message })
