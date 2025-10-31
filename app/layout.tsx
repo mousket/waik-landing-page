@@ -15,17 +15,35 @@ const inter = Inter({
   display: "swap",
 })
 
+// Automatically detect the correct URL for different environments
+const getSiteUrl = () => {
+  // 1. Explicit environment variable (set in Vercel or .env.local)
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
+  
+  // 2. Vercel preview/production deployments (automatic)
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+  
+  // 3. Local development fallback
+  return "http://localhost:3000"
+}
+
+const siteUrl = getSiteUrl()
+
 export const metadata: Metadata = {
   title: "WAiK - Voice-First AI for Healthcare Documentation",
   description:
     "Stay Audit ready and Turn critical incident documentation and reports into a 5-minute conversation. Give your nurses and staff back hundreds of hours and slash compliance risk.",
   generator: "v0.app",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://waik.care"),
+  metadataBase: new URL(siteUrl),
   openGraph: {
     title: "WAiK - Voice-First AI for Healthcare Documentation",
     description:
       "Stay Audit ready and Turn critical incident documentation and reports into a 5-minute conversation. Give your nurses and staff back hundreds of hours and slash compliance risk.",
-    url: "https://waik.care",
+    url: siteUrl,
     siteName: "WAiK",
     images: [
       {

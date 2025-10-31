@@ -1,5 +1,26 @@
 # 🚀 Quick Start - Get Your Forms Working in 15 Minutes
 
+## 0️⃣ First Time? Install Dependencies First!
+
+If this is your first time running the project:
+
+```bash
+# Navigate to project folder
+cd /Users/gerardbeaubrun/Documents/projects/WAik/waik_landing_page/waik-landing-page
+
+# Install dependencies (use --legacy-peer-deps for React 19 compatibility)
+npm install --legacy-peer-deps
+
+# Start the dev server
+npm run dev
+```
+
+Visit **http://localhost:3000** - you should see the landing page! ✅
+
+**Note:** If you have `pnpm` installed, you can use `pnpm install` and `pnpm dev` instead.
+
+---
+
 ## What You Need to Do Right Now
 
 ### 1️⃣ Create 3 Google Sheets (5 min)
@@ -47,7 +68,8 @@ NEXT_PUBLIC_GOOGLE_SHEETS_NEWSLETTER_URL=https://script.google.com/macros/s/YOUR
 ### 4️⃣ Test It! (3 min)
 
 ```bash
-pnpm dev
+npm run dev
+# or if you have pnpm: pnpm dev
 ```
 
 Then test:

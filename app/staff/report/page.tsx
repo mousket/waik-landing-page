@@ -118,7 +118,10 @@ export default function StaffReportPage() {
   }, [])
 
   const speakQuestion = (questionIndex: number) => {
-    if (!synthRef.current || isPaused) return
+    if (!synthRef.current || isPaused) {
+      console.log("[v0] Cannot speak - synthesis not ready or paused")
+      return
+    }
 
     const question = conversationScript[questionIndex]
     const utterance = new SpeechSynthesisUtterance(question.question)
@@ -126,31 +129,72 @@ export default function StaffReportPage() {
     utterance.onstart = () => {
       console.log("[v0] Started speaking question:", questionIndex)
       setIsSpeaking(true)
+      // Make sure we're not listening while speaking
+      if (recognitionRef.current && isListening) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          // Ignore errors if already stopped
+        }
+      }
     }
 
     utterance.onend = () => {
       console.log("[v0] Finished speaking question:", questionIndex)
       setIsSpeaking(false)
-      // Start listening after speaking
+      // Add a small delay before starting to listen to ensure clean state
       if (!isPaused) {
-        startListening()
+        setTimeout(() => {
+          console.log("[v0] About to start listening after question:", questionIndex)
+          startListening()
+        }, 300)
       }
+    }
+
+    utterance.onerror = (event) => {
+      console.log("[v0] Speech synthesis error:", event)
+      setIsSpeaking(false)
     }
 
     synthRef.current.speak(utterance)
   }
 
   const speakAcknowledgment = (text: string, callback: () => void) => {
-    if (!synthRef.current || isPaused) return
+    if (!synthRef.current || isPaused) {
+      console.log("[v0] Cannot speak acknowledgment - synthesis not ready or paused")
+      return
+    }
 
+    console.log("[v0] Speaking acknowledgment:", text)
     const utterance = new SpeechSynthesisUtterance(text)
 
     utterance.onstart = () => {
+      console.log("[v0] Started speaking acknowledgment")
       setIsSpeaking(true)
+      // Stop listening if we're still listening
+      if (recognitionRef.current && isListening) {
+        try {
+          recognitionRef.current.stop()
+          setIsListening(false)
+        } catch (e) {
+          // Ignore errors
+        }
+      }
     }
 
     utterance.onend = () => {
+      console.log("[v0] Finished speaking acknowledgment, calling callback")
       setIsSpeaking(false)
+      // Small delay before callback to ensure clean state transition
+      setTimeout(() => {
+        callback()
+      }, 200)
+    }
+
+    utterance.onerror = (event) => {
+      console.log("[v0] Acknowledgment speech error:", event)
+      setIsSpeaking(false)
+      // Still call callback even if there's an error
       callback()
     }
 
@@ -158,7 +202,15 @@ export default function StaffReportPage() {
   }
 
   const startListening = () => {
-    if (!recognitionRef.current || isPaused || isListening) return
+    if (!recognitionRef.current || isPaused) {
+      console.log("[v0] Cannot start listening - recognition not ready or paused")
+      return
+    }
+
+    if (isListening) {
+      console.log("[v0] Already listening, skipping start")
+      return
+    }
 
     try {
       console.log("[v0] Starting to listen...")
@@ -166,11 +218,19 @@ export default function StaffReportPage() {
       setIsListening(true)
     } catch (error) {
       console.log("[v0] Error starting recognition:", error)
+      // If we get an error because recognition is already started, just set the state
+      if (error instanceof Error && error.message.includes("already started")) {
+        console.log("[v0] Recognition already started, updating state")
+        setIsListening(true)
+      }
     }
   }
 
   const handleUserResponse = (transcript: string) => {
     const currentQuestion = conversationScript[currentQuestionIndex]
+
+    console.log("[v0] Handling response for question index:", currentQuestionIndex)
+    console.log("[v0] User said:", transcript)
 
     // Handle initial trigger
     if (currentQuestionIndex === 0) {
@@ -183,11 +243,13 @@ export default function StaffReportPage() {
         setAnswers([transcript])
         setCurrentQuestionIndex(nextIndex)
 
+        console.log("[v0] Moving to question:", nextIndex)
         speakAcknowledgment("Great. Let's begin.", () => {
           speakQuestion(nextIndex)
         })
       } else {
         // Repeat the trigger question
+        console.log("[v0] Keyword not detected, repeating trigger question")
         speakQuestion(0)
       }
       return
@@ -196,9 +258,11 @@ export default function StaffReportPage() {
     // Save the answer
     const newAnswers = [...answers, transcript]
     setAnswers(newAnswers)
+    console.log("[v0] Saved answer. Total answers:", newAnswers.length)
 
     // Check if we're done
     if (currentQuestionIndex === conversationScript.length - 1) {
+      console.log("[v0] Final question answered, completing report")
       // Final acknowledgment and completion
       speakAcknowledgment("Got it.", () => {
         const finalUtterance = new SpeechSynthesisUtterance(finalMessage)
@@ -213,11 +277,15 @@ export default function StaffReportPage() {
     } else {
       // Move to next question
       const nextIndex = currentQuestionIndex + 1
+      console.log("[v0] Moving to next question:", nextIndex, "out of", conversationScript.length)
+      
+      // Update state before speaking
       setCurrentQuestionIndex(nextIndex)
 
       const acknowledgmentText = currentQuestion.acknowledgment || "Got it."
 
       speakAcknowledgment(acknowledgmentText, () => {
+        console.log("[v0] About to speak question:", nextIndex)
         speakQuestion(nextIndex)
       })
     }

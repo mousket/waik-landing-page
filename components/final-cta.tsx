@@ -10,6 +10,7 @@ import { submitToGoogleSheets } from "@/lib/google-sheets"
 import { DemoModal } from "@/components/demo-modal"
 
 export function FinalCTA() {
+  const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [honeypot, setHoneypot] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -27,12 +28,14 @@ export function FinalCTA() {
     try {
       const result = await submitToGoogleSheets({
         formType: "newsletter",
+        fullName: fullName,
         email: email,
         honeypot: honeypot,
       })
 
       if (result.success) {
         setSubmitStatus({ type: "success", message: "Thanks for subscribing!" })
+        setFullName("")
         setEmail("")
         setHoneypot("")
       } else {
@@ -93,23 +96,34 @@ export function FinalCTA() {
                     />
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col gap-3">
                     <Input
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type="text"
+                      placeholder="Your full name"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
                       required
-                      className="flex-1"
+                      className="w-full"
                       disabled={isSubmitting}
                     />
-                    <Button 
-                      type="submit" 
-                      className="bg-accent text-accent-foreground hover:bg-accent/90"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? "Subscribing..." : "Subscribe"}
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Input
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="flex-1"
+                        disabled={isSubmitting}
+                      />
+                      <Button 
+                        type="submit" 
+                        className="bg-accent text-accent-foreground hover:bg-accent/90"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Subscribing..." : "Subscribe"}
+                      </Button>
+                    </div>
                   </div>
 
                   {submitStatus.type === "error" && (

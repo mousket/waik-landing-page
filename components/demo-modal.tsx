@@ -16,6 +16,7 @@ interface DemoModalProps {
 export function DemoModal({ isOpen, onClose }: DemoModalProps) {
   const [formData, setFormData] = useState({
     fullName: "",
+    role: "",
     email: "",
     facilityName: "",
     phone: "",
@@ -55,6 +56,7 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
       const result = await submitToGoogleSheets({
         formType: "demo",
         fullName: formData.fullName,
+        role: formData.role,
         email: formData.email,
         facilityName: formData.facilityName,
         phone: formData.phone,
@@ -67,6 +69,7 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
         timeoutRef.current = setTimeout(() => {
           setFormData({
             fullName: "",
+            role: "",
             email: "",
             facilityName: "",
             phone: "",
@@ -141,6 +144,20 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
                 required
                 className="mt-2 h-12 rounded-xl"
                 placeholder="John Doe"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="demo-role" className="text-base font-medium">
+                Role/Title *
+              </Label>
+              <Input
+                id="demo-role"
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                required
+                className="mt-2 h-12 rounded-xl"
+                placeholder="Director of Nursing, Administrator, etc."
               />
             </div>
 

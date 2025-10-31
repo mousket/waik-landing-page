@@ -127,16 +127,14 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({success: true}))
         .setMimeType(ContentService.MimeType.JSON);
     }
-    
-    // Add data to sheet
-    sheet.appendRow([
-      data.timestamp || new Date().toISOString(),
+
+    data.timestamp || new Date().toISOString(),
       data.fullName || '',
-      data.email || '',
+      data.role || '',
       data.facilityName || '',
+      data.email || '',
       data.phone || '',
       data.formType || 'demo'
-    ]);
     
     // Optional: Send email notification to you
     MailApp.sendEmail({
@@ -376,3 +374,23 @@ For questions or issues, check the code comments in:
 
 **Created with ❤️ for WAiK by Gerard**
 
+
+
+
+now I have the form for newsletter expecting the following 
+    sheet.appendRow([
+      data.timestamp || new Date().toISOString(),
+      data.email || '',
+      data.fullName || '',
+      data.formType || 'newsletter'
+    ]);
+
+I also have the form for the Demo Request expect the following now
+      data.fullName || '',
+      data.role || '',
+      data.facilityName || '',
+      data.email || '',
+      data.phone || '',
+      data.formType || 'demo'
+
+Could you check to see if this project is equipped to incorporate those changes, make not make the necessary changes on the front end(ui) and back endso that i can start testing the forms
