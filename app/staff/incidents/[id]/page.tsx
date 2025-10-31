@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,7 +14,8 @@ import { toast } from "sonner"
 import type { Incident } from "@/lib/types"
 import { format } from "date-fns"
 
-export default function StaffIncidentDetailsPage({ params }: { params: { id: string } }) {
+export default function StaffIncidentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params)
   const router = useRouter()
   const { userId } = useAuthStore()
   const [incident, setIncident] = useState<Incident | null>(null)
@@ -24,11 +25,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   useEffect(() => {
     fetchIncident()
-  }, [params.id])
+  }, [resolvedParams.id])
 
   const fetchIncident = async () => {
     try {
-      const response = await fetch(`/api/incidents/${params.id}`)
+      const response = await fetch(`/api/incidents/${resolvedParams.id}`)
       if (!response.ok) throw new Error("Failed to fetch incident")
       const data = await response.json()
       setIncident(data)
@@ -58,7 +59,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       const savePromises = Object.entries(answers)
         .filter(([_, answerText]) => answerText.trim() !== "")
         .map(([questionId, answerText]) =>
-          fetch(`/api/incidents/${params.id}/answers`, {
+          fetch(`/api/incidents/${resolvedParams.id}/answers`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
