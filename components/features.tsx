@@ -1,7 +1,7 @@
 "use client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, Pill, Utensils, ClipboardEdit, FileText } from "lucide-react"
+import { AlertCircle, HeartPulse, Pill, ShieldAlert, ShieldHalf, Gavel, FileText } from "lucide-react"
 import { ScrollReveal } from "./scroll-reveal"
 
 export function Features() {
@@ -11,19 +11,19 @@ export function Features() {
         <ScrollReveal>
           <div className="mx-auto mb-20 max-w-4xl text-center">
             <h2 className="mb-6 text-balance text-5xl font-bold tracking-tight md:text-6xl leading-tight">
-              From Falls to Food Logs, <span className="text-primary">All by Voice.</span>
+              Your Complete <span className="text-primary">Risk & Compliance Engine.</span>
             </h2>
             <p className="text-pretty text-xl text-foreground/70 leading-relaxed">
-              We're starting with the most critical incident reports, with more on the way. WAiK is built to save your
-              team time and reduce costs across all your compliance documentation.
+              From falls and injuries to the most sensitive allegations, WAiK provides a voice-driven, guided workflow to
+              ensure every administrative investigation is fast, thorough, and audit-ready.
             </p>
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={200}>
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-6xl">
             <Tabs defaultValue="falls" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-5 h-auto bg-muted/50 p-2 rounded-2xl">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 h-auto bg-muted/50 p-2 rounded-2xl">
                 <TabsTrigger
                   value="falls"
                   className="flex flex-col gap-2 py-4 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all hover:scale-105 duration-300"
@@ -32,25 +32,39 @@ export function Features() {
                   <span className="text-sm font-medium">Fall Investigations</span>
                 </TabsTrigger>
                 <TabsTrigger
-                  value="medication"
+                  value="injury"
                   className="flex flex-col gap-2 py-4 rounded-xl data-[state=active]:bg-accent data-[state=active]:text-white data-[state=active]:shadow-lg transition-all hover:scale-105 duration-300"
+                >
+                  <HeartPulse className="h-6 w-6 transition-transform group-hover:rotate-12" />
+                  <span className="text-sm font-medium">Injury Reports</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="medication"
+                  className="flex flex-col gap-2 py-4 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all hover:scale-105 duration-300"
                 >
                   <Pill className="h-6 w-6 transition-transform group-hover:rotate-12" />
                   <span className="text-sm font-medium">Medication Errors</span>
                 </TabsTrigger>
                 <TabsTrigger
-                  value="food"
-                  className="flex flex-col gap-2 py-4 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all hover:scale-105 duration-300"
-                >
-                  <Utensils className="h-6 w-6 transition-transform group-hover:rotate-12" />
-                  <span className="text-sm font-medium">Food & Fluid Logs</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="incident"
+                  value="resident-conflict"
                   className="flex flex-col gap-2 py-4 rounded-xl data-[state=active]:bg-accent data-[state=active]:text-white data-[state=active]:shadow-lg transition-all hover:scale-105 duration-300"
                 >
-                  <ClipboardEdit className="h-6 w-6 transition-transform group-hover:rotate-12" />
-                  <span className="text-sm font-medium">Incident Reports</span>
+                  <ShieldAlert className="h-6 w-6 transition-transform group-hover:rotate-12" />
+                  <span className="text-sm font-medium">Resident Conflicts</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="staff-incident"
+                  className="flex flex-col gap-2 py-4 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all hover:scale-105 duration-300"
+                >
+                  <ShieldHalf className="h-6 w-6 transition-transform group-hover:rotate-12" />
+                  <span className="text-sm font-medium">Staff Incidents</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="abuse-allegations"
+                  className="flex flex-col gap-2 py-4 rounded-xl data-[state=active]:bg-accent data-[state=active]:text-white data-[state=active]:shadow-lg transition-all hover:scale-105 duration-300"
+                >
+                  <Gavel className="h-6 w-6 transition-transform group-hover:rotate-12" />
+                  <span className="text-sm font-medium">Abuse Allegations</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="custom"
@@ -76,8 +90,8 @@ export function Features() {
                           <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Environmental Assessment</p>
-                          <p className="text-sm text-muted-foreground">Capture scene details instantly</p>
+                          <p className="font-medium">Context-Aware Questions</p>
+                          <p className="text-sm text-muted-foreground">AI asks specific questions for falls from a bed vs. a wheelchair.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -85,8 +99,8 @@ export function Features() {
                           <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Vital Signs Tracking</p>
-                          <p className="text-sm text-muted-foreground">Record measurements by voice</p>
+                          <p className="font-medium">Point-of-Care Capture</p>
+                          <p className="text-sm text-muted-foreground">Eliminate memory recall errors by documenting at the scene.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -94,8 +108,8 @@ export function Features() {
                           <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Automatic Follow-ups</p>
-                          <p className="text-sm text-muted-foreground">72-hour check-ins managed</p>
+                          <p className="font-medium">Automated Follow-ups</p>
+                          <p className="text-sm text-muted-foreground">Manages the entire 72-hour post-fall monitoring process.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -103,8 +117,8 @@ export function Features() {
                           <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">CMS Compliant</p>
-                          <p className="text-sm text-muted-foreground">All required fields captured</p>
+                          <p className="font-medium">Audit-Ready Reports</p>
+                          <p className="text-sm text-muted-foreground">Generate complete, CMS-compliant reports instantly.</p>
                         </div>
                       </div>
                     </div>
@@ -112,53 +126,101 @@ export function Features() {
                 </Card>
               </TabsContent>
 
-              <TabsContent
-                value="medication"
-                className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500"
-              >
+              <TabsContent value="injury" className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
                 <Card className="border-0 shadow-xl rounded-3xl transition-all hover:shadow-2xl duration-300">
                   <CardContent className="p-10">
-                    <h3 className="text-3xl font-bold mb-6">Medication Error Reports</h3>
+                    <h3 className="text-3xl font-bold mb-6">Injury & Wound Reports</h3>
                     <p className="text-foreground/70 leading-relaxed text-lg mb-8">
-                      Guide staff through the critical steps of a medication error report. Ensure physician notification
-                      is documented, the discrepancy is captured accurately, and your facility remains compliant with
-                      CMS error rate standards.
+                      Go beyond a simple incident report. Document the initial injury, track wound or bruise progression
+                      over time with guided voice notes, and create a complete, defensible timeline of care for every
+                      shift.
                     </p>
                     <div className="mt-6 grid gap-4 sm:grid-cols-2">
                       <div className="flex items-start gap-3">
                         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
                           <span className="text-xs font-bold text-accent">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Longitudinal Tracking</p>
+                          <p className="text-sm text-muted-foreground">Document wound state and measurements over time.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
+                          <span className="text-xs font-bold text-accent">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Guided Assessment</p>
+                          <p className="text-sm text-muted-foreground">AI prompts for tissue type, drainage, and other key details.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
+                          <span className="text-xs font-bold text-accent">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Defensible Timeline</p>
+                          <p className="text-sm text-muted-foreground">Create a clear, time-stamped record of care progression.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
+                          <span className="text-xs font-bold text-accent">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Photo Integration</p>
+                          <p className="text-sm text-muted-foreground">Securely attach images to your voice-captured notes.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="medication" className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
+                <Card className="border-0 shadow-xl rounded-3xl transition-all hover:shadow-2xl duration-300">
+                  <CardContent className="p-10">
+                    <h3 className="text-3xl font-bold mb-6">Medication Errors</h3>
+                    <p className="text-foreground/70 leading-relaxed text-lg mb-8">
+                      Ensure every medication error is documented with precision and speed. WAiK guides staff through the
+                      critical steps, ensuring physician notification is logged and a thorough report is ready for root
+                      cause analysis.
+                    </p>
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Guided Workflow</p>
+                          <p className="text-sm text-muted-foreground">Ensures all required steps are followed and documented.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Physician Notification Log</p>
+                          <p className="text-sm text-muted-foreground">Creates an auditable record of all communications.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
                           <p className="font-medium">Error Classification</p>
-                          <p className="text-sm text-muted-foreground">Automatic categorization</p>
+                          <p className="text-sm text-muted-foreground">AI helps categorize the error for better analysis.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
-                          <span className="text-xs font-bold text-accent">✓</span>
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Physician Notification</p>
-                          <p className="text-sm text-muted-foreground">Track all communications</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
-                          <span className="text-xs font-bold text-accent">✓</span>
-                        </div>
-                        <div>
-                          <p className="font-medium">Root Cause Analysis</p>
-                          <p className="text-sm text-muted-foreground">Guided investigation process</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
-                          <span className="text-xs font-bold text-accent">✓</span>
-                        </div>
-                        <div>
-                          <p className="font-medium">Corrective Actions</p>
-                          <p className="text-sm text-muted-foreground">Document prevention steps</p>
+                          <p className="font-medium">Root Cause Analysis Prep</p>
+                          <p className="text-sm text-muted-foreground">Captures the data needed for quality improvement.</p>
                         </div>
                       </div>
                     </div>
@@ -166,50 +228,50 @@ export function Features() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="food" className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
+              <TabsContent value="resident-conflict" className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
                 <Card className="border-0 shadow-xl rounded-3xl transition-all hover:shadow-2xl duration-300">
                   <CardContent className="p-10">
-                    <h3 className="text-3xl font-bold mb-6">Food & Fluid Intake Logs</h3>
+                    <h3 className="text-3xl font-bold mb-6">Resident-to-Resident Incidents</h3>
                     <p className="text-foreground/70 leading-relaxed text-lg mb-8">
-                      Replace tedious paper logs. Allow staff to quickly record a resident's consumption by voice ("Jane
-                      Doe ate 75% of her meal and drank a full glass of water"). Get instant, accurate data for
-                      nutritional monitoring.
+                      Capture neutral, fact-based accounts of resident altercations or negative behaviors. Our guided
+                      process ensures all perspectives are documented fairly, providing a clear record for intervention
+                      and care planning.
                     </p>
                     <div className="mt-6 grid gap-4 sm:grid-cols-2">
                       <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-                          <span className="text-xs font-bold text-primary">✓</span>
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
+                          <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Voice Entry</p>
-                          <p className="text-sm text-muted-foreground">Natural language logging</p>
+                          <p className="font-medium">Objective Reporting</p>
+                          <p className="text-sm text-muted-foreground">AI prompts focus on facts, not blame.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-                          <span className="text-xs font-bold text-primary">✓</span>
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
+                          <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Percentage Tracking</p>
-                          <p className="text-sm text-muted-foreground">Accurate consumption data</p>
+                          <p className="font-medium">Multi-Perspective Capture</p>
+                          <p className="text-sm text-muted-foreground">Easily add statements from all involved parties.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-                          <span className="text-xs font-bold text-primary">✓</span>
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
+                          <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Trend Analysis</p>
-                          <p className="text-sm text-muted-foreground">Identify nutritional concerns</p>
+                          <p className="font-medium">Behavioral Analysis</p>
+                          <p className="text-sm text-muted-foreground">Track trends to inform care plan adjustments.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-                          <span className="text-xs font-bold text-primary">✓</span>
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 mt-0.5">
+                          <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Real-time Alerts</p>
-                          <p className="text-sm text-muted-foreground">Flag low intake immediately</p>
+                          <p className="font-medium">Intervention Documentation</p>
+                          <p className="text-sm text-muted-foreground">Log the actions taken to de-escalate and resolve.</p>
                         </div>
                       </div>
                     </div>
@@ -217,17 +279,65 @@ export function Features() {
                 </Card>
               </TabsContent>
 
-              <TabsContent
-                value="incident"
-                className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500"
-              >
+              <TabsContent value="staff-incident" className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
                 <Card className="border-0 shadow-xl rounded-3xl transition-all hover:shadow-2xl duration-300">
                   <CardContent className="p-10">
-                    <h3 className="text-3xl font-bold mb-6">General Incident Reports</h3>
+                    <h3 className="text-3xl font-bold mb-6">Resident-to-Staff Incidents</h3>
                     <p className="text-foreground/70 leading-relaxed text-lg mb-8">
-                      For everything else that needs to be documented. WAiK's flexible incident reporting allows staff to
-                      quickly capture any event that doesn't fit a standard category, ensuring a complete and compliant
-                      record of all occurrences.
+                      Protect your staff and your facility. Provide a safe, structured, and immediate way for caregivers
+                      to document negative interactions, creating the necessary HR records for follow-up and ensuring
+                      your team feels heard and supported.
+                    </p>
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Staff Protection</p>
+                          <p className="text-sm text-muted-foreground">Empower staff to report incidents safely and easily.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">HR Compliance</p>
+                          <p className="text-sm text-muted-foreground">Create time-stamped records for HR investigations.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Confidential Reporting</p>
+                          <p className="text-sm text-muted-foreground">Ensure privacy and security for sensitive reports.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+                          <span className="text-xs font-bold text-primary">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Support Staff Well-being</p>
+                          <p className="text-sm text-muted-foreground">Show your team you take their safety seriously.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="abuse-allegations" className="mt-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
+                <Card className="border-0 shadow-xl rounded-3xl transition-all hover:shadow-2xl duration-300">
+                  <CardContent className="p-10">
+                    <h3 className="text-3xl font-bold mb-6">Allegations of Abuse & Neglect</h3>
+                    <p className="text-foreground/70 leading-relaxed text-lg mb-8">
+                      When the worst is alleged, a perfect record is your best defense. WAiK's agentic workflow guides
+                      staff through the sensitive, step-by-step process of documenting allegations, ensuring every detail
+                      is captured for internal and external investigations.
                     </p>
                     <div className="mt-6 grid gap-4 sm:grid-cols-2">
                       <div className="flex items-start gap-3">
@@ -235,8 +345,8 @@ export function Features() {
                           <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Flexible & Adaptable</p>
-                          <p className="text-sm text-muted-foreground">Report any type of event or observation</p>
+                          <p className="font-medium">High-Stakes Documentation</p>
+                          <p className="text-sm text-muted-foreground">A guided process for your most critical reports.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -244,8 +354,8 @@ export function Features() {
                           <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Quick Capture</p>
-                          <p className="text-sm text-muted-foreground">Start a report in seconds by voice</p>
+                          <p className="font-medium">Regulatory Adherence</p>
+                          <p className="text-sm text-muted-foreground">Ensure your process meets state reporting requirements.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -253,8 +363,8 @@ export function Features() {
                           <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Comprehensive Record</p>
-                          <p className="text-sm text-muted-foreground">Ensure no event goes undocumented</p>
+                          <p className="font-medium">Secure & Confidential</p>
+                          <p className="text-sm text-muted-foreground">Protect sensitive information with role-based access.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -262,8 +372,8 @@ export function Features() {
                           <span className="text-xs font-bold text-accent">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Trend Analysis</p>
-                          <p className="text-sm text-muted-foreground">Identify patterns in miscellaneous incidents</p>
+                          <p className="font-medium">Mitigate Liability</p>
+                          <p className="text-sm text-muted-foreground">Create an unimpeachable record of the investigation.</p>
                         </div>
                       </div>
                     </div>
@@ -292,7 +402,7 @@ export function Features() {
                         </div>
                         <div>
                           <p className="font-medium">PDF Upload</p>
-                          <p className="text-sm text-muted-foreground">Use your existing forms</p>
+                          <p className="text-sm text-muted-foreground">Use your facility's existing, trusted forms.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -301,7 +411,7 @@ export function Features() {
                         </div>
                         <div>
                           <p className="font-medium">AI Workflow Generation</p>
-                          <p className="text-sm text-muted-foreground">Instant voice interface</p>
+                          <p className="text-sm text-muted-foreground">Instantly create a new voice-driven workflow.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -309,8 +419,8 @@ export function Features() {
                           <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Form Gallery</p>
-                          <p className="text-sm text-muted-foreground">Access to forms you can reuse</p>
+                          <p className="font-medium">Unlimited Customization</p>
+                          <p className="text-sm text-muted-foreground">Adapt WAiK to any unique process in your facility.</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -318,8 +428,8 @@ export function Features() {
                           <span className="text-xs font-bold text-primary">✓</span>
                         </div>
                         <div>
-                          <p className="font-medium">Custom Logic</p>
-                          <p className="text-sm text-muted-foreground">Adapt to your processes</p>
+                          <p className="font-medium">Maintain Consistency</p>
+                          <p className="text-sm text-muted-foreground">Ensure your specific protocols are always followed.</p>
                         </div>
                       </div>
                     </div>

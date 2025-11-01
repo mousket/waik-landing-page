@@ -152,14 +152,14 @@
       "id": "inc-4",
       "title": "Wandering Resident - Exit Attempt",
       "description": "Resident with dementia attempted to leave through emergency exit",
-      "status": "in-progress",
-      "priority": "high",
+      "status": "pending-review",
+      "priority": "medium",
       "staffId": "user-3",
       "staffName": "James Martinez",
       "residentName": "Harold Bennett",
       "residentRoom": "156",
       "createdAt": "2024-01-22T14:15:00Z",
-      "updatedAt": "2024-01-22T16:30:00Z",
+      "updatedAt": "2025-11-01T15:20:08.403Z",
       "questions": [
         {
           "id": "q-4",
