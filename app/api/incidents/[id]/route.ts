@@ -22,7 +22,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params
     const body = await request.json()
 
-    const updatedIncident = updateIncident(id, body)
+    const updatedIncident = await updateIncident(id, body)
 
     if (!updatedIncident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })

@@ -13,34 +13,34 @@
 
 ### 1. Install Dependencies
 
-```bash
+\`\`\`bash
 # Navigate to the project
 cd /Users/gerardbeaubrun/Documents/projects/WAik/waik_landing_page/waik-landing-page
 
 # Install dependencies
 npm install --legacy-peer-deps
-```
+\`\`\`
 
 **Why `--legacy-peer-deps`?**  
 Some dependencies (like `vaul`) haven't been updated for React 19 yet. This flag allows npm to install them anyway.
 
 **Using pnpm instead:**
-```bash
+\`\`\`bash
 pnpm install
-```
+\`\`\`
 
 ---
 
 ### 2. Start the Development Server
 
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 **Or with pnpm:**
-```bash
+\`\`\`bash
 pnpm dev
-```
+\`\`\`
 
 The server will start at **http://localhost:3000** 🎉
 
@@ -59,7 +59,7 @@ The server will start at **http://localhost:3000** 🎉
 
 ## Project Structure
 
-```
+\`\`\`
 waik-landing-page/
 ├── app/                    # Next.js app directory
 │   ├── layout.tsx         # Root layout (metadata, fonts)
@@ -78,7 +78,7 @@ waik-landing-page/
 │   ├── GOOGLE_SHEETS_SETUP.md  # Forms setup
 │   └── ENVIRONMENT_VARIABLES.md # Env var guide
 └── public/                # Static assets (images, logos)
-```
+\`\`\`
 
 ---
 
@@ -111,23 +111,23 @@ To enable the contact forms (Demo requests, Vanguard applications, Newsletter):
 ### "next: command not found"
 
 **Solution:** Install dependencies first:
-```bash
+\`\`\`bash
 npm install --legacy-peer-deps
-```
+\`\`\`
 
 ### Dependency conflicts / peer dependency errors
 
 **Solution:** Use the `--legacy-peer-deps` flag:
-```bash
+\`\`\`bash
 npm install --legacy-peer-deps
-```
+\`\`\`
 
 ### Port 3000 already in use
 
 **Solution:** Stop other processes using port 3000, or change the port:
-```bash
+\`\`\`bash
 PORT=3001 npm run dev
-```
+\`\`\`
 
 ### Changes not showing up
 
@@ -190,4 +190,3 @@ Vercel will automatically:
 - Ask in project chat/Slack
 
 **Happy coding! 🎉**
-

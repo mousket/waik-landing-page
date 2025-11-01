@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       askedAt: new Date().toISOString(),
     }
 
-    const success = addQuestionToIncident(id, question)
+    const success = await addQuestionToIncident(id, question)
 
     if (!success) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
