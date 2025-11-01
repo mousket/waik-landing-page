@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       method,
     }
 
-    const success = answerQuestion(id, questionId, answer)
+    const success = await answerQuestion(id, questionId, answer)
 
     if (!success) {
       return NextResponse.json({ error: "Incident or question not found" }, { status: 404 })

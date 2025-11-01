@@ -28,6 +28,29 @@ export interface Question {
   answer?: Answer
 }
 
+export interface HumanReport {
+  summary: string
+  insights: string
+  recommendations: string
+  actions: string
+  createdBy: string
+  createdAt: string
+  lastEditedBy?: string
+  lastEditedAt?: string
+}
+
+export interface AIReport {
+  summary: string
+  insights: string
+  recommendations: string
+  actions: string
+  generatedAt: string
+  model: string
+  confidence: number
+  promptTokens?: number
+  completionTokens?: number
+}
+
 export interface Incident {
   id: string
   title: string
@@ -42,6 +65,8 @@ export interface Incident {
   updatedAt: string
   questions: Question[]
   summary?: string | null
+  humanReport?: HumanReport
+  aiReport?: AIReport
 }
 
 export interface Database {
