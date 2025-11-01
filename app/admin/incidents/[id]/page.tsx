@@ -10,9 +10,22 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { Incident } from "@/lib/types"
+import { Checkbox } from "@/components/ui/checkbox"
+import type { Incident, User } from "@/lib/types"
 import { format, isValid, parseISO } from "date-fns"
-import { ArrowLeft, Send, Sparkles, Brain, Lightbulb, Target, MessageSquare, FileText, Mic } from "lucide-react"
+import {
+  ArrowLeft,
+  Send,
+  Sparkles,
+  Brain,
+  Lightbulb,
+  Target,
+  MessageSquare,
+  FileText,
+  Mic,
+  Trash2,
+  UserPlus,
+} from "lucide-react"
 import { toast } from "sonner"
 
 function formatDate(dateString: string | undefined, formatString: string): string {
@@ -34,9 +47,12 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
   const [loading, setLoading] = useState(true)
   const [newQuestion, setNewQuestion] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [selectedStaff, setSelectedStaff] = useState<string[]>([])
+  const [staffList, setStaffList] = useState<User[]>([])
 
   useEffect(() => {
     fetchIncident()
+    fetchStaffList()
   }, [params.id])
 
   const fetchIncident = async () => {
@@ -50,6 +66,18 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
       console.error("[v0] Error fetching incident:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchStaffList = async () => {
+    try {
+      const response = await fetch("/api/users?role=staff")
+      if (response.ok) {
+        const users = await response.json()
+        setStaffList(users)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching staff list:", error)
     }
   }
 
@@ -99,12 +127,17 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
       const response = await fetch(`/api/incidents/${params.id}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionText: newQuestion }),
+        body: JSON.stringify({
+          questionText: newQuestion,
+          askedBy: "Admin User",
+          assignedTo: selectedStaff.length > 0 ? selectedStaff : undefined,
+        }),
       })
 
       if (response.ok) {
         toast.success("Question sent to staff")
         setNewQuestion("")
+        setSelectedStaff([])
         fetchIncident()
       }
     } catch (error) {
@@ -112,6 +145,24 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
       toast.error("Failed to send question")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const deleteQuestion = async (questionId: string) => {
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        toast.success("Question deleted")
+        fetchIncident()
+      } else {
+        toast.error("Failed to delete question")
+      }
+    } catch (error) {
+      console.error("[v0] Error deleting question:", error)
+      toast.error("Failed to delete question")
     }
   }
 
@@ -377,9 +428,15 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                           </Badge>
                           <div className="flex-1">
                             <p className="text-sm font-medium">{question.questionText}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-muted-foreground">
+                                Asked by <span className="font-medium">{question.askedBy}</span>
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                              </p>
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-start gap-2 ml-8 mt-2">
@@ -388,7 +445,11 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                             <p className="text-sm">{question.answer?.answerText}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-xs text-muted-foreground">
-                                Answered {formatDate(question.answer!.answeredAt, "MMM d, yyyy 'at' h:mm a")}
+                                Answered by <span className="font-medium">{question.answer?.answeredBy}</span>
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(question.answer!.answeredAt, "MMM d, yyyy 'at' h:mm a")}
                               </p>
                               <Badge variant="secondary" className="text-xs">
                                 {question.answer?.method}
@@ -423,13 +484,43 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                         </Badge>
                         <div className="flex-1">
                           <p className="text-sm font-medium">{question.questionText}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                          </p>
-                          <Badge variant="secondary" className="text-xs mt-2">
-                            Awaiting response
-                          </Badge>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-muted-foreground">
+                              Asked by <span className="font-medium">{question.askedBy}</span>
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                            </p>
+                          </div>
+                          {question.assignedTo && question.assignedTo.length > 0 && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <UserPlus className="h-3 w-3 text-muted-foreground" />
+                              <p className="text-xs text-muted-foreground">
+                                Assigned to:{" "}
+                                {question.assignedTo
+                                  .map((staffId) => {
+                                    const staff = staffList.find((s) => s.id === staffId)
+                                    return staff?.name || staffId
+                                  })
+                                  .join(", ")}
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              Awaiting response
+                            </Badge>
+                          </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteQuestion(question.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))
@@ -437,15 +528,55 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
 
                 <Separator className="my-4" />
 
-                <div className="space-y-2">
-                  <Label htmlFor="new-question">Send Follow-up Question to Staff</Label>
-                  <Textarea
-                    id="new-question"
-                    placeholder="Type your question here..."
-                    value={newQuestion}
-                    onChange={(e) => setNewQuestion(e.target.value)}
-                    rows={3}
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="new-question">Send Follow-up Question to Staff</Label>
+                    <Textarea
+                      id="new-question"
+                      placeholder="Type your question here..."
+                      value={newQuestion}
+                      onChange={(e) => setNewQuestion(e.target.value)}
+                      rows={3}
+                      className="mt-2"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="mb-2 block">Assign to Staff Members (Optional)</Label>
+                    <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto">
+                      {staffList.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No staff members available</p>
+                      ) : (
+                        staffList.map((staff) => (
+                          <div key={staff.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={staff.id}
+                              checked={selectedStaff.includes(staff.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedStaff([...selectedStaff, staff.id])
+                                } else {
+                                  setSelectedStaff(selectedStaff.filter((id) => id !== staff.id))
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={staff.id}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                            >
+                              {staff.name}
+                            </label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {selectedStaff.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {selectedStaff.length} staff member{selectedStaff.length > 1 ? "s" : ""} selected
+                      </p>
+                    )}
+                  </div>
+
                   <Button
                     onClick={sendQuestion}
                     disabled={submitting || !newQuestion.trim()}

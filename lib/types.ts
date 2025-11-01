@@ -25,6 +25,7 @@ export interface Question {
   questionText: string
   askedBy: string
   askedAt: string
+  assignedTo?: string[]
   answer?: Answer
 }
 

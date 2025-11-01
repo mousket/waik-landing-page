@@ -12,6 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       questionText: body.questionText,
       askedBy: body.askedBy || "admin",
       askedAt: new Date().toISOString(),
+      assignedTo: body.assignedTo || undefined,
     }
 
     const success = await addQuestionToIncident(id, question)

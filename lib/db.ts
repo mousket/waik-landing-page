@@ -277,6 +277,27 @@ export async function answerQuestion(
   return true
 }
 
+export async function deleteQuestion(incidentId: string, questionId: string): Promise<boolean> {
+  await initializeDb()
+
+  const incident = getIncidentById(incidentId)
+  if (!incident) return false
+
+  const questionIndex = incident.questions.findIndex((q) => q.id === questionId)
+  if (questionIndex === -1) return false
+
+  // Only allow deleting unanswered questions
+  if (incident.questions[questionIndex].answer) {
+    console.log("[DB] Cannot delete answered question")
+    return false
+  }
+
+  incident.questions.splice(questionIndex, 1)
+  incident.updatedAt = new Date().toISOString()
+
+  return true
+}
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
