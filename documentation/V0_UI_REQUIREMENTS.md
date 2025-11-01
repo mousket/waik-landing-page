@@ -26,13 +26,13 @@ Shows placeholder: "AI Summary Coming Soon"
 **Component Name**: `AIReportDisplay.tsx`
 
 **Props:**
-```typescript
+\`\`\`typescript
 {
   incidentId: string
   existingReport?: AIReport  // If report already exists
   canGenerate: boolean       // Admin can generate, staff view-only
 }
-```
+\`\`\`
 
 **Features:**
 1. **If no report exists:**
@@ -76,14 +76,14 @@ Doesn't exist - need to add new tab
 **Component Name**: `HumanReportForm.tsx`
 
 **Props:**
-```typescript
+\`\`\`typescript
 {
   incidentId: string
   existingReport?: HumanReport
   userId: string
   userRole: "staff" | "admin"
 }
-```
+\`\`\`
 
 **Features:**
 1. **Form with 4 text areas:**
@@ -136,12 +136,12 @@ Shows placeholder: "Intelligence system coming soon"
 **Component Name**: `IntelligenceChat.tsx`
 
 **Props:**
-```typescript
+\`\`\`typescript
 {
   incidentId: string
   incident: Incident  // For context
 }
-```
+\`\`\`
 
 **Features:**
 1. **Chat Interface:**
@@ -271,7 +271,7 @@ Basic hardcoded 8-question script (works but not intelligent)
 
 ### **How V0's Components Will Connect:**
 
-```
+\`\`\`
 User clicks "Generate AI Report"
         ↓
 <AIReportDisplay />
@@ -283,7 +283,7 @@ AI Agent generates report (our code)
 Returns report data
         ↓
 Component displays 4 sections ✅
-```
+\`\`\`
 
 ---
 
@@ -395,4 +395,3 @@ Component displays 4 sections ✅
 5. → We build advanced AI features
 
 **Ready to send to V0?** The backend is solid! 🚀
-

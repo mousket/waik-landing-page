@@ -13,7 +13,7 @@
 
 In your project root, create `.env.local`:
 
-```env
+\`\`\`env
 # Required: Your OpenAI API key
 OPENAI_API_KEY=sk-your-actual-key-here
 
@@ -22,14 +22,14 @@ OPENAI_LLM_MODEL=gpt-4o-mini
 
 # Optional: Embedding model (defaults to text-embedding-3-small)
 OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
-```
+\`\`\`
 
 ### **Step 3: Restart Server**
 
-```bash
+\`\`\`bash
 pkill -9 node
 npm run dev
-```
+\`\`\`
 
 ---
 
@@ -91,11 +91,11 @@ Embed all 8 incidents:
 
 ### **Use These Settings:**
 
-```env
+\`\`\`env
 OPENAI_API_KEY=sk-your-key
 OPENAI_LLM_MODEL=gpt-4o-mini
 OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
-```
+\`\`\`
 
 **Why?**
 - ✅ **80% cheaper** than gpt-4o
@@ -111,9 +111,9 @@ OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
 ### **Want Better Quality?**
 
 Change to `gpt-4o`:
-```env
+\`\`\`env
 OPENAI_LLM_MODEL=gpt-4o
-```
+\`\`\`
 
 **Cost increase:** ~17x more expensive  
 **Quality improvement:** ~15% better  
@@ -122,9 +122,9 @@ OPENAI_LLM_MODEL=gpt-4o
 ### **Want Cheaper?**
 
 Change to `gpt-3.5-turbo`:
-```env
+\`\`\`env
 OPENAI_LLM_MODEL=gpt-3.5-turbo
-```
+\`\`\`
 
 **Cost:** 70% cheaper  
 **Quality:** Noticeably worse for medical reports  
@@ -153,34 +153,34 @@ OPENAI_LLM_MODEL=gpt-3.5-turbo
 
 ### **Current Settings:**
 
-```typescript
+\`\`\`typescript
 export const AI_CONFIG = {
   model: process.env.OPENAI_LLM_MODEL || "gpt-4o-mini",
   embeddingModel: process.env.OPENAI_TEXT_EMBEDDING_MODEL || "text-embedding-3-small",
   temperature: 0.7,        // Creativity (0-1)
   maxTokens: 2000,         // Max response length
 }
-```
+\`\`\`
 
 ### **Adjust for Different Needs:**
 
 **More factual/consistent:**
-```env
+\`\`\`env
 # Lower temperature = more deterministic
 temperature: 0.3
-```
+\`\`\`
 
 **More creative/varied:**
-```env
+\`\`\`env
 # Higher temperature = more creative
 temperature: 0.9
-```
+\`\`\`
 
 **Longer responses:**
-```env
+\`\`\`env
 # Increase max tokens
 maxTokens: 3000
-```
+\`\`\`
 
 ---
 
@@ -205,17 +205,17 @@ maxTokens: 3000
 ## ✅ **Summary of Changes**
 
 **Updated `lib/openai.ts` to use:**
-```typescript
+\`\`\`typescript
 model: process.env.OPENAI_LLM_MODEL || "gpt-4o-mini"
 embeddingModel: process.env.OPENAI_TEXT_EMBEDDING_MODEL || "text-embedding-3-small"
-```
+\`\`\`
 
 **Your `.env.local` should have:**
-```env
+\`\`\`env
 OPENAI_API_KEY=sk-your-key
 OPENAI_LLM_MODEL=gpt-4o-mini
 OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
-```
+\`\`\`
 
 ---
 
@@ -232,4 +232,3 @@ OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
 ---
 
 **Configuration updated! Ready to test with gpt-4o-mini.** 🚀
-

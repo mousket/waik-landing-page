@@ -63,7 +63,7 @@
 
 ## 📊 **Architecture**
 
-```
+\`\`\`
 Frontend (Next.js)
     ↓
 API Routes (app/api/)
@@ -77,30 +77,30 @@ OpenAI (GPT-4 + Embeddings)
 Database (lowdb)
     ├─ data/db.json (main data)
     └─ data/embeddings.json (vector cache)
-```
+\`\`\`
 
 ---
 
 ## 🔑 **Setup Required**
 
 ### **1. Get OpenAI API Key**
-```
+\`\`\`
 1. Go to: https://platform.openai.com/api-keys
 2. Create new secret key
 3. Copy the key (starts with "sk-")
-```
+\`\`\`
 
 ### **2. Add to Environment**
 Create or update `.env.local`:
-```env
+\`\`\`env
 OPENAI_API_KEY=sk-your-actual-key-here
-```
+\`\`\`
 
 ### **3. Restart Server**
-```bash
+\`\`\`bash
 pkill -9 node
 npm run dev
-```
+\`\`\`
 
 ---
 
@@ -134,7 +134,7 @@ npm run dev
 ## 📁 **Files Created/Modified**
 
 ### **New Files:**
-```
+\`\`\`
 lib/
 ├── openai.ts                          ← OpenAI client
 ├── embeddings.ts                       ← Vector cache
@@ -158,10 +158,10 @@ documentation/
 ├── AI_INTEGRATION_GUIDE.md           ← Full technical guide
 ├── DATABASE_REFACTOR_NOV1.md         ← Database migration guide
 └── IMPLEMENTATION_COMPLETE.md        ← This file
-```
+\`\`\`
 
 ### **Modified Files:**
-```
+\`\`\`
 lib/
 ├── types.ts                           ← Added report interfaces
 └── db.ts                              ← Converted to lowdb
@@ -171,7 +171,7 @@ app/api/
 ├── incidents/[id]/route.ts            ← Added await
 ├── incidents/[id]/questions/route.ts  ← Added await
 └── incidents/[id]/answers/route.ts    ← Added await
-```
+\`\`\`
 
 ---
 
@@ -220,19 +220,19 @@ app/api/
 ## 🚀 **How to Use**
 
 ### **Generate AI Report:**
-```bash
+\`\`\`bash
 curl -X POST http://localhost:3000/api/incidents/inc-1/ai-report
-```
+\`\`\`
 
 ### **Ask Intelligence Question:**
-```bash
+\`\`\`bash
 curl -X POST http://localhost:3000/api/incidents/inc-1/intelligence \
   -H "Content-Type: application/json" \
   -d '{"question": "What injuries did the resident sustain?"}'
-```
+\`\`\`
 
 ### **Save Human Report:**
-```bash
+\`\`\`bash
 curl -X PUT http://localhost:3000/api/incidents/inc-1/human-report \
   -H "Content-Type: application/json" \
   -d '{
@@ -242,7 +242,7 @@ curl -X PUT http://localhost:3000/api/incidents/inc-1/human-report \
     "actions": "...",
     "userId": "user-1"
   }'
-```
+\`\`\`
 
 ---
 
@@ -282,4 +282,3 @@ You now have:
 ---
 
 **Ready to add OpenAI key and test?** See `AI_INTEGRATION_GUIDE.md` for details!
-

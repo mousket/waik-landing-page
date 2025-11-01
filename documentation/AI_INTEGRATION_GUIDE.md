@@ -13,7 +13,7 @@ The WAiK system now includes AI-powered intelligence features using OpenAI and L
 
 ## 🏗️ **Architecture**
 
-```
+\`\`\`
 ┌─────────────────┐
 │   User Query    │
 └────────┬────────┘
@@ -38,13 +38,13 @@ The WAiK system now includes AI-powered intelligence features using OpenAI and L
     │ (Reports│
     │  Saved) │
     └─────────┘
-```
+\`\`\`
 
 ---
 
 ## 📁 **File Structure**
 
-```
+\`\`\`
 lib/
 ├── openai.ts                    ← OpenAI client & utilities
 ├── embeddings.ts                ← Vector embeddings cache
@@ -64,7 +64,7 @@ app/api/incidents/[id]/
 data/
 ├── db.json                      ← Main database
 └── embeddings.json              ← Vector cache (generated)
-```
+\`\`\`
 
 ---
 
@@ -83,16 +83,16 @@ data/
   - **Actions**: Specific action items with assignments
 
 **Example:**
-```typescript
+\`\`\`typescript
 // Call from frontend
 const response = await fetch(`/api/incidents/inc-1/ai-report`, {
   method: "POST"
 })
 const { aiReport } = await response.json()
-```
+\`\`\`
 
 **Response:**
-```json
+\`\`\`json
 {
   "success": true,
   "aiReport": {
@@ -105,7 +105,7 @@ const { aiReport } = await response.json()
     "confidence": 0.95
   }
 }
-```
+\`\`\`
 
 ---
 
@@ -122,7 +122,7 @@ const { aiReport } = await response.json()
 - Tracks creation and edit history
 
 **Example:**
-```typescript
+\`\`\`typescript
 // Save human report
 await fetch(`/api/incidents/inc-1/human-report`, {
   method: "PUT",
@@ -135,7 +135,7 @@ await fetch(`/api/incidents/inc-1/human-report`, {
     userId: "user-1"
   })
 })
-```
+\`\`\`
 
 ---
 
@@ -149,7 +149,7 @@ await fetch(`/api/incidents/inc-1/human-report`, {
 - Generates contextual answers
 
 **Example:**
-```typescript
+\`\`\`typescript
 // Ask a question
 const response = await fetch(`/api/incidents/inc-1/intelligence`, {
   method: "POST",
@@ -161,7 +161,7 @@ const response = await fetch(`/api/incidents/inc-1/intelligence`, {
 
 const { answer } = await response.json()
 // answer: "Yes, the resident sustained minor bruising..."
-```
+\`\`\`
 
 ---
 
@@ -171,7 +171,7 @@ const { answer } = await response.json()
 
 Uses **LangChain.js** with OpenAI GPT-4:
 
-```typescript
+\`\`\`typescript
 class IncidentAnalyzerAgent {
   async generateReport(incident) {
     // Parallel generation for speed
@@ -185,7 +185,7 @@ class IncidentAnalyzerAgent {
     return { summary, insights, recommendations, actions, ... }
   }
 }
-```
+\`\`\`
 
 **Prompts are designed for:**
 - Healthcare compliance focus
@@ -199,7 +199,7 @@ class IncidentAnalyzerAgent {
 
 Uses **Retrieval-Augmented Generation**:
 
-```typescript
+\`\`\`typescript
 class IntelligenceQAAgent {
   async answerQuestion(incident, question) {
     // 1. Find relevant Q&A using embeddings
@@ -214,7 +214,7 @@ class IntelligenceQAAgent {
     return answer
   }
 }
-```
+\`\`\`
 
 **Benefits:**
 - Answers based on actual incident data
@@ -229,7 +229,7 @@ class IntelligenceQAAgent {
 ### **How It Works:**
 
 **Ad Hoc Generation:**
-```
+\`\`\`
 User accesses incident
   ↓
 Check embeddings cache (data/embeddings.json)
@@ -237,7 +237,7 @@ Check embeddings cache (data/embeddings.json)
 Cache miss? → Generate embedding → Cache it
   ↓
 Cache hit? → Use cached embedding
-```
+\`\`\`
 
 **What Gets Embedded:**
 - Full incident (title + description + all Q&A)
@@ -245,7 +245,7 @@ Cache hit? → Use cached embedding
 - Updated when incident changes
 
 **Cache Structure:**
-```json
+\`\`\`json
 {
   "inc-1": {
     "incidentEmbedding": [0.123, 0.456, ...],
@@ -256,7 +256,7 @@ Cache hit? → Use cached embedding
     "lastUpdated": "2024-01-20T10:00:00Z"
   }
 }
-```
+\`\`\`
 
 **Cache Invalidation:**
 - Automatic: When `incident.updatedAt` > `cache.lastUpdated`
@@ -269,9 +269,9 @@ Cache hit? → Use cached embedding
 ### **Required Environment Variable:**
 
 Add to `.env.local`:
-```env
+\`\`\`env
 OPENAI_API_KEY=sk-your-api-key-here
-```
+\`\`\`
 
 **Get your API key:**
 1. Go to https://platform.openai.com/api-keys
@@ -281,13 +281,13 @@ OPENAI_API_KEY=sk-your-api-key-here
 ### **Model Configuration:**
 
 Models are configured via environment variables in `.env.local`:
-```env
+\`\`\`env
 # LLM for reports & intelligence (default: gpt-4o-mini)
 OPENAI_LLM_MODEL=gpt-4o-mini
 
 # Embedding model for RAG (default: text-embedding-3-small)
 OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
-```
+\`\`\`
 
 **Why gpt-4o-mini?**
 - ✅ 80% cheaper than gpt-4o ($0.15 vs $2.50 per 1M tokens)
@@ -302,14 +302,14 @@ OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
 - `gpt-3.5-turbo` - Cheapest but lower quality
 
 **Current defaults in `lib/openai.ts`:**
-```typescript
+\`\`\`typescript
 export const AI_CONFIG = {
   model: process.env.OPENAI_LLM_MODEL || "gpt-4o-mini",
   embeddingModel: process.env.OPENAI_TEXT_EMBEDDING_MODEL || "text-embedding-3-small",
   temperature: 0.7,
   maxTokens: 2000,
 }
-```
+\`\`\`
 
 ---
 
@@ -338,34 +338,34 @@ export const AI_CONFIG = {
 
 ### **Test 1: Generate AI Report**
 
-```
+\`\`\`
 1. Login as admin
 2. Go to incident details (inc-6 has sample data)
 3. Click "AI Summary" tab
 4. Click "Generate AI Report" button
 5. Wait ~10-15 seconds
 6. See summary, insights, recommendations, actions ✅
-```
+\`\`\`
 
 ### **Test 2: Create Human Report**
 
-```
+\`\`\`
 1. Login as staff
 2. Go to any incident
 3. Fill in the 4 fields (summary, insights, recommendations, actions)
 4. Click "Save Report"
 5. Refresh page - report is saved ✅
-```
+\`\`\`
 
 ### **Test 3: Ask Intelligence Question**
 
-```
+\`\`\`
 1. Go to any incident with answered questions
 2. Click "Intelligence" tab
 3. Type: "Was the resident injured?"
 4. Click "Ask"
 5. Get AI answer based on incident Q&A ✅
-```
+\`\`\`
 
 ---
 
@@ -475,37 +475,36 @@ export const AI_CONFIG = {
 ## ⚡ **Quick Start**
 
 ### **1. Get OpenAI API Key:**
-```
+\`\`\`
 https://platform.openai.com/api-keys
-```
+\`\`\`
 
 ### **2. Add to .env.local:**
-```env
+\`\`\`env
 # Required
 OPENAI_API_KEY=sk-your-key-here
 
 # Optional (these are the defaults)
 OPENAI_LLM_MODEL=gpt-4o-mini
 OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
-```
+\`\`\`
 
 ### **3. Restart Server:**
-```bash
+\`\`\`bash
 pkill -9 node
 npm run dev
-```
+\`\`\`
 
 ### **4. Test:**
-```
+\`\`\`
 - Login as admin
 - Go to incident inc-6
 - Try generating AI report
 - Try asking intelligence questions
-```
+\`\`\`
 
 ---
 
 **Last Updated**: November 1, 2025  
 **Status**: Ready for testing  
 **Next**: UI integration & user testing
-

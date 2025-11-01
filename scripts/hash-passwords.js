@@ -19,4 +19,3 @@ async function hashPasswords() {
 }
 
 hashPasswords().catch(console.error)
-
