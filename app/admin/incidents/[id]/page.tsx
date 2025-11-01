@@ -11,9 +11,22 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Incident } from "@/lib/types"
-import { format } from "date-fns"
+import { format, isValid, parseISO } from "date-fns"
 import { ArrowLeft, Send, Sparkles, Brain, Lightbulb, Target, MessageSquare, FileText, Mic } from "lucide-react"
 import { toast } from "sonner"
+
+function formatDate(dateString: string | undefined, formatString: string): string {
+  if (!dateString) return "Invalid date"
+
+  try {
+    const date = parseISO(dateString)
+    if (!isValid(date)) return "Invalid date"
+    return format(date, formatString)
+  } catch (error) {
+    console.error("[v0] Date formatting error:", error, "for date:", dateString)
+    return "Invalid date"
+  }
+}
 
 export default function IncidentDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -291,11 +304,11 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Created</p>
-                    <p className="font-medium">{format(new Date(incident.createdAt), "MMM d, yyyy 'at' h:mm a")}</p>
+                    <p className="font-medium">{formatDate(incident.createdAt, "MMM d, yyyy 'at' h:mm a")}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Last Updated</p>
-                    <p className="font-medium">{format(new Date(incident.updatedAt), "MMM d, yyyy 'at' h:mm a")}</p>
+                    <p className="font-medium">{formatDate(incident.updatedAt, "MMM d, yyyy 'at' h:mm a")}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -365,7 +378,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                           <div className="flex-1">
                             <p className="text-sm font-medium">{question.questionText}</p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Asked {format(new Date(question.askedAt), "MMM d, yyyy 'at' h:mm a")}
+                              Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
                             </p>
                           </div>
                         </div>
@@ -375,7 +388,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                             <p className="text-sm">{question.answer?.answerText}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-xs text-muted-foreground">
-                                Answered {format(new Date(question.answer!.answeredAt), "MMM d, yyyy 'at' h:mm a")}
+                                Answered {formatDate(question.answer!.answeredAt, "MMM d, yyyy 'at' h:mm a")}
                               </p>
                               <Badge variant="secondary" className="text-xs">
                                 {question.answer?.method}
@@ -411,7 +424,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                         <div className="flex-1">
                           <p className="text-sm font-medium">{question.questionText}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Asked {format(new Date(question.askedAt), "MMM d, yyyy 'at' h:mm a")}
+                            Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
                           </p>
                           <Badge variant="secondary" className="text-xs mt-2">
                             Awaiting response

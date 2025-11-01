@@ -42,7 +42,7 @@ async function initializeDb() {
           role: "admin",
           name: "Scott Kallstrom",
           email: "scott@waik.com",
-          createdAt: "2024-01-15T10:00:00Z"
+          createdAt: "2024-01-15T10:00:00Z",
         },
         {
           id: "user-6",
@@ -51,11 +51,11 @@ async function initializeDb() {
           role: "admin",
           name: "Gerard Beaubrun",
           email: "gerard@waik.com",
-          createdAt: "2024-01-15T10:00:00Z"
-        }
+          createdAt: "2024-01-15T10:00:00Z",
+        },
       ]
 
-// Pre-populate with sample incidents
+      // Pre-populate with sample incidents
       db.incidents = [
         {
           id: "inc-1",
@@ -113,7 +113,7 @@ async function initializeDb() {
               id: "q-3",
               question: "What was the reason for the staffing shortage?",
               askedBy: "WAiK Agent",
-              askedAt: "2Z25-01-21T10:15:00Z",
+              askedAt: "2025-01-21T10:15:00Z",
               answer: {
                 text: "Two staff members called in sick, and we were unable to find immediate coverage.",
                 answeredBy: "Sarah Johnson",
