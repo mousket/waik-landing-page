@@ -15,7 +15,7 @@ import { format } from "date-fns"
 import { ArrowLeft, Send, Sparkles, Brain, Lightbulb, Target, MessageSquare, FileText, Mic } from "lucide-react"
 import { toast } from "sonner"
 
-export default function IncidentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+export default function StaffIncidentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
   const [incident, setIncident] = useState<Incident | null>(null)

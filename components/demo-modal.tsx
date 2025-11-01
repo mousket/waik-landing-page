@@ -225,4 +225,3 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
     </div>
   )
 }
-
