@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -15,8 +15,7 @@ import { format } from "date-fns"
 import { ArrowLeft, Send, Sparkles, Brain, Lightbulb, Target, MessageSquare, FileText, Mic } from "lucide-react"
 import { toast } from "sonner"
 
-export default function IncidentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params)
+export default function IncidentDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [incident, setIncident] = useState<Incident | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,11 +24,11 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
 
   useEffect(() => {
     fetchIncident()
-  }, [resolvedParams.id])
+  }, [params.id])
 
   const fetchIncident = async () => {
     try {
-      const response = await fetch(`/api/incidents/${resolvedParams.id}`)
+      const response = await fetch(`/api/incidents/${params.id}`)
       if (response.ok) {
         const data = await response.json()
         setIncident(data)
@@ -43,7 +42,7 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
 
   const updateStatus = async (status: string) => {
     try {
-      const response = await fetch(`/api/incidents/${resolvedParams.id}`, {
+      const response = await fetch(`/api/incidents/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -62,7 +61,7 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
 
   const updatePriority = async (priority: string) => {
     try {
-      const response = await fetch(`/api/incidents/${resolvedParams.id}`, {
+      const response = await fetch(`/api/incidents/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ priority }),
@@ -84,7 +83,7 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
 
     setSubmitting(true)
     try {
-      const response = await fetch(`/api/incidents/${resolvedParams.id}/questions`, {
+      const response = await fetch(`/api/incidents/${params.id}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ questionText: newQuestion }),
