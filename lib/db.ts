@@ -55,7 +55,7 @@ async function initializeDb() {
         }
       ]
 
-      // Pre-populate with sample incidents
+// Pre-populate with sample incidents
       db.incidents = [
         {
           id: "inc-1",
@@ -63,6 +63,7 @@ async function initializeDb() {
           description: "Resident experienced a fall while attempting to get out of bed.",
           status: "open",
           priority: "high",
+          sub_type: "fall-bed",
           residentName: "Margaret Thompson",
           residentAge: 78,
           residentGender: "Female",
@@ -98,6 +99,7 @@ async function initializeDb() {
           description: "Morning medication was administered 30 minutes late due to staffing constraints.",
           status: "in-progress",
           priority: "medium",
+          sub_type: "medication-delay",
           residentName: "Robert Williams",
           residentAge: 82,
           residentGender: "Male",
@@ -111,7 +113,7 @@ async function initializeDb() {
               id: "q-3",
               question: "What was the reason for the staffing shortage?",
               askedBy: "WAiK Agent",
-              askedAt: "2025-01-21T10:15:00Z",
+              askedAt: "2Z25-01-21T10:15:00Z",
               answer: {
                 text: "Two staff members called in sick, and we were unable to find immediate coverage.",
                 answeredBy: "Sarah Johnson",
@@ -126,6 +128,7 @@ async function initializeDb() {
           description: "Resident with lactose intolerance was served a meal containing dairy products.",
           status: "resolved",
           priority: "low",
+          sub_type: "dietary-restriction",
           residentName: "Elizabeth Davis",
           residentAge: 75,
           residentGender: "Female",
