@@ -36,23 +36,23 @@ async function initializeDb() {
           createdAt: "2025-01-15T08:00:00Z",
         },
         {
-          id: "user-3",
-          username: "scott",
-          // Pre-hashed: password123
-          password: "$2b$10$tB0sJ7AwM5zL1pP4rN6yZgAwM5zL1pP4rN6yZgAwM5zL1pP4rN6yZg",
-          role: "admin",
-          name: "Scott",
-          createdAt: "2025-01-20T08:00:00Z",
-        },
-        {
-          id: "user-4",
-          username: "gerard",
-          // Pre-hashed: password123
-          password: "$2b$10$uC1tK8BxN6aM2qQ5sO7zAhBxN6aM2qQ5sO7zAhBxN6aM2qQ5sO7zAh",
-          role: "admin",
-          name: "Gerard",
-          createdAt: "2025-01-20T08:00:00Z",
-        },
+      "id": "user-5",
+      "username": "scott.kallstrom",
+      "password": "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
+      "role": "admin",
+      "name": "Scott Kallstrom",
+      "email": "scott@waik.com",
+      "createdAt": "2024-01-15T10:00:00Z"
+    },
+    {
+      "id": "user-6",
+      "username": "gerard.beaubrun",
+      "password": "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
+      "role": "admin",
+      "name": "Gerard Beaubrun",
+      "email": "gerard@waik.com",
+      "createdAt": "2024-01-15T10:00:00Z"
+    }
       ]
 
       // Pre-populate with sample incidents
