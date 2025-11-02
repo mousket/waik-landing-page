@@ -388,7 +388,20 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   const unansweredQuestions = incident?.questions.filter((q) => !q.answer) || []
   const answeredQuestions = incident?.questions.filter((q) => q.answer) || []
-  const aiContent = incident ? getAIContent(incident.id) : null
+
+  const aiContent = incident
+    ? {
+        summary: "AI-generated summary will appear here once the AI Summary feature is implemented.",
+        insights: {
+          whatHappened: "Detailed analysis of what happened will appear here.",
+          residentImpact: "Analysis of impact on the resident will appear here.",
+          prevention: "Prevention recommendations will appear here.",
+          futureActions: "Future action recommendations will appear here.",
+        },
+        recommendations: ["AI recommendations will appear here once implemented."],
+        actions: ["AI action items will appear here once implemented."],
+      }
+    : null
 
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">

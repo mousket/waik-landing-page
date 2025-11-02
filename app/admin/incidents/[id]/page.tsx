@@ -73,31 +73,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
 
-  const getAIContent = (incidentId: string) => {
-    const savedContent = localStorage.getItem(`ai-content-${incidentId}`)
-    if (savedContent) {
-      try {
-        // Assuming the stored data is { messages: IntelligenceMessage[] }
-        const parsedData = JSON.JSON.parse(savedContent)
-        // Ensure the parsed data has the expected structure
-        if (parsedData && Array.isArray(parsedData.messages)) {
-          // Map dates back if necessary, assuming they are stored as strings
-          parsedData.messages = parsedData.messages.map((msg: IntelligenceMessage) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp),
-          }))
-          return parsedData
-        }
-      } catch (error) {
-        console.error("[v0] Error parsing AI content from localStorage:", error)
-        // Fallback to empty if parsing fails or data is malformed
-        return { messages: [] }
-      }
-    }
-    return { messages: [] }
-  }
-
-  const aiContent = getAIContent(params.id)
+  // Intelligence messages now start fresh on every page load
 
   useEffect(() => {
     fetchIncident()
@@ -110,9 +86,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
       if (response.ok) {
         const data = await response.json()
         setIncident(data)
-        // Load intelligence messages from localStorage on fetch
-        const storedMessages = getAIContent(data.id)
-        setIntelligenceMessages(storedMessages.messages)
       }
     } catch (error) {
       console.error("[v0] Error fetching incident:", error)
@@ -222,10 +195,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     }
   }
 
-  const saveAIContent = (incidentId: string, messages: IntelligenceMessage[]) => {
-    localStorage.setItem(`ai-content-${incidentId}`, JSON.stringify({ messages }))
-  }
-
   const handleIntelligenceSubmit = async () => {
     if (!intelligenceInput.trim() || !incident) return
 
@@ -236,11 +205,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
       timestamp: new Date(),
     }
 
-    setIntelligenceMessages((prev) => {
-      const updatedMessages = [...prev, userMessage]
-      saveAIContent(incident.id, updatedMessages) // Save messages to localStorage
-      return updatedMessages
-    })
+    setIntelligenceMessages((prev) => [...prev, userMessage])
     setIntelligenceInput("")
     setIsIntelligenceLoading(true)
 
@@ -264,11 +229,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
         timestamp: new Date(),
       }
 
-      setIntelligenceMessages((prev) => {
-        const updatedMessages = [...prev, aiMessage]
-        saveAIContent(incident.id, updatedMessages) // Save messages to localStorage
-        return updatedMessages
-      })
+      setIntelligenceMessages((prev) => [...prev, aiMessage])
 
       if (autoSpeak) {
         speakText(data.answer)
@@ -283,11 +244,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
         text: "Sorry, I encountered an error. Please try again.",
         timestamp: new Date(),
       }
-      setIntelligenceMessages((prev) => {
-        const updatedMessages = [...prev, errorMessage]
-        saveAIContent(incident.id, updatedMessages)
-        return updatedMessages
-      })
+      setIntelligenceMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsIntelligenceLoading(false)
     }
@@ -397,20 +354,19 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const answeredQuestions = incident.questions.filter((q) => q.answer)
   const unansweredQuestions = incident.questions.filter((q) => !q.answer)
 
-  // Placeholder for getAIContent logic for WAiK Agent tab
-  const getWAikAgentContent = () => {
-    return {
-      summary: "Awaiting LangGraph agent integration...",
-      insights: {
-        whatHappened: "Awaiting LangGraph agent analysis...",
-        residentImpact: "Awaiting LangGraph agent analysis...",
-        prevention: "Awaiting LangGraph agent analysis...",
-        futureActions: "Awaiting LangGraph agent analysis...",
-      },
-      recommendations: ["Awaiting LangGraph agent integration..."],
-      actions: ["Awaiting LangGraph agent integration..."],
-    }
-  }
+  const aiContent = incident
+    ? {
+        summary: "AI-generated summary will appear here once the AI Summary feature is implemented.",
+        insights: {
+          whatHappened: "Detailed analysis of what happened will appear here.",
+          residentImpact: "Analysis of impact on the resident will appear here.",
+          prevention: "Prevention recommendations will appear here.",
+          futureActions: "Future action recommendations will appear here.",
+        },
+        recommendations: ["AI recommendations will appear here once implemented."],
+        actions: ["AI action items will appear here once implemented."],
+      }
+    : null
 
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
