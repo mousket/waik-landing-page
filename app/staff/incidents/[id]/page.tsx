@@ -30,6 +30,20 @@ import { toast } from "sonner"
 import type { Incident } from "@/lib/types"
 import { format } from "date-fns"
 
+function formatDate(dateString: string | undefined, formatString: string): string {
+  if (!dateString) return "Invalid date"
+
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      return "Invalid date"
+    }
+    return format(date, formatString)
+  } catch (error) {
+    return "Invalid date"
+  }
+}
+
 export default function StaffIncidentDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { userId } = useAuthStore()
@@ -329,15 +343,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Created</p>
-                    <p className="font-medium">
-                      {format(new Date(incident?.createdAt || ""), "MMM d, yyyy 'at' h:mm a")}
-                    </p>
+                    <p className="font-medium">{formatDate(incident?.createdAt, "MMM d, yyyy 'at' h:mm a")}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Last Updated</p>
-                    <p className="font-medium">
-                      {format(new Date(incident?.updatedAt || ""), "MMM d, yyyy 'at' h:mm a")}
-                    </p>
+                    <p className="font-medium">{formatDate(incident?.updatedAt, "MMM d, yyyy 'at' h:mm a")}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -397,7 +407,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         <div className="flex-1">
                           <p className="font-medium text-sm sm:text-base">{question.questionText}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Asked {format(new Date(question.askedAt), "MMM d, yyyy 'at' h:mm a")}
+                            Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
                           </p>
                         </div>
                       </div>
@@ -457,10 +467,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">
                           Asked{" "}
-                          {format(
-                            new Date(unansweredQuestions[currentQuestionIndex]?.askedAt),
-                            "MMM d, yyyy 'at' h:mm a",
-                          )}
+                          {formatDate(unansweredQuestions[currentQuestionIndex]?.askedAt, "MMM d, yyyy 'at' h:mm a")}
                         </p>
                       </div>
                     </div>
@@ -585,7 +592,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           <div className="flex-1">
                             <p className="text-sm font-medium">{question.questionText}</p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Asked {format(new Date(question.askedAt), "MMM d, yyyy 'at' h:mm a")}
+                              Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
                             </p>
                           </div>
                         </div>
@@ -595,7 +602,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                             <p className="text-sm">{question.answer?.answerText}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-xs text-muted-foreground">
-                                Answered {format(new Date(question.answer!.answeredAt), "MMM d, yyyy 'at' h:mm a")}
+                                Answered {formatDate(question.answer?.answeredAt, "MMM d, yyyy 'at' h:mm a")}
                               </p>
                               <Badge variant="secondary" className="text-xs">
                                 {question.answer?.method === "voice" ? (
