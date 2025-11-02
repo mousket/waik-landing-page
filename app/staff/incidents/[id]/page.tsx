@@ -402,6 +402,14 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     }
   }
 
+  const stopSpeaking = () => {
+    if (synthesis) {
+      synthesis.cancel()
+      setIsSpeaking(false)
+      toast.info("Speech stopped")
+    }
+  }
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [intelligenceMessages, isIntelligenceLoading])
@@ -973,24 +981,38 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       Incident Intelligence
                     </CardTitle>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setAutoSpeak(!autoSpeak)}
-                    className="flex items-center gap-1.5 flex-shrink-0 h-9 px-3"
-                  >
-                    {autoSpeak ? (
-                      <>
-                        <Volume2 className="h-4 w-4" />
-                        <span className="hidden sm:inline text-xs">Audio On</span>
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="h-4 w-4 opacity-50" />
-                        <span className="hidden sm:inline text-xs">Audio Off</span>
-                      </>
+                  <div className="flex items-center gap-2">
+                    {isSpeaking && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={stopSpeaking}
+                        className="flex items-center gap-1.5 flex-shrink-0 h-9 px-3 animate-pulse"
+                      >
+                        <MicOff className="h-4 w-4" />
+                        <span className="hidden sm:inline text-xs">Stop</span>
+                      </Button>
                     )}
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAutoSpeak(!autoSpeak)}
+                      className="flex items-center gap-1.5 flex-shrink-0 h-9 px-3"
+                    >
+                      {autoSpeak ? (
+                        <>
+                          <Volume2 className="h-4 w-4" />
+                          <span className="hidden sm:inline text-xs">Audio On</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="h-4 w-4 opacity-50" />
+                          <span className="hidden sm:inline text-xs">Audio Off</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {/* </CHANGE> */}
                 </div>
                 <CardDescription className="text-xs sm:text-sm mt-1">
                   Ask questions about this incident using voice or text
