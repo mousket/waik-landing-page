@@ -22,7 +22,6 @@ import {
   MicOff,
   Type,
   Volume2,
-  SkipForward,
   CheckCircle2,
   Circle,
 } from "lucide-react"
@@ -56,6 +55,8 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const [isRecording, setIsRecording] = useState(false)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [voiceAnswers, setVoiceAnswers] = useState<Record<string, string>>({})
+  const [currentTranscript, setCurrentTranscript] = useState("")
+  const [isEditingTranscript, setIsEditingTranscript] = useState(false)
   const [recognition, setRecognition] = useState<any>(null)
   const [synthesis, setSynthesis] = useState<SpeechSynthesis | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -162,17 +163,13 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     }
 
     setIsRecording(true)
+    setCurrentTranscript("")
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript
-      const currentQuestion = incident?.questions[currentQuestionIndex]
-
-      setVoiceAnswers((prev) => ({
-        ...prev,
-        [currentQuestion?.id || ""]: transcript,
-      }))
-
-      toast.success("Answer recorded!")
+      setCurrentTranscript(transcript)
+      setIsEditingTranscript(true)
+      toast.success("Answer recorded! Review and save to continue.")
     }
 
     recognition.onerror = (event: any) => {
@@ -200,16 +197,59 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     }
   }
 
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < (incident?.questions.filter((q) => !q.answer).length || 0) - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1)
-      setTimeout(() => {
-        speakQuestion(incident?.questions.filter((q) => !q.answer)[currentQuestionIndex + 1].questionText || "")
-      }, 500)
-    } else {
-      toast.success("All questions completed!")
+  const handleSaveCurrentAnswer = async () => {
+    if (!currentTranscript.trim() || !incident || !userId) return
+
+    const currentQuestion = unansweredQuestions[currentQuestionIndex]
+
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/answers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId: currentQuestion.id,
+          answerText: currentTranscript,
+          answeredBy: userId,
+          method: "voice",
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to save answer")
+
+      toast.success("Answer saved!")
+
+      setVoiceAnswers((prev) => ({
+        ...prev,
+        [currentQuestion.id]: currentTranscript,
+      }))
+
+      await fetchIncident()
+
+      setCurrentTranscript("")
+      setIsEditingTranscript(false)
+
+      const remainingQuestions = incident.questions.filter((q) => !q.answer && q.id !== currentQuestion.id)
+
+      if (remainingQuestions.length > 0) {
+        // Move to next question
+        setTimeout(() => {
+          speakQuestion(remainingQuestions[0].questionText)
+        }, 500)
+      } else {
+        // All questions answered
+        toast.success("All questions answered! Great job!")
+        setQaMode("text")
+      }
+    } catch (error) {
+      console.error("[v0] Error saving answer:", error)
+      toast.error("Failed to save your answer")
+    } finally {
+      setSaving(false)
     }
   }
+
+  // They are replaced by handleSaveCurrentAnswer
 
   const handleStartVoiceMode = () => {
     if (!incident || incident.questions.filter((q) => !q.answer).length === 0) {
@@ -227,39 +267,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     setTimeout(() => {
       speakQuestion(incident.questions.filter((q) => !q.answer)[0].questionText || "")
     }, 500)
-  }
-
-  const handleSaveVoiceAnswers = async () => {
-    if (!incident || !userId) return
-
-    setSaving(true)
-    try {
-      const savePromises = Object.entries(voiceAnswers)
-        .filter(([_, answerText]) => answerText.trim() !== "")
-        .map(([questionId, answerText]) =>
-          fetch(`/api/incidents/${params.id}/answers`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              questionId,
-              answerText,
-              answeredBy: userId,
-              method: "voice",
-            }),
-          }),
-        )
-
-      await Promise.all(savePromises)
-      toast.success("Voice answers saved successfully")
-      await fetchIncident()
-      setVoiceAnswers({})
-      setQaMode("text")
-    } catch (error) {
-      console.error("[v0] Error saving voice answers:", error)
-      toast.error("Failed to save your voice answers")
-    } finally {
-      setSaving(false)
-    }
   }
 
   const unansweredQuestions = incident?.questions.filter((q) => !q.answer) || []
@@ -495,7 +502,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       </div>
                     )}
 
-                    {!isSpeaking && !isRecording && (
+                    {!isSpeaking && !isRecording && !isEditingTranscript && (
                       <div className="text-center">
                         <Mic className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground">Ready to record</p>
@@ -503,13 +510,43 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     )}
                   </div>
 
-                  {/* Current Answer */}
-                  {voiceAnswers[unansweredQuestions[currentQuestionIndex]?.id] && (
-                    <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-                      <p className="text-sm font-medium text-green-900 mb-2">Your Answer:</p>
-                      <p className="text-sm text-green-800">
-                        {voiceAnswers[unansweredQuestions[currentQuestionIndex]?.id]}
-                      </p>
+                  {currentTranscript && (
+                    <div className="p-6 border-2 rounded-lg bg-green-50 border-green-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-green-900">Your Answer (Review & Edit):</p>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          <Mic className="h-3 w-3 mr-1" />
+                          Voice
+                        </Badge>
+                      </div>
+                      <Textarea
+                        value={currentTranscript}
+                        onChange={(e) => setCurrentTranscript(e.target.value)}
+                        className="min-h-[120px] bg-white border-green-300 focus:border-green-500 text-base"
+                        placeholder="Your transcribed answer will appear here..."
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSaveCurrentAnswer}
+                          disabled={saving || !currentTranscript.trim()}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          size="lg"
+                        >
+                          <Save className="mr-2 h-4 w-4" />
+                          {saving ? "Saving..." : "Save & Continue"}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setCurrentTranscript("")
+                            setIsEditingTranscript(false)
+                            toast.info("Answer discarded. Record again.")
+                          }}
+                          variant="outline"
+                          disabled={saving}
+                        >
+                          Discard
+                        </Button>
+                      </div>
                     </div>
                   )}
 
@@ -517,7 +554,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <div className="flex gap-2 flex-wrap">
                     <Button
                       onClick={() => speakQuestion(unansweredQuestions[currentQuestionIndex]?.questionText || "")}
-                      disabled={isSpeaking || isRecording}
+                      disabled={isSpeaking || isRecording || saving}
                       variant="outline"
                       className="flex-1"
                     >
@@ -525,37 +562,23 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       Repeat Question
                     </Button>
 
-                    {!isRecording ? (
-                      <Button onClick={startRecording} disabled={isSpeaking} variant="default" className="flex-1">
+                    {!isRecording && !isEditingTranscript ? (
+                      <Button
+                        onClick={startRecording}
+                        disabled={isSpeaking || saving}
+                        variant="default"
+                        className="flex-1"
+                      >
                         <Mic className="mr-2 h-4 w-4" />
                         Start Recording
                       </Button>
-                    ) : (
+                    ) : isRecording ? (
                       <Button onClick={stopRecording} variant="destructive" className="flex-1">
                         <MicOff className="mr-2 h-4 w-4" />
                         Stop Recording
                       </Button>
-                    )}
-
-                    {currentQuestionIndex < unansweredQuestions.length - 1 && (
-                      <Button onClick={handleNextQuestion} disabled={isSpeaking || isRecording} variant="outline">
-                        <SkipForward className="mr-2 h-4 w-4" />
-                        Next
-                      </Button>
-                    )}
+                    ) : null}
                   </div>
-
-                  {/* Save All Answers */}
-                  {Object.keys(voiceAnswers).length > 0 && (
-                    <div className="pt-4 border-t">
-                      <Button onClick={handleSaveVoiceAnswers} disabled={saving} className="w-full" size="lg">
-                        <Save className="mr-2 h-4 w-4" />
-                        {saving
-                          ? "Saving..."
-                          : `Save ${Object.keys(voiceAnswers).length} Voice Answer${Object.keys(voiceAnswers).length > 1 ? "s" : ""}`}
-                      </Button>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             )}
