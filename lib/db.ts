@@ -28,7 +28,7 @@ async function initializeDb() {
           email: "sarah.johnson@demo.waik.care"
         },
         {
-          id: "James.martinez",
+          id: "james.martinez",
           username: "waik-demo-staff",
           // Password: staff123
           password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
