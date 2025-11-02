@@ -28,8 +28,8 @@ async function initializeDb() {
           email: "sarah.johnson@demo.waik.care"
         },
         {
-          id: "james.martinez",
-          username: "waik-demo-staff",
+          id: "user-1",
+          username: "james.martinez",
           // Password: staff123
           password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
           role: "staff",
@@ -38,8 +38,8 @@ async function initializeDb() {
           email: "james.martine@waik.demo.care"
         },
         {
-          id: "user-1",
-          username: "waik-demo-staff",
+          id: "user-3",
+          username: "emily.davis",
           // Password: staff123
           password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
           role: "staff",
