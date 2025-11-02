@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 import type { Incident, User } from "@/lib/types"
 import { format, isValid, parseISO } from "date-fns"
 import {
@@ -25,6 +26,8 @@ import {
   Mic,
   Trash2,
   UserPlus,
+  Volume2,
+  Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -41,6 +44,13 @@ function formatDate(dateString: string | undefined, formatString: string): strin
   }
 }
 
+type IntelligenceMessage = {
+  id: string
+  type: "user" | "ai"
+  text: string
+  timestamp: Date
+}
+
 export default function IncidentDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [incident, setIncident] = useState<Incident | null>(null)
@@ -49,6 +59,14 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
   const [submitting, setSubmitting] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState<string[]>([])
   const [staffList, setStaffList] = useState<User[]>([])
+
+  const [intelligenceMessages, setIntelligenceMessages] = useState<IntelligenceMessage[]>([])
+  const [intelligenceInput, setIntelligenceInput] = useState("")
+  const [isIntelligenceLoading, setIsIntelligenceLoading] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const recognitionRef = useRef<any>(null)
 
   useEffect(() => {
     fetchIncident()
@@ -259,6 +277,153 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
   }
 
   const aiContent = incident ? getAIContent(incident.id) : null
+
+  const getMockRAGResponse = (question: string, incident: Incident): string => {
+    const lowerQuestion = question.toLowerCase()
+
+    // Question patterns and responses
+    if (lowerQuestion.includes("what happened") || lowerQuestion.includes("summary")) {
+      return `Based on the incident report, ${incident.residentName} in Room ${incident.residentRoom} experienced ${incident.title.toLowerCase()}. The incident was reported by ${incident.staffName} and is currently marked as ${incident.status}. ${incident.description}`
+    }
+
+    if (lowerQuestion.includes("when") || lowerQuestion.includes("time")) {
+      return `The incident occurred on ${formatDate(incident.createdAt, "MMMM d, yyyy 'at' h:mm a")}. It was last updated on ${formatDate(incident.updatedAt, "MMMM d, yyyy 'at' h:mm a")}.`
+    }
+
+    if (lowerQuestion.includes("who") || lowerQuestion.includes("involved") || lowerQuestion.includes("staff")) {
+      return `The incident involves resident ${incident.residentName} from Room ${incident.residentRoom}. The reporting staff member is ${incident.staffName}. ${incident.questions.length > 0 ? `There are ${incident.questions.length} follow-up questions being addressed by the care team.` : ""}`
+    }
+
+    if (lowerQuestion.includes("status") || lowerQuestion.includes("progress")) {
+      const answered = incident.questions.filter((q) => q.answer).length
+      const total = incident.questions.length
+      return `The incident status is currently "${incident.status}" with a priority level of "${incident.priority}". ${total > 0 ? `Out of ${total} follow-up questions, ${answered} have been answered by staff.` : "No follow-up questions have been added yet."}`
+    }
+
+    if (lowerQuestion.includes("priority") || lowerQuestion.includes("urgent") || lowerQuestion.includes("serious")) {
+      return `This incident has been classified as "${incident.priority}" priority. ${incident.priority === "high" || incident.priority === "urgent" ? "This requires immediate attention and follow-up from the care team." : "The care team is monitoring this situation appropriately."}`
+    }
+
+    if (lowerQuestion.includes("question") || lowerQuestion.includes("follow-up") || lowerQuestion.includes("asked")) {
+      const answered = incident.questions.filter((q) => q.answer)
+      const unanswered = incident.questions.filter((q) => !q.answer)
+      return `There are ${incident.questions.length} total questions related to this incident. ${answered.length} have been answered and ${unanswered.length} are still pending. ${unanswered.length > 0 ? `The pending questions include: ${unanswered.map((q) => q.questionText).join("; ")}` : ""}`
+    }
+
+    if (lowerQuestion.includes("resident") || lowerQuestion.includes("patient")) {
+      return `The resident involved is ${incident.residentName}, located in Room ${incident.residentRoom}. ${incident.description.includes("injury") || incident.description.includes("fall") ? "Medical assessment and appropriate care protocols have been initiated." : "The resident's wellbeing is being monitored by the care team."}`
+    }
+
+    if (lowerQuestion.includes("prevent") || lowerQuestion.includes("future") || lowerQuestion.includes("avoid")) {
+      return `To prevent similar incidents in the future, the care team should review the circumstances that led to this event. Key preventive measures may include enhanced monitoring, environmental modifications, updated care protocols, and staff training. A comprehensive incident review will identify specific action items.`
+    }
+
+    if (lowerQuestion.includes("action") || lowerQuestion.includes("next step") || lowerQuestion.includes("do now")) {
+      return `Recommended next steps: 1) Ensure all follow-up questions are answered by assigned staff, 2) Complete a thorough incident review with the care team, 3) Update the resident's care plan if needed, 4) Document any environmental or procedural changes, and 5) Schedule follow-up monitoring to ensure resident safety.`
+    }
+
+    // Default response
+    return `Based on the incident data, I can tell you that this ${incident.priority} priority incident involving ${incident.residentName} in Room ${incident.residentRoom} is currently ${incident.status}. The incident "${incident.title}" was reported by ${incident.staffName}. Is there a specific aspect of this incident you'd like to know more about?`
+  }
+
+  const handleIntelligenceSubmit = async () => {
+    if (!intelligenceInput.trim() || !incident) return
+
+    const userMessage: IntelligenceMessage = {
+      id: `user-${Date.now()}`,
+      type: "user",
+      text: intelligenceInput,
+      timestamp: new Date(),
+    }
+
+    setIntelligenceMessages((prev) => [...prev, userMessage])
+    setIntelligenceInput("")
+    setIsIntelligenceLoading(true)
+
+    // Simulate AI processing delay
+    await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000))
+
+    const aiResponse = getMockRAGResponse(intelligenceInput, incident)
+
+    const aiMessage: IntelligenceMessage = {
+      id: `ai-${Date.now()}`,
+      type: "ai",
+      text: aiResponse,
+      timestamp: new Date(),
+    }
+
+    setIntelligenceMessages((prev) => [...prev, aiMessage])
+    setIsIntelligenceLoading(false)
+
+    // Speak the response
+    speakText(aiResponse)
+  }
+
+  const speakText = (text: string) => {
+    if ("speechSynthesis" in window) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel()
+
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 0.9
+      utterance.pitch = 1
+      utterance.volume = 1
+
+      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onend = () => setIsSpeaking(false)
+      utterance.onerror = () => setIsSpeaking(false)
+
+      window.speechSynthesis.speak(utterance)
+    }
+  }
+
+  const startVoiceRecording = () => {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+      toast.error("Voice recognition is not supported in your browser")
+      return
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.lang = "en-US"
+
+    recognition.onstart = () => {
+      setIsRecording(true)
+    }
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript
+      setIntelligenceInput(transcript)
+      setIsRecording(false)
+    }
+
+    recognition.onerror = (event: any) => {
+      console.error("[v0] Speech recognition error:", event.error)
+      setIsRecording(false)
+      toast.error("Voice recognition failed. Please try again.")
+    }
+
+    recognition.onend = () => {
+      setIsRecording(false)
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+  }
+
+  const stopVoiceRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsRecording(false)
+    }
+  }
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [intelligenceMessages, isIntelligenceLoading])
 
   if (loading) {
     return (
@@ -591,22 +756,178 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
           </TabsContent>
 
           <TabsContent value="intelligence" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader>
+            <Card className="border-primary/20 bg-white shadow-lg h-[calc(100vh-16rem)] flex flex-col">
+              <CardHeader className="flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <Mic className="h-5 w-5 text-primary" />
+                  <div className="relative">
+                    <Brain className="h-5 w-5 text-primary" />
+                    <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
+                  </div>
                   <CardTitle className="text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
                     Incident Intelligence
                   </CardTitle>
                 </div>
                 <CardDescription>Ask questions about this incident using voice or text</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <Mic className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground mb-2">Intelligence system coming soon</p>
-                  <p className="text-sm text-muted-foreground">
-                    This will allow you to ask questions about the incident and get AI-powered answers
+
+              <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {intelligenceMessages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-primary/20 blur-3xl rounded-full" />
+                        <Brain className="h-16 w-16 text-primary relative" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-foreground">Ask me anything about this incident</h3>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          I can help you understand what happened, who was involved, current status, and provide
+                          recommendations.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
+                        {[
+                          "What happened?",
+                          "Who was involved?",
+                          "What's the current status?",
+                          "What are the next steps?",
+                        ].map((suggestion) => (
+                          <Button
+                            key={suggestion}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIntelligenceInput(suggestion)
+                              setTimeout(() => handleIntelligenceSubmit(), 100)
+                            }}
+                            className="text-xs"
+                          >
+                            {suggestion}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {intelligenceMessages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex gap-3 ${message.type === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          {message.type === "ai" && (
+                            <div className="flex-shrink-0">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
+                                <Brain className="h-4 w-4 text-white" />
+                              </div>
+                            </div>
+                          )}
+                          <div
+                            className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                              message.type === "user"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-foreground border border-border"
+                            }`}
+                          >
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                            <p
+                              className={`text-xs mt-2 ${message.type === "user" ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                            >
+                              {format(message.timestamp, "h:mm a")}
+                            </p>
+                          </div>
+                          {message.type === "user" && (
+                            <div className="flex-shrink-0">
+                              <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center">
+                                <span className="text-xs font-semibold text-accent-foreground">You</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Loading Animation */}
+                      {isIntelligenceLoading && (
+                        <div className="flex gap-3 justify-start">
+                          <div className="flex-shrink-0">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
+                              <Brain className="h-4 w-4 text-white animate-pulse" />
+                            </div>
+                          </div>
+                          <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-muted border border-border">
+                            <div className="flex items-center gap-2">
+                              <div className="flex gap-1">
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
+                              </div>
+                              <span className="text-xs text-muted-foreground">Analyzing incident data...</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div className="flex-shrink-0 border-t bg-background p-4">
+                  {isSpeaking && (
+                    <div className="mb-3 flex items-center gap-2 text-sm text-primary">
+                      <Volume2 className="h-4 w-4 animate-pulse" />
+                      <span>Speaking response...</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        placeholder="Ask a question about this incident..."
+                        value={intelligenceInput}
+                        onChange={(e) => setIntelligenceInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            handleIntelligenceSubmit()
+                          }
+                        }}
+                        disabled={isIntelligenceLoading || isRecording}
+                        className="pr-12"
+                      />
+                      {isRecording && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="flex gap-1">
+                            <div className="h-3 w-1 bg-destructive rounded-full animate-pulse" />
+                            <div className="h-3 w-1 bg-destructive rounded-full animate-pulse [animation-delay:0.2s]" />
+                            <div className="h-3 w-1 bg-destructive rounded-full animate-pulse [animation-delay:0.4s]" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant={isRecording ? "destructive" : "outline"}
+                      onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                      disabled={isIntelligenceLoading}
+                      className="flex-shrink-0"
+                    >
+                      <Mic className={`h-4 w-4 ${isRecording ? "animate-pulse" : ""}`} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      onClick={handleIntelligenceSubmit}
+                      disabled={!intelligenceInput.trim() || isIntelligenceLoading || isRecording}
+                      className="flex-shrink-0"
+                    >
+                      {isIntelligenceLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Press Enter to send • Click mic to use voice • Responses are spoken aloud
                   </p>
                 </div>
               </CardContent>
