@@ -25,6 +25,7 @@ async function initializeDb() {
           role: "staff",
           name: "Sarah Johnson",
           createdAt: "2025-01-15T08:00:00Z",
+          email: "sarah.johnson@demo.waik.care"
         },
         {
           id: "James.martinez",
@@ -34,6 +35,7 @@ async function initializeDb() {
           role: "staff",
           name: "James Martinez",
           createdAt: "2025-01-15T08:00:00Z",
+          email: "james.martine@waik.demo.care"
         },
         {
           id: "user-1",
