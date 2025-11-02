@@ -26,8 +26,8 @@ import {
   Circle,
   Send,
   Loader2,
-  Nut as Input,
 } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import type { Incident } from "@/lib/types"
 import { format } from "date-fns"
@@ -892,9 +892,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           <div className="max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 bg-muted border border-border">
                             <div className="flex items-center gap-2">
                               <div className="flex gap-1">
-                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
-                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
-                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-pulse [animation-delay:-0.3s]" />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-pulse [animation-delay:-0.15s]" />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                               </div>
                               <span className="text-[10px] sm:text-xs text-muted-foreground">
                                 Analyzing incident data...
