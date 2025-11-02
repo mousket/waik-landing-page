@@ -16,17 +16,7 @@ async function initializeDb() {
 
     try {
       // Pre-populate with sample users
-      db.users = [
-        {
-          id: "user-2",
-          username: "waik-demo-staff",
-          // Password: staff123
-          password: "$2b$10$rQZ5cqx4O.Zx5qx4O.Zx4OeKGjfvb4JGVYtvTdZx.BuATiYaQkIk",
-          role: "staff",
-          name: "Sarah Johnson",
-          createdAt: "2025-01-15T08:00:00Z",
-          email: "sarah.johnson@demo.waik.care"
-        },
+      db.users = [        
         {
           id: "user-1",
           username: "james.martinez",
@@ -36,6 +26,16 @@ async function initializeDb() {
           name: "James Martinez",
           createdAt: "2025-01-15T08:00:00Z",
           email: "james.martine@waik.demo.care"
+        },
+        {
+          id: "user-2",
+          username: "waik-demo-staff",
+          // Password: staff123
+          password: "$2b$10$rQZ5cqx4O.Zx5qx4O.Zx4OeKGjfvb4JGVYtvTdZx.BuATiYaQkIk",
+          role: "staff",
+          name: "Sarah Johnson",
+          createdAt: "2025-01-15T08:00:00Z",
+          email: "sarah.johnson@demo.waik.care"
         },
         {
           id: "user-3",
