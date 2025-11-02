@@ -27,12 +27,22 @@ async function initializeDb() {
           createdAt: "2025-01-15T08:00:00Z",
         },
         {
-          id: "ames-martinez",
+          id: "James.martinez",
           username: "waik-demo-staff",
           // Password: staff123
           password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
           role: "staff",
           name: "James Martinez",
+          createdAt: "2025-01-15T08:00:00Z",
+        },
+        {
+          id: "user-1",
+          username: "waik-demo-staff",
+          // Password: staff123
+          password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
+          role: "staff",
+          name: "Emily Davis",
+          email: "emily@waik-demo.com",
           createdAt: "2025-01-15T08:00:00Z",
         },
         {
