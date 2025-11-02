@@ -409,7 +409,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
             </TabsTrigger>
             <TabsTrigger value="summary" className="data-[state=active]:bg-white">
               <Sparkles className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">AI Summary</span>
+              <span className="hidden sm:inline">Insights</span>
               <span className="sm:hidden">AI</span>
             </TabsTrigger>
             <TabsTrigger value="waik" className="data-[state=active]:bg-white">
