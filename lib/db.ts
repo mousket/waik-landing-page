@@ -30,7 +30,6 @@ async function initializeDb() {
         {
           id: "user-2",
           username: "waik-demo-staff",
-          // Password: staff123
           password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
           role: "staff",
           name: "Sarah Johnson",
