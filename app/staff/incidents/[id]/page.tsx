@@ -54,6 +54,8 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
+  const [currentTextQuestionIndex, setCurrentTextQuestionIndex] = useState(0)
+
   const [qaMode, setQaMode] = useState<"text" | "voice">("text")
   const [isRecording, setIsRecording] = useState(false)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -116,31 +118,49 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const handleSaveProgress = async () => {
     if (!incident || !userId) return
 
+    const currentQuestion = unansweredQuestions[currentTextQuestionIndex]
+    const answerText = answers[currentQuestion?.id]
+
+    if (!answerText || answerText.trim() === "") {
+      toast.error("Please provide an answer before saving")
+      return
+    }
+
     setSaving(true)
     try {
-      const savePromises = Object.entries(answers)
-        .filter(([_, answerText]) => answerText.trim() !== "")
-        .map(([questionId, answerText]) =>
-          fetch(`/api/incidents/${params.id}/answers`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              questionId,
-              answerText,
-              answeredBy: userId,
-              method: "text",
-            }),
-          }),
-        )
+      const response = await fetch(`/api/incidents/${params.id}/answers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId: currentQuestion.id,
+          answerText,
+          answeredBy: userId,
+          method: "text",
+        }),
+      })
 
-      await Promise.all(savePromises)
+      if (!response.ok) throw new Error("Failed to save answer")
 
-      toast.success("Progress saved successfully")
+      toast.success("Answer saved successfully!")
 
       await fetchIncident()
+
+      setAnswers((prev) => {
+        const newAnswers = { ...prev }
+        delete newAnswers[currentQuestion.id]
+        return newAnswers
+      })
+
+      // Move to next unanswered question
+      const remainingQuestions = incident.questions.filter((q) => !q.answer && q.id !== currentQuestion.id)
+      if (remainingQuestions.length > 0) {
+        setCurrentTextQuestionIndex(0)
+      } else {
+        toast.success("All questions answered! Great job!")
+      }
     } catch (error) {
       console.error("[v0] Error saving progress:", error)
-      toast.error("Failed to save your answers")
+      toast.error("Failed to save your answer")
     } finally {
       setSaving(false)
     }
@@ -529,42 +549,132 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
             {qaMode === "text" && unansweredQuestions.length > 0 && (
               <Card className="bg-white shadow-lg border-accent/40">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-accent">
-                    <MessageSquare className="h-5 w-5" />
-                    Questions Awaiting Your Response ({unansweredQuestions.length})
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-accent text-base sm:text-lg">
+                    <Type className="h-5 w-5" />
+                    Text Mode - Question {currentTextQuestionIndex + 1} of {unansweredQuestions.length}
                   </CardTitle>
-                  <CardDescription>Type your answers below</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Type your answer and save to continue
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {unansweredQuestions.map((question) => (
-                    <div key={question.id} className="space-y-3 p-4 border rounded-lg bg-accent/5">
-                      <div className="flex items-start gap-2">
-                        <MessageSquare className="h-4 w-4 text-accent mt-1 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="font-medium text-sm sm:text-base">{question.questionText}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                          </p>
-                        </div>
+                <CardContent className="space-y-4 sm:space-y-6">
+                  {/* Question Progress Tabs */}
+                  <div className="flex gap-2 flex-wrap">
+                    {unansweredQuestions.map((q, idx) => (
+                      <button
+                        key={q.id}
+                        onClick={() => setCurrentTextQuestionIndex(idx)}
+                        className={`flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm transition-all ${
+                          idx === currentTextQuestionIndex
+                            ? "bg-accent text-accent-foreground shadow-md"
+                            : answers[q.id]?.trim()
+                              ? "bg-green-100 text-green-700 hover:bg-green-200"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {answers[q.id]?.trim() ? (
+                          <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        ) : (
+                          <Circle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        )}
+                        <span className="font-medium">Q{idx + 1}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Current Question Display */}
+                  <div className="p-4 sm:p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-accent mt-1 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base lg:text-lg leading-relaxed break-words">
+                          {unansweredQuestions[currentTextQuestionIndex]?.questionText}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Asked{" "}
+                          {formatDate(
+                            unansweredQuestions[currentTextQuestionIndex]?.askedAt,
+                            "MMM d, yyyy 'at' h:mm a",
+                          )}
+                        </p>
                       </div>
-                      <Textarea
-                        placeholder="Type your answer here..."
-                        value={answers[question.id] || ""}
-                        onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
-                        className="min-h-[100px]"
+                    </div>
+                  </div>
+
+                  {/* Answer Input */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-foreground">Your Answer:</label>
+                    <Textarea
+                      placeholder="Type your answer here..."
+                      value={answers[unansweredQuestions[currentTextQuestionIndex]?.id] || ""}
+                      onChange={(e) =>
+                        setAnswers({
+                          ...answers,
+                          [unansweredQuestions[currentTextQuestionIndex]?.id]: e.target.value,
+                        })
+                      }
+                      className="min-h-[120px] sm:min-h-[150px] text-sm sm:text-base resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {answers[unansweredQuestions[currentTextQuestionIndex]?.id]?.length || 0} characters
+                    </p>
+                  </div>
+
+                  {/* Navigation and Save Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <Button
+                      onClick={() => setCurrentTextQuestionIndex(Math.max(0, currentTextQuestionIndex - 1))}
+                      disabled={currentTextQuestionIndex === 0}
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+
+                    <Button onClick={handleSaveProgress} disabled={saving} className="flex-1" size="lg">
+                      <Save className="mr-2 h-4 w-4" />
+                      {saving ? "Saving..." : "Save & Continue"}
+                    </Button>
+
+                    <Button
+                      onClick={() =>
+                        setCurrentTextQuestionIndex(
+                          Math.min(unansweredQuestions.length - 1, currentTextQuestionIndex + 1),
+                        )
+                      }
+                      disabled={currentTextQuestionIndex === unansweredQuestions.length - 1}
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                    >
+                      Next
+                      <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                    </Button>
+                  </div>
+
+                  {/* Progress Indicator */}
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                      <span>Progress</span>
+                      <span>
+                        {Object.values(answers).filter((a) => a.trim()).length} / {unansweredQuestions.length} drafted
+                      </span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent transition-all duration-300"
+                        style={{
+                          width: `${(Object.values(answers).filter((a) => a.trim()).length / unansweredQuestions.length) * 100}%`,
+                        }}
                       />
                     </div>
-                  ))}
-
-                  <Button onClick={handleSaveProgress} disabled={saving} className="w-full sm:w-auto" size="lg">
-                    <Save className="mr-2 h-4 w-4" />
-                    {saving ? "Saving..." : "Save Progress"}
-                  </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
+            {/* Voice mode remains unchanged */}
             {qaMode === "voice" && unansweredQuestions.length > 0 && (
               <Card className="bg-white shadow-lg border-primary/20">
                 <CardHeader>
