@@ -674,33 +674,51 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               </Card>
             )}
 
-            {/* Voice mode remains unchanged */}
             {qaMode === "voice" && unansweredQuestions.length > 0 && (
               <Card className="bg-white shadow-lg border-primary/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-primary text-base sm:text-lg">
                     <Mic className="h-5 w-5" />
                     Voice Mode - Question {currentQuestionIndex + 1} of {unansweredQuestions.length}
                   </CardTitle>
-                  <CardDescription>Listen to the question and speak your answer</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Listen to the question and speak your answer
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Question Progress */}
+                <CardContent className="space-y-4 sm:space-y-6">
                   <div className="flex gap-2 flex-wrap">
                     {unansweredQuestions.map((q, idx) => (
-                      <div
+                      <button
                         key={q.id}
-                        className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs ${
+                        onClick={() => {
+                          setCurrentQuestionIndex(idx)
+                          setCurrentTranscript("")
+                          setIsEditingTranscript(false)
+                          if (synthesis) {
+                            synthesis.cancel()
+                          }
+                          if (recognition && isRecording) {
+                            recognition.stop()
+                          }
+                          setTimeout(() => {
+                            speakQuestion(unansweredQuestions[idx].questionText)
+                          }, 300)
+                        }}
+                        className={`flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm transition-all ${
                           idx === currentQuestionIndex
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-primary text-primary-foreground shadow-md"
                             : voiceAnswers[q.id]
-                              ? "bg-green-100 text-green-700"
-                              : "bg-muted text-muted-foreground"
+                              ? "bg-green-100 text-green-700 hover:bg-green-200"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
                         }`}
                       >
-                        {voiceAnswers[q.id] ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}Q
-                        {idx + 1}
-                      </div>
+                        {voiceAnswers[q.id] ? (
+                          <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        ) : (
+                          <Circle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        )}
+                        <span className="font-medium">Q{idx + 1}</span>
+                      </button>
                     ))}
                   </div>
 
@@ -790,34 +808,87 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </div>
                   )}
 
-                  {/* Controls */}
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      onClick={() => speakQuestion(unansweredQuestions[currentQuestionIndex]?.questionText || "")}
-                      disabled={isSpeaking || isRecording || saving}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <Volume2 className="mr-2 h-4 w-4" />
-                      Repeat Question
-                    </Button>
-
-                    {!isRecording && !isEditingTranscript ? (
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
-                        onClick={startRecording}
-                        disabled={isSpeaking || saving}
-                        variant="default"
+                        onClick={() => speakQuestion(unansweredQuestions[currentQuestionIndex]?.questionText || "")}
+                        disabled={isSpeaking || isRecording || saving}
+                        variant="outline"
+                        className="flex-1 min-w-[140px]"
+                      >
+                        <Volume2 className="mr-2 h-4 w-4" />
+                        Repeat Question
+                      </Button>
+
+                      {!isRecording && !isEditingTranscript ? (
+                        <Button
+                          onClick={startRecording}
+                          disabled={isSpeaking || saving}
+                          variant="default"
+                          className="flex-1 min-w-[140px]"
+                        >
+                          <Mic className="mr-2 h-4 w-4" />
+                          Start Recording
+                        </Button>
+                      ) : isRecording ? (
+                        <Button onClick={stopRecording} variant="destructive" className="flex-1 min-w-[140px]">
+                          <MicOff className="mr-2 h-4 w-4" />
+                          Stop Recording
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          const newIndex = Math.max(0, currentQuestionIndex - 1)
+                          setCurrentQuestionIndex(newIndex)
+                          setCurrentTranscript("")
+                          setIsEditingTranscript(false)
+                          if (synthesis) {
+                            synthesis.cancel()
+                          }
+                          if (recognition && isRecording) {
+                            recognition.stop()
+                          }
+                          setTimeout(() => {
+                            speakQuestion(unansweredQuestions[newIndex].questionText)
+                          }, 300)
+                        }}
+                        disabled={currentQuestionIndex === 0 || isSpeaking || isRecording || saving}
+                        variant="outline"
                         className="flex-1"
                       >
-                        <Mic className="mr-2 h-4 w-4" />
-                        Start Recording
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Previous
                       </Button>
-                    ) : isRecording ? (
-                      <Button onClick={stopRecording} variant="destructive" className="flex-1">
-                        <MicOff className="mr-2 h-4 w-4" />
-                        Stop Recording
+
+                      <Button
+                        onClick={() => {
+                          const newIndex = Math.min(unansweredQuestions.length - 1, currentQuestionIndex + 1)
+                          setCurrentQuestionIndex(newIndex)
+                          setCurrentTranscript("")
+                          setIsEditingTranscript(false)
+                          if (synthesis) {
+                            synthesis.cancel()
+                          }
+                          if (recognition && isRecording) {
+                            recognition.stop()
+                          }
+                          setTimeout(() => {
+                            speakQuestion(unansweredQuestions[newIndex].questionText)
+                          }, 300)
+                        }}
+                        disabled={
+                          currentQuestionIndex === unansweredQuestions.length - 1 || isSpeaking || isRecording || saving
+                        }
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Next
+                        <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                       </Button>
-                    ) : null}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
