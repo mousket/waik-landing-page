@@ -21,7 +21,7 @@ async function initializeDb() {
           id: "user-1",
           username: "james.martinez",
           // Password: staff123
-          password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
+          password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
           role: "staff",
           name: "James Martinez",
           createdAt: "2025-01-15T08:00:00Z",
