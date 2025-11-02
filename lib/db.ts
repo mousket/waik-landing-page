@@ -16,12 +16,12 @@ async function initializeDb() {
 
     try {
       // Pre-populate with sample users
-      db.users = [        
+      db.users = [
         {
           id: "user-2",
           username: "waik-demo-staff",
-          // Pre-hashed: waik1+demo-staff!@#
-          password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
+          // Password: staff123
+          password: "$2b$10$rQZ5cqx4O.Zx5qx4O.Zx4OeKGjfvb4JGVYtvTdZx.BuATiYaQkIk",
           role: "staff",
           name: "Sarah Johnson",
           createdAt: "2025-01-15T08:00:00Z",
@@ -29,6 +29,7 @@ async function initializeDb() {
         {
           id: "user-5",
           username: "scott.kallstrom",
+          // Password: admin123
           password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
           role: "admin",
           name: "Scott Kallstrom",
@@ -38,6 +39,7 @@ async function initializeDb() {
         {
           id: "user-6",
           username: "gerard.beaubrun",
+          // Password: admin123
           password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
           role: "admin",
           name: "Gerard Beaubrun",
