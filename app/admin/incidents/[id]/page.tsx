@@ -332,27 +332,34 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     recognition.lang = "en-US"
 
     recognition.onstart = () => {
-      setIsListening(true) // Use setIsListening
+      setIsListening(true)
     }
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript
       setIntelligenceInput(transcript)
-      setIsListening(false) // Use setIsListening
+      setIsListening(false)
     }
 
     recognition.onerror = (event: any) => {
       console.error("[v0] Speech recognition error:", event.error)
-      setIsListening(false) // Use setIsListening
+      setIsListening(false)
       toast.error("Voice recognition failed. Please try again.")
     }
 
     recognition.onend = () => {
-      setIsListening(false) // Use setIsListening
+      setIsListening(false)
     }
 
     recognitionRef.current = recognition
-    recognition.start()
+
+    try {
+      recognition.start()
+    } catch (error) {
+      console.error("[v0] Error starting recognition:", error)
+      setIsListening(false)
+      toast.error("Failed to start voice recognition. Please try again.")
+    }
   }
 
   const stopVoiceRecording = () => {

@@ -348,28 +348,27 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       return
     }
 
-    const newRecognition = { ...recognition }
     setIsIntelligenceRecording(true)
 
-    newRecognition.onresult = (event: any) => {
+    recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript
       setIntelligenceInput(transcript)
       setIsIntelligenceRecording(false)
     }
 
-    newRecognition.onerror = (event: any) => {
+    recognition.onerror = (event: any) => {
       console.error("[v0] Speech recognition error:", event.error)
       setIsIntelligenceRecording(false)
       toast.error("Voice recognition failed. Please try again.")
     }
 
-    newRecognition.onend = () => {
+    recognition.onend = () => {
       setIsIntelligenceRecording(false)
     }
 
-    intelligenceRecognitionRef.current = newRecognition
+    intelligenceRecognitionRef.current = recognition
     try {
-      newRecognition.start()
+      recognition.start()
     } catch (error) {
       console.error("[v0] Error starting recognition:", error)
       setIsIntelligenceRecording(false)
