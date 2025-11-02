@@ -16,21 +16,12 @@ async function initializeDb() {
 
     try {
       // Pre-populate with sample users
-      db.users = [
-        {
-          id: "user-1",
-          username: "waik-demo-admin",
-          // Pre-hashed: waik1+demo-admin!@#
-          password: "$2b$10$rZ8qH5YvK3xJ9mN2pL4wXeYvK3xJ9mN2pL4wXeYvK3xJ9mN2pL4wXe",
-          role: "admin",
-          name: "Admin User",
-          createdAt: "2025-01-15T08:00:00Z",
-        },
+      db.users = [        
         {
           id: "user-2",
           username: "waik-demo-staff",
           // Pre-hashed: waik1+demo-staff!@#
-          password: "$2b$10$sA9rI6ZwL4yK0oO3qM5xYfZwL4yK0oO3qM5xYfZwL4yK0oO3qM5xYf",
+          password: "$2b$10$amHGjfvb4JGVYtvTdZx.BuATiYaQkIkvDnPUYs1a74bQS9UFZFvAm",
           role: "staff",
           name: "Sarah Johnson",
           createdAt: "2025-01-15T08:00:00Z",
