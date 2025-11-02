@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +24,9 @@ import {
   Volume2,
   CheckCircle2,
   Circle,
+  Send,
+  Loader2,
+  Nut as Input,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Incident } from "@/lib/types"
@@ -60,6 +63,14 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const [recognition, setRecognition] = useState<any>(null)
   const [synthesis, setSynthesis] = useState<SpeechSynthesis | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
+
+  const [intelligenceMessages, setIntelligenceMessages] = useState<IntelligenceMessage[]>([])
+  const [intelligenceInput, setIntelligenceInput] = useState("")
+  const [isIntelligenceLoading, setIsIntelligenceLoading] = useState(false)
+  const [isIntelligenceRecording, setIsIntelligenceRecording] = useState(false)
+  const [autoSpeak, setAutoSpeak] = useState(true)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const intelligenceRecognitionRef = useRef<any>(null)
 
   useEffect(() => {
     fetchIncident()
@@ -268,6 +279,113 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       speakQuestion(incident.questions.filter((q) => !q.answer)[0].questionText || "")
     }, 500)
   }
+
+  const handleIntelligenceSubmit = async () => {
+    if (!intelligenceInput.trim() || !incident) return
+
+    const userMessage: IntelligenceMessage = {
+      id: `user-${Date.now()}`,
+      type: "user",
+      text: intelligenceInput,
+      timestamp: new Date(),
+    }
+
+    setIntelligenceMessages((prev) => [...prev, userMessage])
+    setIntelligenceInput("")
+    setIsIntelligenceLoading(true)
+
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/intelligence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: intelligenceInput }),
+      })
+
+      if (!response.ok) throw new Error("Failed to get intelligence response")
+
+      const data = await response.json()
+
+      const aiMessage: IntelligenceMessage = {
+        id: `ai-${Date.now()}`,
+        type: "ai",
+        text: data.answer,
+        timestamp: new Date(),
+      }
+
+      setIntelligenceMessages((prev) => [...prev, aiMessage])
+
+      if (autoSpeak) {
+        speakIntelligenceText(data.answer)
+      }
+    } catch (error) {
+      console.error("[v0] Error getting intelligence response:", error)
+      toast.error("Failed to get response. Please try again.")
+    } finally {
+      setIsIntelligenceLoading(false)
+    }
+  }
+
+  const speakIntelligenceText = (text: string) => {
+    if ("speechSynthesis" in window && synthesis) {
+      synthesis.cancel()
+
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 0.9
+      utterance.pitch = 1
+      utterance.volume = 1
+
+      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onend = () => setIsSpeaking(false)
+      utterance.onerror = () => setIsSpeaking(false)
+
+      synthesis.speak(utterance)
+    }
+  }
+
+  const startIntelligenceVoiceRecording = () => {
+    if (!recognition) {
+      toast.error("Voice recognition is not supported in your browser")
+      return
+    }
+
+    const newRecognition = { ...recognition }
+    setIsIntelligenceRecording(true)
+
+    newRecognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript
+      setIntelligenceInput(transcript)
+      setIsIntelligenceRecording(false)
+    }
+
+    newRecognition.onerror = (event: any) => {
+      console.error("[v0] Speech recognition error:", event.error)
+      setIsIntelligenceRecording(false)
+      toast.error("Voice recognition failed. Please try again.")
+    }
+
+    newRecognition.onend = () => {
+      setIsIntelligenceRecording(false)
+    }
+
+    intelligenceRecognitionRef.current = newRecognition
+    try {
+      newRecognition.start()
+    } catch (error) {
+      console.error("[v0] Error starting recognition:", error)
+      setIsIntelligenceRecording(false)
+    }
+  }
+
+  const stopIntelligenceVoiceRecording = () => {
+    if (intelligenceRecognitionRef.current) {
+      intelligenceRecognitionRef.current.stop()
+      setIsIntelligenceRecording(false)
+    }
+  }
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [intelligenceMessages, isIntelligenceLoading])
 
   const unansweredQuestions = incident?.questions.filter((q) => !q.answer) || []
   const answeredQuestions = incident?.questions.filter((q) => q.answer) || []
@@ -650,22 +768,198 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
           </TabsContent>
 
           <TabsContent value="intelligence" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Mic className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                    Incident Intelligence
-                  </CardTitle>
+            <Card className="border-primary/20 bg-white shadow-lg h-[calc(100vh-16rem)] flex flex-col">
+              <CardHeader className="flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Brain className="h-5 w-5 text-primary" />
+                      <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
+                    </div>
+                    <CardTitle className="text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
+                      Incident Intelligence
+                    </CardTitle>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAutoSpeak(!autoSpeak)}
+                    className="flex items-center gap-2"
+                  >
+                    {autoSpeak ? (
+                      <>
+                        <Volume2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Audio On</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-4 w-4 opacity-50" />
+                        <span className="hidden sm:inline">Audio Off</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
                 <CardDescription>Ask questions about this incident using voice or text</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <Mic className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground mb-2">Intelligence system coming soon</p>
-                  <p className="text-sm text-muted-foreground">
-                    This will allow you to ask questions about the incident and get AI-powered answers
+
+              <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {intelligenceMessages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-primary/20 blur-3xl rounded-full" />
+                        <Brain className="h-16 w-16 text-primary relative" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-foreground">Ask me anything about this incident</h3>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          I can help you understand what happened, who was involved, current status, and provide
+                          recommendations.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
+                        {[
+                          "What happened?",
+                          "Who was involved?",
+                          "What's the current status?",
+                          "What are the next steps?",
+                        ].map((suggestion) => (
+                          <Button
+                            key={suggestion}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIntelligenceInput(suggestion)
+                              setTimeout(() => handleIntelligenceSubmit(), 100)
+                            }}
+                            className="text-xs"
+                          >
+                            {suggestion}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {intelligenceMessages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex gap-3 ${message.type === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          {message.type === "ai" && (
+                            <div className="flex-shrink-0">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
+                                <Brain className="h-4 w-4 text-white" />
+                              </div>
+                            </div>
+                          )}
+                          <div
+                            className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                              message.type === "user"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-foreground border border-border"
+                            }`}
+                          >
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                            <p
+                              className={`text-xs mt-2 ${message.type === "user" ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                            >
+                              {format(message.timestamp, "h:mm a")}
+                            </p>
+                          </div>
+                          {message.type === "user" && (
+                            <div className="flex-shrink-0">
+                              <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center">
+                                <span className="text-xs font-semibold text-accent-foreground">You</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {isIntelligenceLoading && (
+                        <div className="flex gap-3 justify-start">
+                          <div className="flex-shrink-0">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
+                              <Brain className="h-4 w-4 text-white animate-pulse" />
+                            </div>
+                          </div>
+                          <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-muted border border-border">
+                            <div className="flex items-center gap-2">
+                              <div className="flex gap-1">
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
+                              </div>
+                              <span className="text-xs text-muted-foreground">Analyzing incident data...</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="flex-shrink-0 border-t bg-background p-4">
+                  {isSpeaking && (
+                    <div className="mb-3 flex items-center gap-2 text-sm text-primary">
+                      <Volume2 className="h-4 w-4 animate-pulse" />
+                      <span>Speaking response...</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        placeholder="Ask a question about this incident..."
+                        value={intelligenceInput}
+                        onChange={(e) => setIntelligenceInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            handleIntelligenceSubmit()
+                          }
+                        }}
+                        disabled={isIntelligenceLoading || isIntelligenceRecording}
+                        className="pr-12"
+                      />
+                      {isIntelligenceRecording && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="flex gap-1">
+                            <div className="h-3 w-1 bg-destructive rounded-full animate-pulse" />
+                            <div className="h-3 w-1 bg-destructive rounded-full animate-pulse [animation-delay:0.2s]" />
+                            <div className="h-3 w-1 bg-destructive rounded-full animate-pulse [animation-delay:0.4s]" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant={isIntelligenceRecording ? "destructive" : "outline"}
+                      onClick={
+                        isIntelligenceRecording ? stopIntelligenceVoiceRecording : startIntelligenceVoiceRecording
+                      }
+                      disabled={isIntelligenceLoading}
+                      className="flex-shrink-0"
+                    >
+                      <Mic className={`h-4 w-4 ${isIntelligenceRecording ? "animate-pulse" : ""}`} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      onClick={handleIntelligenceSubmit}
+                      disabled={!intelligenceInput.trim() || isIntelligenceLoading || isIntelligenceRecording}
+                      className="flex-shrink-0"
+                    >
+                      {isIntelligenceLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Press Enter to send • Click mic to use voice •{" "}
+                    {autoSpeak ? "Responses are spoken aloud" : "Audio is off"}
                   </p>
                 </div>
               </CardContent>
@@ -787,6 +1081,13 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       </div>
     </div>
   )
+}
+
+type IntelligenceMessage = {
+  id: string
+  type: "user" | "ai"
+  text: string
+  timestamp: Date
 }
 
 function getAIContent(incidentId: string) {

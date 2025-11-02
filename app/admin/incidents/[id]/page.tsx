@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import type { Incident, User } from "@/lib/types"
+import type { Incident, User as Staff } from "@/lib/types" // Renamed User to Staff
 import { format, isValid, parseISO } from "date-fns"
 import {
   ArrowLeft,
@@ -51,22 +51,53 @@ type IntelligenceMessage = {
   timestamp: Date
 }
 
-export default function IncidentDetailsPage({ params }: { params: { id: string } }) {
+export default function AdminIncidentDetailPage({ params }: { params: { id: string } }) {
+  // Renamed function
   const router = useRouter()
   const [incident, setIncident] = useState<Incident | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [staffList, setStaffList] = useState<Staff[]>([]) // Changed type to Staff
+  const [isLoading, setIsLoading] = useState(true) // Renamed loading to isLoading
+  const [activeTab, setActiveTab] = useState("overview") // New state for active tab
   const [newQuestion, setNewQuestion] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  const [selectedStaff, setSelectedStaff] = useState<string[]>([])
-  const [staffList, setStaffList] = useState<User[]>([])
-
+  const [isAddingQuestion, setIsAddingQuestion] = useState(false) // New state
+  const [editingAnswer, setEditingAnswer] = useState<string | null>(null) // New state
+  const [answerText, setAnswerText] = useState("") // New state
+  const [isSavingAnswer, setIsSavingAnswer] = useState(false) // New state
   const [intelligenceMessages, setIntelligenceMessages] = useState<IntelligenceMessage[]>([])
   const [intelligenceInput, setIntelligenceInput] = useState("")
   const [isIntelligenceLoading, setIsIntelligenceLoading] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
+  const [isListening, setIsListening] = useState(false) // Renamed isRecording to isListening
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [autoSpeak, setAutoSpeak] = useState(true)
+  const [selectedStaff, setSelectedStaff] = useState<string[]>([]) // Declare selectedStaff
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
+
+  const getAIContent = (incidentId: string) => {
+    const savedContent = localStorage.getItem(`ai-content-${incidentId}`)
+    if (savedContent) {
+      try {
+        // Assuming the stored data is { messages: IntelligenceMessage[] }
+        const parsedData = JSON.parse(savedContent)
+        // Ensure the parsed data has the expected structure
+        if (parsedData && Array.isArray(parsedData.messages)) {
+          // Map dates back if necessary, assuming they are stored as strings
+          parsedData.messages = parsedData.messages.map((msg: IntelligenceMessage) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+          }))
+          return parsedData
+        }
+      } catch (error) {
+        console.error("[v0] Error parsing AI content from localStorage:", error)
+        // Fallback to empty if parsing fails or data is malformed
+        return { messages: [] }
+      }
+    }
+    return { messages: [] }
+  }
+
+  const aiContent = getAIContent(params.id)
 
   useEffect(() => {
     fetchIncident()
@@ -79,11 +110,14 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
       if (response.ok) {
         const data = await response.json()
         setIncident(data)
+        // Load intelligence messages from localStorage on fetch
+        const storedMessages = getAIContent(data.id)
+        setIntelligenceMessages(storedMessages.messages)
       }
     } catch (error) {
       console.error("[v0] Error fetching incident:", error)
     } finally {
-      setLoading(false)
+      setIsLoading(false) // Use setIsLoading
     }
   }
 
@@ -100,6 +134,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
   }
 
   const updateStatus = async (status: string) => {
+    if (!incident) return
     try {
       const response = await fetch(`/api/incidents/${params.id}`, {
         method: "PATCH",
@@ -119,6 +154,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
   }
 
   const updatePriority = async (priority: string) => {
+    if (!incident) return
     try {
       const response = await fetch(`/api/incidents/${params.id}`, {
         method: "PATCH",
@@ -140,14 +176,14 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
   const sendQuestion = async () => {
     if (!newQuestion.trim()) return
 
-    setSubmitting(true)
+    setIsAddingQuestion(true) // Use setIsAddingQuestion
     try {
       const response = await fetch(`/api/incidents/${params.id}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionText: newQuestion,
-          askedBy: "Admin User",
+          askedBy: "Admin User", // Placeholder, should ideally come from auth context
           assignedTo: selectedStaff.length > 0 ? selectedStaff : undefined,
         }),
       })
@@ -157,12 +193,14 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
         setNewQuestion("")
         setSelectedStaff([])
         fetchIncident()
+      } else {
+        toast.error("Failed to send question")
       }
     } catch (error) {
       console.error("[v0] Error sending question:", error)
       toast.error("Failed to send question")
     } finally {
-      setSubmitting(false)
+      setIsAddingQuestion(false) // Use setIsAddingQuestion
     }
   }
 
@@ -184,146 +222,8 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
     }
   }
 
-  const getAIContent = (incidentId: string) => {
-    const aiContent: Record<
-      string,
-      {
-        summary: string
-        insights: {
-          whatHappened: string
-          residentImpact: string
-          prevention: string
-          futureActions: string
-        }
-        recommendations: string[]
-        actions: string[]
-      }
-    > = {
-      "inc-1": {
-        summary:
-          "Resident Margaret Thompson experienced a fall at 8:15 AM while attempting to get out of bed in Room 204. Staff member Sarah Johnson discovered the resident on the floor during morning rounds. The resident sustained minor bruising on the left hip, which was assessed by nursing staff and treated with an ice pack.",
-        insights: {
-          whatHappened:
-            "Resident fell while attempting to get out of bed unassisted during morning rounds. The fall occurred at approximately 8:15 AM when the resident was trying to reach the bathroom.",
-          residentImpact:
-            "Minor bruising on left hip area. No fractures or serious injuries detected. Resident remained alert and oriented. Ice pack applied immediately, and nursing assessment completed within 15 minutes of discovery.",
-          prevention:
-            "Bed rails should have been raised during the night. Call button was not within easy reach of the resident. The resident may have been attempting to avoid disturbing staff during busy morning rounds.",
-          futureActions:
-            "Implement bed alarm system for high-risk residents. Ensure call buttons are always within reach and test functionality during each shift. Increase frequency of morning rounds in rooms with fall-risk residents. Review and update fall prevention care plan.",
-        },
-        recommendations: [
-          "Install bed alarm system to alert staff when resident attempts to get out of bed unassisted",
-          "Conduct comprehensive fall risk assessment and update care plan with specific interventions",
-          "Review room layout to ensure bathroom accessibility and consider installing grab bars",
-        ],
-        actions: [
-          "Schedule physical therapy evaluation within 48 hours to assess mobility and recommend assistive devices",
-          "Update resident's care plan to include fall prevention protocols and increased monitoring",
-          "Conduct staff training session on fall prevention best practices and proper use of bed alarms",
-        ],
-      },
-      "inc-2": {
-        summary:
-          "Morning medication for resident Robert Williams in Room 312 was administered 30 minutes late due to staffing constraints during the morning shift. The delay occurred on January 21st at 10:00 AM, affecting the resident's scheduled 9:30 AM medication administration.",
-        insights: {
-          whatHappened:
-            "Medication administration was delayed by 30 minutes due to unexpected staffing shortage during morning shift. The primary medication nurse was assisting with an emergency in another wing, and backup protocols were not immediately activated.",
-          residentImpact:
-            "No adverse effects reported from the 30-minute delay. Resident took medication without issue once administered. Vital signs remained stable throughout the morning. Resident was informed of the delay and expressed understanding.",
-          prevention:
-            "Staffing levels were below optimal during peak medication administration hours. Backup medication administration protocols were not clearly communicated to available staff. Emergency response in another wing created cascading delays.",
-          futureActions:
-            "Review and adjust staffing schedules to ensure adequate coverage during peak medication times. Implement clear backup protocols for medication administration. Create a medication administration priority system for time-sensitive medications. Cross-train additional staff members on medication administration procedures.",
-        },
-        recommendations: [
-          "Adjust morning shift staffing schedule to ensure minimum two qualified medication administrators are available",
-          "Implement digital medication tracking system with automated alerts for approaching administration times",
-          "Create and document clear backup protocols for medication administration during emergencies",
-        ],
-        actions: [
-          "Review and update medication administration schedule to identify and prioritize time-critical medications",
-          "Initiate hiring process for additional qualified nursing staff to improve coverage ratios",
-          "Implement digital medication management system with real-time tracking and automated reminders",
-        ],
-      },
-      "inc-3": {
-        summary:
-          "Resident Elizabeth Davis in Room 108, who has a documented lactose intolerance, was served a meal containing dairy products on January 22nd at lunch. The error was discovered by staff before the resident consumed the meal, preventing any adverse reaction.",
-        insights: {
-          whatHappened:
-            "Kitchen staff prepared and delivered a meal containing dairy products to a resident with documented lactose intolerance. The error occurred during lunch service when a substitute kitchen worker was unfamiliar with the dietary restriction flagging system.",
-          residentImpact:
-            "No adverse effects as the error was caught by nursing staff before the resident consumed the meal. Replacement meal was provided within 15 minutes. Resident expressed appreciation for staff vigilance and was not distressed by the incident.",
-          prevention:
-            "Dietary restriction information was not prominently displayed on the meal tray. Substitute kitchen staff had not received adequate training on the dietary restriction system. Communication gap between dietary department and nursing staff during shift change.",
-          futureActions:
-            "Implement visual dietary restriction alert system on all meal trays and in kitchen preparation area. Ensure all kitchen staff, including substitutes, receive comprehensive training on dietary restrictions. Establish mandatory meal verification checklist before delivery. Create regular audit system for dietary compliance.",
-        },
-        recommendations: [
-          "Create highly visible dietary restriction alerts using color-coded labels on meal trays and resident room cards",
-          "Update kitchen communication protocols to include mandatory dietary restriction verification before meal preparation",
-          "Implement pre-delivery meal verification process where nursing staff confirms dietary compliance",
-        ],
-        actions: [
-          "Install visual dietary alert system with color-coded labels and digital displays in kitchen and on meal trays",
-          "Conduct comprehensive dietary restriction training for all kitchen and nursing staff within one week",
-          "Establish meal verification checklist that requires sign-off from both kitchen and nursing staff before delivery",
-        ],
-      },
-    }
-
-    return aiContent[incidentId] || null
-  }
-
-  const aiContent = incident ? getAIContent(incident.id) : null
-
-  const getMockRAGResponse = (question: string, incident: Incident): string => {
-    const lowerQuestion = question.toLowerCase()
-
-    // Question patterns and responses
-    if (lowerQuestion.includes("what happened") || lowerQuestion.includes("summary")) {
-      return `Based on the incident report, ${incident.residentName} in Room ${incident.residentRoom} experienced ${incident.title.toLowerCase()}. The incident was reported by ${incident.staffName} and is currently marked as ${incident.status}. ${incident.description}`
-    }
-
-    if (lowerQuestion.includes("when") || lowerQuestion.includes("time")) {
-      return `The incident occurred on ${formatDate(incident.createdAt, "MMMM d, yyyy 'at' h:mm a")}. It was last updated on ${formatDate(incident.updatedAt, "MMMM d, yyyy 'at' h:mm a")}.`
-    }
-
-    if (lowerQuestion.includes("who") || lowerQuestion.includes("involved") || lowerQuestion.includes("staff")) {
-      return `The incident involves resident ${incident.residentName} from Room ${incident.residentRoom}. The reporting staff member is ${incident.staffName}. ${incident.questions.length > 0 ? `There are ${incident.questions.length} follow-up questions being addressed by the care team.` : ""}`
-    }
-
-    if (lowerQuestion.includes("status") || lowerQuestion.includes("progress")) {
-      const answered = incident.questions.filter((q) => q.answer).length
-      const total = incident.questions.length
-      return `The incident status is currently "${incident.status}" with a priority level of "${incident.priority}". ${total > 0 ? `Out of ${total} follow-up questions, ${answered} have been answered by staff.` : "No follow-up questions have been added yet."}`
-    }
-
-    if (lowerQuestion.includes("priority") || lowerQuestion.includes("urgent") || lowerQuestion.includes("serious")) {
-      return `This incident has been classified as "${incident.priority}" priority. ${incident.priority === "high" || incident.priority === "urgent" ? "This requires immediate attention and follow-up from the care team." : "The care team is monitoring this situation appropriately."}`
-    }
-
-    if (lowerQuestion.includes("question") || lowerQuestion.includes("follow-up") || lowerQuestion.includes("asked")) {
-      const answered = incident.questions.filter((q) => q.answer)
-      const unanswered = incident.questions.filter((q) => !q.answer)
-      return `There are ${incident.questions.length} total questions related to this incident. ${answered.length} have been answered and ${unanswered.length} are still pending. ${unanswered.length > 0 ? `The pending questions include: ${unanswered.map((q) => q.questionText).join("; ")}` : ""}`
-    }
-
-    if (lowerQuestion.includes("resident") || lowerQuestion.includes("patient")) {
-      return `The resident involved is ${incident.residentName}, located in Room ${incident.residentRoom}. ${incident.description.includes("injury") || incident.description.includes("fall") ? "Medical assessment and appropriate care protocols have been initiated." : "The resident's wellbeing is being monitored by the care team."}`
-    }
-
-    if (lowerQuestion.includes("prevent") || lowerQuestion.includes("future") || lowerQuestion.includes("avoid")) {
-      return `To prevent similar incidents in the future, the care team should review the circumstances that led to this event. Key preventive measures may include enhanced monitoring, environmental modifications, updated care protocols, and staff training. A comprehensive incident review will identify specific action items.`
-    }
-
-    if (lowerQuestion.includes("action") || lowerQuestion.includes("next step") || lowerQuestion.includes("do now")) {
-      return `Recommended next steps: 1) Ensure all follow-up questions are answered by assigned staff, 2) Complete a thorough incident review with the care team, 3) Update the resident's care plan if needed, 4) Document any environmental or procedural changes, and 5) Schedule follow-up monitoring to ensure resident safety.`
-    }
-
-    // Default response
-    return `Based on the incident data, I can tell you that this ${incident.priority} priority incident involving ${incident.residentName} in Room ${incident.residentRoom} is currently ${incident.status}. The incident "${incident.title}" was reported by ${incident.staffName}. Is there a specific aspect of this incident you'd like to know more about?`
+  const saveAIContent = (incidentId: string, messages: IntelligenceMessage[]) => {
+    localStorage.setItem(`ai-content-${incidentId}`, JSON.stringify({ messages }))
   }
 
   const handleIntelligenceSubmit = async () => {
@@ -336,45 +236,86 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
       timestamp: new Date(),
     }
 
-    setIntelligenceMessages((prev) => [...prev, userMessage])
+    setIntelligenceMessages((prev) => {
+      const updatedMessages = [...prev, userMessage]
+      saveAIContent(incident.id, updatedMessages) // Save messages to localStorage
+      return updatedMessages
+    })
     setIntelligenceInput("")
     setIsIntelligenceLoading(true)
 
-    // Simulate AI processing delay
-    await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000))
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/intelligence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: intelligenceInput }),
+      })
 
-    const aiResponse = getMockRAGResponse(intelligenceInput, incident)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
-    const aiMessage: IntelligenceMessage = {
-      id: `ai-${Date.now()}`,
-      type: "ai",
-      text: aiResponse,
-      timestamp: new Date(),
+      const data = await response.json()
+
+      const aiMessage: IntelligenceMessage = {
+        id: `ai-${Date.now()}`,
+        type: "ai",
+        text: data.answer,
+        timestamp: new Date(),
+      }
+
+      setIntelligenceMessages((prev) => {
+        const updatedMessages = [...prev, aiMessage]
+        saveAIContent(incident.id, updatedMessages) // Save messages to localStorage
+        return updatedMessages
+      })
+
+      if (autoSpeak) {
+        speakText(data.answer)
+      }
+    } catch (error) {
+      console.error("[v0] Error getting intelligence response:", error)
+      toast.error("Failed to get response. Please try again.")
+      // Add an error message to the chat
+      const errorMessage: IntelligenceMessage = {
+        id: `ai-error-${Date.now()}`,
+        type: "ai",
+        text: "Sorry, I encountered an error. Please try again.",
+        timestamp: new Date(),
+      }
+      setIntelligenceMessages((prev) => {
+        const updatedMessages = [...prev, errorMessage]
+        saveAIContent(incident.id, updatedMessages)
+        return updatedMessages
+      })
+    } finally {
+      setIsIntelligenceLoading(false)
     }
-
-    setIntelligenceMessages((prev) => [...prev, aiMessage])
-    setIsIntelligenceLoading(false)
-
-    // Speak the response
-    speakText(aiResponse)
   }
 
   const speakText = (text: string) => {
-    if ("speechSynthesis" in window) {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel()
-
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 0.9
-      utterance.pitch = 1
-      utterance.volume = 1
-
-      utterance.onstart = () => setIsSpeaking(true)
-      utterance.onend = () => setIsSpeaking(false)
-      utterance.onerror = () => setIsSpeaking(false)
-
-      window.speechSynthesis.speak(utterance)
+    if (!("speechSynthesis" in window)) {
+      toast.error("Speech synthesis is not supported in your browser.")
+      return
     }
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 0.9
+    utterance.pitch = 1
+    utterance.volume = 1
+
+    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = (event) => {
+      console.error("[v0] Speech synthesis error:", event)
+      setIsSpeaking(false)
+      toast.error("Speech synthesis failed.")
+    }
+
+    window.speechSynthesis.speak(utterance)
   }
 
   const startVoiceRecording = () => {
@@ -391,23 +332,23 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
     recognition.lang = "en-US"
 
     recognition.onstart = () => {
-      setIsRecording(true)
+      setIsListening(true) // Use setIsListening
     }
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript
       setIntelligenceInput(transcript)
-      setIsRecording(false)
+      setIsListening(false) // Use setIsListening
     }
 
     recognition.onerror = (event: any) => {
       console.error("[v0] Speech recognition error:", event.error)
-      setIsRecording(false)
+      setIsListening(false) // Use setIsListening
       toast.error("Voice recognition failed. Please try again.")
     }
 
     recognition.onend = () => {
-      setIsRecording(false)
+      setIsListening(false) // Use setIsListening
     }
 
     recognitionRef.current = recognition
@@ -417,15 +358,20 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
   const stopVoiceRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop()
-      setIsRecording(false)
+      setIsListening(false) // Use setIsListening
     }
   }
 
-  useEffect(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [intelligenceMessages, isIntelligenceLoading])
+  }
 
-  if (loading) {
+  useEffect(() => {
+    scrollToBottom()
+  }, [intelligenceMessages, isIntelligenceLoading]) // Use scrollToBottom
+
+  if (isLoading) {
+    // Use isLoading
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">Loading incident details...</p>
@@ -443,6 +389,21 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
 
   const answeredQuestions = incident.questions.filter((q) => q.answer)
   const unansweredQuestions = incident.questions.filter((q) => !q.answer)
+
+  // Placeholder for getAIContent logic for WAiK Agent tab
+  const getWAikAgentContent = () => {
+    return {
+      summary: "Awaiting LangGraph agent integration...",
+      insights: {
+        whatHappened: "Awaiting LangGraph agent analysis...",
+        residentImpact: "Awaiting LangGraph agent analysis...",
+        prevention: "Awaiting LangGraph agent analysis...",
+        futureActions: "Awaiting LangGraph agent analysis...",
+      },
+      recommendations: ["Awaiting LangGraph agent integration..."],
+      actions: ["Awaiting LangGraph agent integration..."],
+    }
+  }
 
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
@@ -466,7 +427,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
           </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto gap-2 bg-white/50 p-2">
             <TabsTrigger value="overview" className="data-[state=active]:bg-white">
               <FileText className="h-4 w-4 mr-2" />
@@ -744,11 +705,11 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
 
                   <Button
                     onClick={sendQuestion}
-                    disabled={submitting || !newQuestion.trim()}
+                    disabled={isAddingQuestion || !newQuestion.trim()} // Use isAddingQuestion
                     className="w-full sm:w-auto"
                   >
                     <Send className="mr-2 h-4 w-4" />
-                    {submitting ? "Sending..." : "Send Question"}
+                    {isAddingQuestion ? "Sending..." : "Send Question"} {/* Use isAddingQuestion */}
                   </Button>
                 </div>
               </CardContent>
@@ -758,14 +719,34 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
           <TabsContent value="intelligence" className="space-y-6 mt-6">
             <Card className="border-primary/20 bg-white shadow-lg h-[calc(100vh-16rem)] flex flex-col">
               <CardHeader className="flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Brain className="h-5 w-5 text-primary" />
-                    <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Brain className="h-5 w-5 text-primary" />
+                      <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
+                    </div>
+                    <CardTitle className="text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
+                      Incident Intelligence
+                    </CardTitle>
                   </div>
-                  <CardTitle className="text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                    Incident Intelligence
-                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAutoSpeak(!autoSpeak)}
+                    className="flex items-center gap-2"
+                  >
+                    {autoSpeak ? (
+                      <>
+                        <Volume2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Audio On</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-4 w-4 opacity-50" />
+                        <span className="hidden sm:inline">Audio Off</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
                 <CardDescription>Ask questions about this incident using voice or text</CardDescription>
               </CardHeader>
@@ -891,10 +872,10 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                             handleIntelligenceSubmit()
                           }
                         }}
-                        disabled={isIntelligenceLoading || isRecording}
+                        disabled={isIntelligenceLoading || isListening} // Use isListening
                         className="pr-12"
                       />
-                      {isRecording && (
+                      {isListening && ( // Use isListening
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
                           <div className="flex gap-1">
                             <div className="h-3 w-1 bg-destructive rounded-full animate-pulse" />
@@ -906,17 +887,17 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                     </div>
                     <Button
                       size="icon"
-                      variant={isRecording ? "destructive" : "outline"}
-                      onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                      variant={isListening ? "destructive" : "outline"} // Use isListening
+                      onClick={isListening ? stopVoiceRecording : startVoiceRecording} // Use isListening
                       disabled={isIntelligenceLoading}
                       className="flex-shrink-0"
                     >
-                      <Mic className={`h-4 w-4 ${isRecording ? "animate-pulse" : ""}`} />
+                      <Mic className={`h-4 w-4 ${isListening ? "animate-pulse" : ""}`} /> {/* Use isListening */}
                     </Button>
                     <Button
                       size="icon"
                       onClick={handleIntelligenceSubmit}
-                      disabled={!intelligenceInput.trim() || isIntelligenceLoading || isRecording}
+                      disabled={!intelligenceInput.trim() || isIntelligenceLoading || isListening} // Use isListening
                       className="flex-shrink-0"
                     >
                       {isIntelligenceLoading ? (
@@ -927,7 +908,8 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Press Enter to send • Click mic to use voice • Responses are spoken aloud
+                    Press Enter to send • Click mic to use voice •{" "}
+                    {autoSpeak ? "Responses are spoken aloud" : "Audio is off"}
                   </p>
                 </div>
               </CardContent>
@@ -945,7 +927,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                   <CardDescription>AI-generated summary based on incident details</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {aiContent ? (
+                  {aiContent && aiContent.summary ? ( // Check if summary exists
                     <p className="text-sm leading-relaxed">{aiContent.summary}</p>
                   ) : (
                     <p className="text-sm text-muted-foreground italic">No AI content available for this incident</p>
@@ -962,7 +944,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                   <CardDescription>AI-generated analysis answering key questions</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {aiContent ? (
+                  {aiContent && aiContent.insights ? ( // Check if insights exist
                     <>
                       <div>
                         <h4 className="font-semibold text-sm mb-2 text-accent">What happened?</h4>
@@ -1003,7 +985,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                   <CardDescription>AI-generated recommendations for improvement</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {aiContent ? (
+                  {aiContent && aiContent.recommendations && aiContent.recommendations.length > 0 ? ( // Check if recommendations exist
                     <ul className="space-y-2">
                       {aiContent.recommendations.map((rec, index) => (
                         <li key={index} className="text-sm leading-relaxed flex items-start gap-2">
@@ -1029,7 +1011,7 @@ export default function IncidentDetailsPage({ params }: { params: { id: string }
                   <CardDescription>AI-generated action items to implement</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {aiContent ? (
+                  {aiContent && aiContent.actions && aiContent.actions.length > 0 ? ( // Check if actions exist
                     <ul className="space-y-2">
                       {aiContent.actions.map((action, index) => (
                         <li key={index} className="text-sm leading-relaxed flex items-start gap-2">
