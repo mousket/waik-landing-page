@@ -12,8 +12,9 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import type { Incident, User as Staff } from "@/lib/types" // Renamed User to Staff
+import type { Incident, User as Staff } from "@/lib/types"
 import { format, isValid, parseISO } from "date-fns"
+import { useAuthStore } from "@/lib/auth-store"
 import {
   ArrowLeft,
   Send,
@@ -29,6 +30,11 @@ import {
   Volume2,
   Loader2,
   MicOff,
+  Edit2,
+  Save,
+  X,
+  CheckCircle,
+  Lock,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -53,28 +59,42 @@ type IntelligenceMessage = {
 }
 
 export default function AdminIncidentDetailPage({ params }: { params: { id: string } }) {
-  // Renamed function
   const router = useRouter()
+  const { userId, userRole } = useAuthStore()
   const [incident, setIncident] = useState<Incident | null>(null)
-  const [staffList, setStaffList] = useState<Staff[]>([]) // Changed type to Staff
-  const [isLoading, setIsLoading] = useState(true) // Renamed loading to isLoading
-  const [activeTab, setActiveTab] = useState("overview") // New state for active tab
+  const [staffList, setStaffList] = useState<Staff[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("overview")
+
+  const [isEditingIncident, setIsEditingIncident] = useState(false)
+  const [editedTitle, setEditedTitle] = useState("")
+  const [editedDescription, setEditedDescription] = useState("")
+  const [editedResidentName, setEditedResidentName] = useState("")
+  const [editedResidentRoom, setEditedResidentRoom] = useState("")
+  const [isSavingIncident, setIsSavingIncident] = useState(false)
+  const [isClosingIncident, setIsClosingIncident] = useState(false)
+
+  const [isEditingHumanReport, setIsEditingHumanReport] = useState(false)
+  const [humanReportSummary, setHumanReportSummary] = useState("")
+  const [humanReportInsights, setHumanReportInsights] = useState("")
+  const [humanReportRecommendations, setHumanReportRecommendations] = useState("")
+  const [humanReportActions, setHumanReportActions] = useState("")
+  const [isSavingHumanReport, setIsSavingHumanReport] = useState(false)
+
+  const [isGeneratingAIReport, setIsGeneratingAIReport] = useState(false)
+
   const [newQuestion, setNewQuestion] = useState("")
-  const [isAddingQuestion, setIsAddingQuestion] = useState(false) // New state
-  const [editingAnswer, setEditingAnswer] = useState<string | null>(null) // New state
-  const [answerText, setAnswerText] = useState("") // New state
-  const [isSavingAnswer, setIsSavingAnswer] = useState(false) // New state
+  const [isAddingQuestion, setIsAddingQuestion] = useState(false)
+  const [selectedStaff, setSelectedStaff] = useState<string[]>([])
+
   const [intelligenceMessages, setIntelligenceMessages] = useState<IntelligenceMessage[]>([])
   const [intelligenceInput, setIntelligenceInput] = useState("")
   const [isIntelligenceLoading, setIsIntelligenceLoading] = useState(false)
-  const [isListening, setIsListening] = useState(false) // Renamed isRecording to isListening
+  const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [autoSpeak, setAutoSpeak] = useState(true)
-  const [selectedStaff, setSelectedStaff] = useState<string[]>([]) // Declare selectedStaff
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
-
-  // Intelligence messages now start fresh on every page load
 
   useEffect(() => {
     fetchIncident()
@@ -87,11 +107,22 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
       if (response.ok) {
         const data = await response.json()
         setIncident(data)
+        setEditedTitle(data.title)
+        setEditedDescription(data.description)
+        setEditedResidentName(data.residentName)
+        setEditedResidentRoom(data.residentRoom)
+
+        if (data.humanReport) {
+          setHumanReportSummary(data.humanReport.summary)
+          setHumanReportInsights(data.humanReport.insights)
+          setHumanReportRecommendations(data.humanReport.recommendations)
+          setHumanReportActions(data.humanReport.actions)
+        }
       }
     } catch (error) {
       console.error("[v0] Error fetching incident:", error)
     } finally {
-      setIsLoading(false) // Use setIsLoading
+      setIsLoading(false)
     }
   }
 
@@ -104,6 +135,130 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
       }
     } catch (error) {
       console.error("[v0] Error fetching staff list:", error)
+    }
+  }
+
+  const handleSaveIncidentEdits = async () => {
+    if (!incident) return
+
+    setIsSavingIncident(true)
+    try {
+      const response = await fetch(`/api/incidents/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editedTitle,
+          description: editedDescription,
+          residentName: editedResidentName,
+          residentRoom: editedResidentRoom,
+        }),
+      })
+
+      if (response.ok) {
+        const updated = await response.json()
+        setIncident(updated)
+        setIsEditingIncident(false)
+        toast.success("Incident details updated successfully")
+      } else {
+        toast.error("Failed to update incident details")
+      }
+    } catch (error) {
+      console.error("[v0] Error updating incident:", error)
+      toast.error("Failed to update incident details")
+    } finally {
+      setIsSavingIncident(false)
+    }
+  }
+
+  const handleCloseIncident = async () => {
+    if (!incident) return
+
+    setIsClosingIncident(true)
+    try {
+      const response = await fetch(`/api/incidents/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "closed" }),
+      })
+
+      if (response.ok) {
+        const updated = await response.json()
+        setIncident(updated)
+        toast.success("Incident closed successfully")
+      } else {
+        toast.error("Failed to close incident")
+      }
+    } catch (error) {
+      console.error("[v0] Error closing incident:", error)
+      toast.error("Failed to close incident")
+    } finally {
+      setIsClosingIncident(false)
+    }
+  }
+
+  const handleSaveHumanReport = async () => {
+    if (!incident || !userId) return
+
+    setIsSavingHumanReport(true)
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/human-report`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: humanReportSummary,
+          insights: humanReportInsights,
+          recommendations: humanReportRecommendations,
+          actions: humanReportActions,
+          userId,
+        }),
+      })
+
+      if (response.ok) {
+        await fetchIncident()
+        setIsEditingHumanReport(false)
+        toast.success("Insights saved successfully")
+      } else {
+        toast.error("Failed to save insights")
+      }
+    } catch (error) {
+      console.error("[v0] Error saving human report:", error)
+      toast.error("Failed to save insights")
+    } finally {
+      setIsSavingHumanReport(false)
+    }
+  }
+
+  const handleGenerateAIReport = async () => {
+    if (!incident) return
+
+    const answeredQuestions = incident.questions.filter((q) => q.answer)
+    if (answeredQuestions.length < 5) {
+      toast.error(
+        `Need at least 5 answered questions to generate AI insights. Currently have ${answeredQuestions.length}.`,
+      )
+      return
+    }
+
+    setIsGeneratingAIReport(true)
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/ai-report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (response.ok) {
+        await fetchIncident()
+        toast.success("WAiK AI insights generated successfully!")
+        setActiveTab("waik")
+      } else {
+        const error = await response.json()
+        toast.error(error.error || "Failed to generate AI insights")
+      }
+    } catch (error) {
+      console.error("[v0] Error generating AI report:", error)
+      toast.error("Failed to generate AI insights")
+    } finally {
+      setIsGeneratingAIReport(false)
     }
   }
 
@@ -150,14 +305,14 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const sendQuestion = async () => {
     if (!newQuestion.trim()) return
 
-    setIsAddingQuestion(true) // Use setIsAddingQuestion
+    setIsAddingQuestion(true)
     try {
       const response = await fetch(`/api/incidents/${params.id}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionText: newQuestion,
-          askedBy: "Admin User", // Placeholder, should ideally come from auth context
+          askedBy: "Admin User",
           assignedTo: selectedStaff.length > 0 ? selectedStaff : undefined,
         }),
       })
@@ -174,7 +329,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
       console.error("[v0] Error sending question:", error)
       toast.error("Failed to send question")
     } finally {
-      setIsAddingQuestion(false) // Use setIsAddingQuestion
+      setIsAddingQuestion(false)
     }
   }
 
@@ -238,7 +393,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     } catch (error) {
       console.error("[v0] Error getting intelligence response:", error)
       toast.error("Failed to get response. Please try again.")
-      // Add an error message to the chat
       const errorMessage: IntelligenceMessage = {
         id: `ai-error-${Date.now()}`,
         type: "ai",
@@ -257,7 +411,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
       return
     }
 
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel()
 
     const utterance = new SpeechSynthesisUtterance(text)
@@ -331,7 +484,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const stopVoiceRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop()
-      setIsListening(false) // Use setIsListening
+      setIsListening(false)
     }
   }
 
@@ -341,10 +494,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   useEffect(() => {
     scrollToBottom()
-  }, [intelligenceMessages, isIntelligenceLoading]) // Use scrollToBottom
+  }, [intelligenceMessages, isIntelligenceLoading])
 
   if (isLoading) {
-    // Use isLoading
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">Loading incident details...</p>
@@ -362,20 +514,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   const answeredQuestions = incident.questions.filter((q) => q.answer)
   const unansweredQuestions = incident.questions.filter((q) => !q.answer)
-
-  const aiContent = incident
-    ? {
-        summary: "AI-generated summary will appear here once the AI Summary feature is implemented.",
-        insights: {
-          whatHappened: "Detailed analysis of what happened will appear here.",
-          residentImpact: "Analysis of impact on the resident will appear here.",
-          prevention: "Prevention recommendations will appear here.",
-          futureActions: "Future action recommendations will appear here.",
-        },
-        recommendations: ["AI recommendations will appear here once implemented."],
-        actions: ["AI action items will appear here once implemented."],
-      }
-    : null
+  const canGenerateAIReport = answeredQuestions.length >= 5
 
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
@@ -432,11 +571,82 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
             <Card className="border-primary/20 bg-white shadow-lg">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                      {incident.title}
-                    </CardTitle>
-                    <CardDescription className="mt-2">{incident.description}</CardDescription>
+                  <div className="flex-1 space-y-4">
+                    {isEditingIncident ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="title">Incident Title</Label>
+                          <Input
+                            id="title"
+                            value={editedTitle}
+                            onChange={(e) => setEditedTitle(e.target.value)}
+                            className="text-lg font-semibold"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea
+                            id="description"
+                            value={editedDescription}
+                            onChange={(e) => setEditedDescription(e.target.value)}
+                            rows={3}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="residentName">Resident Name</Label>
+                            <Input
+                              id="residentName"
+                              value={editedResidentName}
+                              onChange={(e) => setEditedResidentName(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="residentRoom">Room Number</Label>
+                            <Input
+                              id="residentRoom"
+                              value={editedResidentRoom}
+                              onChange={(e) => setEditedResidentRoom(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleSaveIncidentEdits} disabled={isSavingIncident} size="sm">
+                            <Save className="mr-2 h-4 w-4" />
+                            {isSavingIncident ? "Saving..." : "Save Changes"}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setIsEditingIncident(false)
+                              setEditedTitle(incident.title)
+                              setEditedDescription(incident.description)
+                              setEditedResidentName(incident.residentName)
+                              setEditedResidentRoom(incident.residentRoom)
+                            }}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Cancel
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-4">
+                          <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
+                            {incident.title}
+                          </CardTitle>
+                          {userRole === "admin" && (
+                            <Button onClick={() => setIsEditingIncident(true)} variant="outline" size="sm">
+                              <Edit2 className="mr-2 h-4 w-4" />
+                              Edit
+                            </Button>
+                          )}
+                        </div>
+                        <CardDescription className="mt-2">{incident.description}</CardDescription>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
@@ -469,7 +679,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                   <CardTitle className="text-base">Status</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Select value={incident.status} onValueChange={updateStatus}>
+                  <Select value={incident.status} onValueChange={updateStatus} disabled={incident.status === "closed"}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -488,7 +698,11 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                   <CardTitle className="text-base">Priority</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Select value={incident.priority} onValueChange={updatePriority}>
+                  <Select
+                    value={incident.priority}
+                    onValueChange={updatePriority}
+                    disabled={incident.status === "closed"}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -502,6 +716,31 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                 </CardContent>
               </Card>
             </div>
+
+            {userRole === "admin" && incident.status !== "closed" && (
+              <Card className="border-destructive/20 bg-destructive/5">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Lock className="h-5 w-5 text-destructive" />
+                    Close Incident
+                  </CardTitle>
+                  <CardDescription>
+                    Closing this incident will finalize all details and prevent further edits. This action is permanent.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={handleCloseIncident}
+                    disabled={isClosingIncident}
+                    variant="destructive"
+                    className="w-full sm:w-auto"
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    {isClosingIncident ? "Closing..." : "Close Incident"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="qa" className="space-y-6 mt-6">
@@ -677,11 +916,11 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
                   <Button
                     onClick={sendQuestion}
-                    disabled={isAddingQuestion || !newQuestion.trim()} // Use isAddingQuestion
+                    disabled={isAddingQuestion || !newQuestion.trim()}
                     className="w-full sm:w-auto"
                   >
                     <Send className="mr-2 h-4 w-4" />
-                    {isAddingQuestion ? "Sending..." : "Send Question"} {/* Use isAddingQuestion */}
+                    {isAddingQuestion ? "Sending..." : "Send Question"}
                   </Button>
                 </div>
               </CardContent>
@@ -732,7 +971,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                       )}
                     </Button>
                   </div>
-                  {/* </CHANGE> */}
                 </div>
                 <CardDescription className="text-xs sm:text-sm mt-1">
                   Ask questions about this incident using voice or text
@@ -740,7 +978,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
               </CardHeader>
 
               <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
-                {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 space-y-3 sm:space-y-4">
                   {intelligenceMessages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center space-y-3 sm:space-y-4 px-4">
@@ -819,7 +1056,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                         </div>
                       ))}
 
-                      {/* Loading Animation */}
                       {isIntelligenceLoading && (
                         <div className="flex gap-2 sm:gap-3 justify-start">
                           <div className="flex-shrink-0">
@@ -846,7 +1082,6 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area */}
                 <div className="flex-shrink-0 border-t bg-background p-3 sm:p-4">
                   {isSpeaking && (
                     <div className="mb-2 sm:mb-3 flex items-center gap-2 text-xs sm:text-sm text-primary">
@@ -910,230 +1145,427 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
           </TabsContent>
 
           <TabsContent value="summary" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Incident Summary</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated summary based on incident details</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {aiContent && aiContent.summary ? ( // Check if summary exists
-                    <p className="text-sm leading-relaxed">{aiContent.summary}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No AI content available for this incident</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-accent/20 lg:col-span-2 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Incident Insights</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated analysis answering key questions</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {aiContent && aiContent.insights ? ( // Check if insights exist
-                    <>
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">What happened?</h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.whatHappened}</p>
-                      </div>
-                      <Separator />
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">What happened to the resident?</h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.residentImpact}</p>
-                      </div>
-                      <Separator />
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">
-                          How could we have prevented this incident?
-                        </h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.prevention}</p>
-                      </div>
-                      <Separator />
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">
-                          What should we do to stop incidents like this in the future?
-                        </h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.futureActions}</p>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No AI insights available for this incident</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Lightbulb className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Recommendations</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated recommendations for improvement</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {aiContent && aiContent.recommendations && aiContent.recommendations.length > 0 ? ( // Check if recommendations exist
-                    <ul className="space-y-2">
-                      {aiContent.recommendations.map((rec, index) => (
-                        <li key={index} className="text-sm leading-relaxed flex items-start gap-2">
-                          <span className="text-accent mt-1">•</span>
-                          <span>{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      No AI recommendations available for this incident
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Action Items</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated action items to implement</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {aiContent && aiContent.actions && aiContent.actions.length > 0 ? ( // Check if actions exist
-                    <ul className="space-y-2">
-                      {aiContent.actions.map((action, index) => (
-                        <li key={index} className="text-sm leading-relaxed flex items-start gap-2">
-                          <span className="text-accent mt-1">•</span>
-                          <span>{action}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No AI actions available for this incident</p>
-                  )}
-                </CardContent>
-              </Card>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
+                  Incident Insights
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">Human-generated analysis and recommendations</p>
+              </div>
+              {!isEditingHumanReport && (
+                <Button onClick={() => setIsEditingHumanReport(true)} variant="outline">
+                  <Edit2 className="mr-2 h-4 w-4" />
+                  Edit Insights
+                </Button>
+              )}
             </div>
+
+            {isEditingHumanReport ? (
+              <div className="space-y-4">
+                <Card className="border-accent/20 bg-white shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-accent" />
+                      Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={humanReportSummary}
+                      onChange={(e) => setHumanReportSummary(e.target.value)}
+                      placeholder="Brief overview of the incident..."
+                      rows={4}
+                      className="resize-none"
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-accent/20 bg-white shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-accent" />
+                      Insights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={humanReportInsights}
+                      onChange={(e) => setHumanReportInsights(e.target.value)}
+                      placeholder="What we learned from this incident..."
+                      rows={6}
+                      className="resize-none"
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-accent/20 bg-white shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-accent" />
+                      Recommendations
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={humanReportRecommendations}
+                      onChange={(e) => setHumanReportRecommendations(e.target.value)}
+                      placeholder="What should be done to improve..."
+                      rows={5}
+                      className="resize-none"
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-accent/20 bg-white shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Target className="h-5 w-5 text-accent" />
+                      Actions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={humanReportActions}
+                      onChange={(e) => setHumanReportActions(e.target.value)}
+                      placeholder="Specific tasks and action items..."
+                      rows={5}
+                      className="resize-none"
+                    />
+                  </CardContent>
+                </Card>
+
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveHumanReport} disabled={isSavingHumanReport} size="lg">
+                    <Save className="mr-2 h-4 w-4" />
+                    {isSavingHumanReport ? "Saving..." : "Save Insights"}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setIsEditingHumanReport(false)
+                      if (incident.humanReport) {
+                        setHumanReportSummary(incident.humanReport.summary)
+                        setHumanReportInsights(incident.humanReport.insights)
+                        setHumanReportRecommendations(incident.humanReport.recommendations)
+                        setHumanReportActions(incident.humanReport.actions)
+                      }
+                    }}
+                    variant="outline"
+                    size="lg"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-accent/20 bg-white shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-accent" />
+                      <CardTitle className="text-base">Summary</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {incident.humanReport?.summary ? (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.humanReport.summary}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        No summary added yet. Click Edit to add insights.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-accent/20 lg:col-span-2 bg-white shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-accent" />
+                      <CardTitle className="text-base">Insights</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {incident.humanReport?.insights ? (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.humanReport.insights}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        No insights added yet. Click Edit to add insights.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-accent/20 bg-white shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-accent" />
+                      <CardTitle className="text-base">Recommendations</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {incident.humanReport?.recommendations ? (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {incident.humanReport.recommendations}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        No recommendations added yet. Click Edit to add insights.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-accent/20 bg-white shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-accent" />
+                      <CardTitle className="text-base">Actions</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {incident.humanReport?.actions ? (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.humanReport.actions}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        No actions added yet. Click Edit to add insights.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {incident.humanReport && (
+                  <Card className="border-muted/20 bg-muted/5 lg:col-span-2">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>
+                          Created by {incident.humanReport.createdBy} on{" "}
+                          {formatDate(incident.humanReport.createdAt, "MMM d, yyyy 'at' h:mm a")}
+                        </span>
+                        {incident.humanReport.lastEditedBy && (
+                          <span>
+                            Last edited by {incident.humanReport.lastEditedBy} on{" "}
+                            {formatDate(incident.humanReport.lastEditedAt, "MMM d, yyyy 'at' h:mm a")}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="waik" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 shadow-md">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">WAik Agent Summary</CardTitle>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      Pending
-                    </Badge>
-                  </div>
-                  <CardDescription>LangGraph/OpenAI-generated summary will appear here</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-                    <span>Awaiting LangGraph agent integration</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-primary/20 lg:col-span-2 bg-gradient-to-br from-primary/5 to-accent/5 shadow-md">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">WAik Agent Insights</CardTitle>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      Pending
-                    </Badge>
-                  </div>
-                  <CardDescription>LangGraph/OpenAI-generated insights will appear here</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-sm mb-2 text-primary flex items-center gap-2">
-                      What happened?
-                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Awaiting LangGraph agent analysis</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <h4 className="font-medium text-sm mb-2 text-primary flex items-center gap-2">
-                      What happened to the resident?
-                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Awaiting LangGraph agent analysis</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <h4 className="font-medium text-sm mb-2 text-primary flex items-center gap-2">
-                      How could we have prevented this incident?
-                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Awaiting LangGraph agent analysis</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <h4 className="font-medium text-sm mb-2 text-primary flex items-center gap-2">
-                      What should we do to stop incidents like this in the future?
-                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Awaiting LangGraph agent analysis</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 shadow-md">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Lightbulb className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">WAik Agent Recommendations</CardTitle>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      Pending
-                    </Badge>
-                  </div>
-                  <CardDescription>LangGraph/OpenAI-generated recommendations will appear here</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-                    <span>Awaiting LangGraph agent integration</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 shadow-md">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">WAik Agent Actions</CardTitle>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      Pending
-                    </Badge>
-                  </div>
-                  <CardDescription>LangGraph/OpenAI-generated actions will appear here</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-                    <span>Awaiting LangGraph agent integration</span>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                  WAiK AI Agent
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">AI-powered analysis and recommendations</p>
+              </div>
+              {userRole === "admin" && (
+                <Button
+                  onClick={handleGenerateAIReport}
+                  disabled={!canGenerateAIReport || isGeneratingAIReport || !!incident.aiReport}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                >
+                  {isGeneratingAIReport ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : incident.aiReport ? (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Generated
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Generate WAiK Insights
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
+
+            {!canGenerateAIReport && !incident.aiReport && (
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                      <Brain className="h-4 w-4 text-yellow-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-yellow-900">More data needed</p>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        At least 5 answered questions are required to generate AI insights. Currently have{" "}
+                        {answeredQuestions.length} answered question{answeredQuestions.length !== 1 ? "s" : ""}.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {incident.aiReport ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Summary</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.summary}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Insights</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.insights}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Recommendations</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.recommendations}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Actions</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.actions}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-100 bg-purple-50/50 lg:col-span-2">
+                  <CardContent className="pt-6">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Brain className="h-3.5 w-3.5 text-purple-600" />
+                        <span>Model: {incident.aiReport.model}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                        <span>Confidence: {(incident.aiReport.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>Generated: {formatDate(incident.aiReport.generatedAt, "MMM d, yyyy 'at' h:mm a")}</span>
+                      </div>
+                      {incident.aiReport.promptTokens && incident.aiReport.completionTokens && (
+                        <div className="flex items-center gap-2">
+                          <span>
+                            Tokens: {incident.aiReport.promptTokens + incident.aiReport.completionTokens} total
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-purple-400" />
+                        <CardTitle className="text-base text-muted-foreground">AI Summary</CardTitle>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Pending
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                      <span>Awaiting AI generation</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Brain className="h-5 w-5 text-purple-400" />
+                        <CardTitle className="text-base text-muted-foreground">AI Insights</CardTitle>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Pending
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                      <span>Awaiting AI generation</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="h-5 w-5 text-purple-400" />
+                        <CardTitle className="text-base text-muted-foreground">AI Recommendations</CardTitle>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Pending
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                      <span>Awaiting AI generation</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-5 w-5 text-purple-400" />
+                        <CardTitle className="text-base text-muted-foreground">AI Actions</CardTitle>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Pending
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                      <span>Awaiting AI generation</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

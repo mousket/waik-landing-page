@@ -16,7 +16,7 @@ async function initializeDb() {
 
     try {
       // Pre-populate with sample users
-      db.users = [        
+      db.users = [
         {
           id: "user-1",
           username: "james.martinez",
@@ -25,7 +25,7 @@ async function initializeDb() {
           role: "staff",
           name: "James Martinez",
           createdAt: "2025-01-15T08:00:00Z",
-          email: "james.martine@waik.demo.care"
+          email: "james.martine@waik.demo.care",
         },
         {
           id: "user-2",
@@ -34,7 +34,7 @@ async function initializeDb() {
           role: "staff",
           name: "Sarah Johnson",
           createdAt: "2025-01-15T08:00:00Z",
-          email: "sarah.johnson@demo.waik.care"
+          email: "sarah.johnson@demo.waik.care",
         },
         {
           id: "user-3",
@@ -251,6 +251,33 @@ export async function addIncident(incident: Incident): Promise<Incident> {
   await initializeDb()
 
   db.incidents.push(incident)
+
+  return incident
+}
+
+export async function updateHumanReport(
+  incidentId: string,
+  humanReport: Incident["humanReport"],
+): Promise<Incident | null> {
+  await initializeDb()
+
+  const incident = getIncidentById(incidentId)
+  if (!incident) return null
+
+  incident.humanReport = humanReport
+  incident.updatedAt = new Date().toISOString()
+
+  return incident
+}
+
+export async function updateAIReport(incidentId: string, aiReport: Incident["aiReport"]): Promise<Incident | null> {
+  await initializeDb()
+
+  const incident = getIncidentById(incidentId)
+  if (!incident) return null
+
+  incident.aiReport = aiReport
+  incident.updatedAt = new Date().toISOString()
 
   return incident
 }
