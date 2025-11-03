@@ -1367,27 +1367,72 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                 <Button
                   onClick={handleGenerateAIReport}
                   disabled={!canGenerateAIReport || isGeneratingAIReport || !!incident.aiReport}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 relative overflow-hidden group"
                 >
-                  {isGeneratingAIReport ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : incident.aiReport ? (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Generated
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate WAiK Insights
-                    </>
+                  {isGeneratingAIReport && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 animate-pulse opacity-50" />
                   )}
+                  <span className="relative z-10 flex items-center">
+                    {isGeneratingAIReport ? (
+                      <>
+                        <Brain className="mr-2 h-4 w-4 animate-pulse" />
+                        Analyzing Incident...
+                      </>
+                    ) : incident.aiReport ? (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Regenerate Analysis
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4 group-hover:animate-pulse" />
+                        Generate WAiK's Analysis
+                      </>
+                    )}
+                  </span>
                 </Button>
               )}
             </div>
+
+            {isGeneratingAIReport && (
+              <Card className="border-purple-200 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 shadow-lg overflow-hidden">
+                <CardContent className="pt-8 pb-8">
+                  <div className="flex flex-col items-center justify-center space-y-6">
+                    <div className="relative">
+                      {/* Animated gradient background */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 blur-3xl opacity-30 animate-pulse" />
+
+                      {/* Pulsing brain icon */}
+                      <div className="relative">
+                        <Brain className="h-16 w-16 text-purple-600 animate-pulse" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 opacity-50 blur-xl animate-ping" />
+                      </div>
+                    </div>
+
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                        WAiK is analyzing the incident...
+                      </h3>
+                      <p className="text-sm text-muted-foreground max-w-md">
+                        Processing {answeredQuestions.length} answered questions and generating comprehensive insights
+                      </p>
+                    </div>
+
+                    {/* Animated dots */}
+                    <div className="flex gap-2">
+                      <div className="h-3 w-3 rounded-full bg-purple-600 animate-bounce [animation-delay:-0.3s]" />
+                      <div className="h-3 w-3 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.15s]" />
+                      <div className="h-3 w-3 rounded-full bg-cyan-600 animate-bounce" />
+                    </div>
+
+                    {/* Scanning effect */}
+                    <div className="w-full max-w-md h-1 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 animate-[scan_2s_ease-in-out_infinite]" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {!canGenerateAIReport && !incident.aiReport && (
               <Card className="border-yellow-200 bg-yellow-50">

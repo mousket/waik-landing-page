@@ -466,9 +466,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               <span className="sm:hidden">Q&A</span>
             </TabsTrigger>
             <TabsTrigger value="intelligence" className="data-[state=active]:bg-white">
-              <Mic className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Intelligence</span>
-              <span className="sm:hidden">Intel</span>
+              <Brain className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">WAIK Agent</span>
+              <span className="sm:hidden">WAIK</span>
             </TabsTrigger>
             <TabsTrigger value="summary" className="data-[state=active]:bg-white">
               <Sparkles className="h-4 w-4 mr-2" />
@@ -978,7 +978,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
                     </div>
                     <CardTitle className="text-base sm:text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent truncate">
-                      Incident Intelligence
+                      WAIK Agent
                     </CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1012,7 +1012,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       )}
                     </Button>
                   </div>
-                  {/* </CHANGE> */}
                 </div>
                 <CardDescription className="text-xs sm:text-sm mt-1">
                   Ask questions about this incident using voice or text
