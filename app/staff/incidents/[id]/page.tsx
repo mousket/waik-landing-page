@@ -467,14 +467,21 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </TabsTrigger>
             <TabsTrigger value="intelligence" className="data-[state=active]:bg-white">
               <Brain className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">WAIK Agent</span>
-              <span className="sm:hidden">WAIK</span>
+              <span className="hidden sm:inline">Intelligence</span>
+              <span className="sm:hidden">Intel</span>
             </TabsTrigger>
             <TabsTrigger value="summary" className="data-[state=active]:bg-white">
               <Sparkles className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Insights</span>
               <span className="sm:hidden">AI</span>
             </TabsTrigger>
+            {incident?.aiReport && (
+              <TabsTrigger value="waik" className="data-[state=active]:bg-white">
+                <Target className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">WAiK Agent</span>
+                <span className="sm:hidden">WAiK</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 mt-6">
@@ -978,7 +985,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
                     </div>
                     <CardTitle className="text-base sm:text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent truncate">
-                      WAIK Agent
+                      Incident Intelligence
                     </CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1298,6 +1305,92 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               </Card>
             </div>
           </TabsContent>
+
+          {incident?.aiReport && (
+            <TabsContent value="waik" className="space-y-6 mt-6">
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                  WAiK AI Agent
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">AI-powered analysis and recommendations</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Summary</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.summary}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Insights</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.insights}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Recommendations</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.recommendations}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-base">AI Actions</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.actions}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-100 bg-purple-50/50 lg:col-span-2">
+                  <CardContent className="pt-6">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Brain className="h-3.5 w-3.5 text-purple-600" />
+                        <span>Model: {incident.aiReport.model}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                        <span>Confidence: {(incident.aiReport.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>Generated: {formatDate(incident.aiReport.generatedAt, "MMM d, yyyy 'at' h:mm a")}</span>
+                      </div>
+                      {incident.aiReport.promptTokens && incident.aiReport.completionTokens && (
+                        <div className="flex items-center gap-2">
+                          <span>
+                            Tokens: {incident.aiReport.promptTokens + incident.aiReport.completionTokens} total
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
