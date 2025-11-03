@@ -516,6 +516,14 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const unansweredQuestions = incident.questions.filter((q) => !q.answer)
   const canGenerateAIReport = answeredQuestions.length >= 5
 
+  console.log("[v0] WAiK Agent Debug Info:", {
+    userRole,
+    answeredQuestionsCount: answeredQuestions.length,
+    canGenerateAIReport,
+    hasAIReport: !!incident?.aiReport,
+    isGeneratingAIReport,
+  })
+
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
       <div className="absolute inset-0 -z-10">
