@@ -512,6 +512,13 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     )
   }
 
+  console.log("[v0] Auth Store Values:", {
+    userId,
+    userRole,
+    userRoleType: typeof userRole,
+    isAdmin: userRole === "admin",
+  })
+
   const answeredQuestions = incident.questions.filter((q) => q.answer)
   const unansweredQuestions = incident.questions.filter((q) => !q.answer)
   const canGenerateAIReport = answeredQuestions.length >= 5
@@ -522,6 +529,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     canGenerateAIReport,
     hasAIReport: !!incident?.aiReport,
     isGeneratingAIReport,
+    shouldShowButton: userRole === "admin",
   })
 
   return (
