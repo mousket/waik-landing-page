@@ -303,6 +303,7 @@ export function createIncident(data: {
   priority: Incident["priority"]
   reportedBy: string
   reportedByName: string
+  initialReport?: Incident["initialReport"]
 }): Incident {
   console.log("[v0] [DB] createIncident called with:", {
     title: data.title,
@@ -310,6 +311,7 @@ export function createIncident(data: {
     roomNumber: data.roomNumber,
     reportedBy: data.reportedBy,
     reportedByName: data.reportedByName,
+    hasInitialReport: !!data.initialReport,
   })
 
   const id = `inc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -328,6 +330,7 @@ export function createIncident(data: {
     createdAt: now,
     updatedAt: now,
     questions: [],
+    initialReport: data.initialReport,
   }
 
   db.incidents.push(incident)
@@ -338,6 +341,7 @@ export function createIncident(data: {
     id: incident.id,
     title: incident.title,
     staffName: incident.staffName,
+    hasInitialReport: !!incident.initialReport,
   })
 
   return incident

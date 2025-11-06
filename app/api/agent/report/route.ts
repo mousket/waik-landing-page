@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createIncident, addQuestion } from "@/lib/db"
+import { enhanceNarrative } from "@/lib/utils/enhance-narrative"
 
 const INCIDENT_REPORT_QUESTIONS = [
   {
@@ -56,40 +57,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    let fullDescription = narrative
-    if (residentState) {
-      fullDescription += `\n\nResident State: ${residentState}`
-    }
-    if (environmentNotes) {
-      fullDescription += `\n\nEnvironment Notes: ${environmentNotes}`
-    }
+    console.log("[v0] Generating enhanced narratives...")
+    const enhancedNarrative = enhanceNarrative(narrative)
+    const enhancedResidentState = residentState ? enhanceNarrative(residentState) : undefined
+    const enhancedEnvironmentNotes = environmentNotes ? enhanceNarrative(environmentNotes) : undefined
+
+    console.log("[v0] ✅ Enhanced narratives generated")
+    console.log("[v0] Original narrative length:", narrative.length)
+    console.log("[v0] Enhanced narrative length:", enhancedNarrative.length)
 
     console.log("[v0] Creating incident...")
 
-    // Create the incident
     const incident = createIncident({
       title: `Incident - ${residentName} (Room ${roomNumber})`,
-      description: fullDescription,
+      description: enhancedNarrative,
       residentName,
       roomNumber,
       status: "open",
       priority: "medium",
       reportedBy: reportedBy || "unknown",
       reportedByName: reportedByName || "Unknown User",
+      initialReport: {
+        narrative,
+        enhancedNarrative,
+        residentState,
+        enhancedResidentState,
+        environmentNotes,
+        enhancedEnvironmentNotes,
+        createdBy: reportedBy || "unknown",
+        createdByName: reportedByName || "Unknown User",
+        createdAt: new Date().toISOString(),
+        method: "voice",
+      },
     })
 
     console.log("[v0] ✅ Incident created successfully!")
     console.log("[v0] Incident ID:", incident.id)
     console.log("[v0] Incident Title:", incident.title)
     console.log("[v0] Reported By:", incident.staffName, `(${incident.staffId})`)
+    console.log("[v0] Initial Report included: ✅")
 
     console.log("[v0] Adding incident report answers as Q&A...")
     let answeredQuestionsAdded = 0
 
     const reportAnswers = {
-      narrative,
-      residentState,
-      environmentNotes,
+      narrative: enhancedNarrative,
+      residentState: enhancedResidentState,
+      environmentNotes: enhancedEnvironmentNotes,
     }
 
     INCIDENT_REPORT_QUESTIONS.forEach((item) => {

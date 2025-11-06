@@ -37,6 +37,19 @@ export interface Question {
   generatedBy?: string
 }
 
+export interface InitialReport {
+  narrative: string // Raw voice transcript
+  enhancedNarrative: string // AI-polished version
+  residentState?: string // Raw voice transcript
+  enhancedResidentState?: string // AI-polished version
+  environmentNotes?: string // Raw voice transcript
+  enhancedEnvironmentNotes?: string // AI-polished version
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  method: "voice" | "text"
+}
+
 export interface HumanReport {
   summary: string
   insights: string
@@ -74,6 +87,7 @@ export interface Incident {
   updatedAt: string
   questions: Question[]
   summary?: string | null
+  initialReport?: InitialReport
   humanReport?: HumanReport
   aiReport?: AIReport
 }
