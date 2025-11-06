@@ -121,7 +121,7 @@ export default function StaffDashboard() {
           <Button
             size="lg"
             className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all w-full sm:w-auto"
-            onClick={() => router.push("/staff/report")}
+            onClick={() => router.push("/incidents/create")}
           >
             <Plus className="w-5 h-5 mr-2" />
             Create New Incident
