@@ -31,7 +31,6 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import type { Incident } from "@/lib/types"
 import { format } from "date-fns"
-import { getDisplayNarrative } from "@/lib/utils/enhance-narrative"
 
 function formatDate(dateString: string | undefined, formatString: string): string {
   if (!dateString) return "Invalid date"
@@ -494,22 +493,23 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       {incident?.title}
                     </CardTitle>
                     <div className="space-y-2 mt-2">
-                      {incident?.initialReport?.enhancedNarrative && (
-                        <Badge variant="secondary" className="mb-2">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          AI-Enhanced
-                        </Badge>
-                      )}
-                      <CardDescription>{incident ? getDisplayNarrative(incident) : ""}</CardDescription>
-                      {incident?.initialReport?.narrative &&
+                      <CardDescription>
+                        {incident?.initialReport?.narrative || incident?.description || "No description available"}
+                      </CardDescription>
+                      {incident?.initialReport?.enhancedNarrative &&
                         incident.initialReport.narrative !== incident.initialReport.enhancedNarrative && (
                           <details className="mt-2">
-                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                              View original transcript
+                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
+                              <Sparkles className="h-3 w-3" />
+                              View AI-enhanced version
                             </summary>
-                            <p className="text-sm text-muted-foreground mt-2 p-3 bg-muted/50 rounded-md">
-                              {incident.initialReport.narrative}
-                            </p>
+                            <div className="mt-2 p-3 bg-accent/5 rounded-md border border-accent/20">
+                              <Badge variant="secondary" className="mb-2">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                AI-Enhanced
+                              </Badge>
+                              <p className="text-sm text-foreground">{incident.initialReport.enhancedNarrative}</p>
+                            </div>
                           </details>
                         )}
                     </div>
