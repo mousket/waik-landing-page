@@ -75,6 +75,11 @@ export default function CreateIncidentPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleNext = () => {
+    if (currentStep === 5) {
+      handleSubmit()
+      return
+    }
+
     if (currentStep < 6) {
       const nextStep = (currentStep + 1) as Step
       setCurrentStep(nextStep)

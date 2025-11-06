@@ -17,20 +17,27 @@ const MOCK_QUESTIONS = [
 ]
 
 export async function POST(request: NextRequest) {
+  console.log("[v0] ========================================")
+  console.log("[v0] INCIDENT CREATION API CALLED")
+  console.log("[v0] ========================================")
+
   try {
     const body = await request.json()
     const { residentName, roomNumber, narrative, residentState, environmentNotes, reportedBy, reportedByName } = body
 
-    console.log("[v0] Creating incident with data:", {
+    console.log("[v0] Request body received:", {
       residentName,
       roomNumber,
-      narrative,
-      residentState,
-      environmentNotes,
+      narrativeLength: narrative?.length,
+      residentStateLength: residentState?.length,
+      environmentNotesLength: environmentNotes?.length,
+      reportedBy,
+      reportedByName,
     })
 
     // Validate required fields
     if (!residentName || !roomNumber || !narrative) {
+      console.log("[v0] Validation failed - missing required fields")
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
@@ -41,6 +48,8 @@ export async function POST(request: NextRequest) {
     if (environmentNotes) {
       fullDescription += `\n\nEnvironment Notes: ${environmentNotes}`
     }
+
+    console.log("[v0] Creating incident...")
 
     // Create the incident
     const incident = createIncident({
@@ -54,10 +63,14 @@ export async function POST(request: NextRequest) {
       reportedByName: reportedByName || "Unknown User",
     })
 
-    console.log("[v0] Incident created with ID:", incident.id)
+    console.log("[v0] ✅ Incident created successfully!")
+    console.log("[v0] Incident ID:", incident.id)
+    console.log("[v0] Incident Title:", incident.title)
+    console.log("[v0] Reported By:", incident.staffName, `(${incident.staffId})`)
 
+    console.log("[v0] Adding questions to incident...")
     let questionsAdded = 0
-    MOCK_QUESTIONS.forEach((questionText) => {
+    MOCK_QUESTIONS.forEach((questionText, index) => {
       const success = addQuestion(incident.id, {
         question: questionText,
         askedBy: "ai-agent",
@@ -66,10 +79,18 @@ export async function POST(request: NextRequest) {
         source: "ai-generated",
         generatedBy: "ai-agent",
       })
-      if (success) questionsAdded++
+      if (success) {
+        questionsAdded++
+        console.log(`[v0] ✅ Question ${index + 1}/${MOCK_QUESTIONS.length} added`)
+      } else {
+        console.log(`[v0] ❌ Question ${index + 1}/${MOCK_QUESTIONS.length} failed`)
+      }
     })
 
-    console.log("[v0] Questions added:", questionsAdded)
+    console.log("[v0] ✅ All questions added:", questionsAdded, "/", MOCK_QUESTIONS.length)
+    console.log("[v0] ========================================")
+    console.log("[v0] INCIDENT CREATION COMPLETE")
+    console.log("[v0] ========================================")
 
     return NextResponse.json({
       success: true,
@@ -77,7 +98,8 @@ export async function POST(request: NextRequest) {
       questionsGenerated: questionsAdded,
     })
   } catch (error) {
-    console.error("[v0] Error creating incident:", error)
+    console.error("[v0] ❌ ERROR creating incident:", error)
+    console.error("[v0] Error stack:", error instanceof Error ? error.stack : "No stack trace")
     return NextResponse.json({ error: "Failed to create incident" }, { status: 500 })
   }
 }

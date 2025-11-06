@@ -304,6 +304,14 @@ export function createIncident(data: {
   reportedBy: string
   reportedByName: string
 }): Incident {
+  console.log("[v0] [DB] createIncident called with:", {
+    title: data.title,
+    residentName: data.residentName,
+    roomNumber: data.roomNumber,
+    reportedBy: data.reportedBy,
+    reportedByName: data.reportedByName,
+  })
+
   const id = `inc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   const now = new Date().toISOString()
 
@@ -323,6 +331,15 @@ export function createIncident(data: {
   }
 
   db.incidents.push(incident)
+
+  console.log("[v0] [DB] ✅ Incident added to database")
+  console.log("[v0] [DB] Total incidents in database:", db.incidents.length)
+  console.log("[v0] [DB] Latest incident:", {
+    id: incident.id,
+    title: incident.title,
+    staffName: incident.staffName,
+  })
+
   return incident
 }
 
@@ -338,7 +355,10 @@ export function addQuestion(
   },
 ): boolean {
   const incident = getIncidentById(incidentId)
-  if (!incident) return false
+  if (!incident) {
+    console.log("[v0] [DB] ❌ addQuestion failed - incident not found:", incidentId)
+    return false
+  }
 
   const questionId = `q-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   const now = new Date().toISOString()
