@@ -76,10 +76,13 @@ export default function CreateIncidentPage() {
 
   const handleNext = () => {
     if (currentStep < 6) {
-      setCurrentStep(currentStep + 1)
-    }
-    if (autoSpeak && currentStep < 6) {
-      speakPrompt(VOICE_PROMPTS[currentStep - 1].question)
+      const nextStep = (currentStep + 1) as Step
+      setCurrentStep(nextStep)
+
+      // Speak the prompt for the NEXT step, not the current one
+      if (autoSpeak && nextStep < 6) {
+        speakPrompt(VOICE_PROMPTS[nextStep - 1].question)
+      }
     }
   }
 
