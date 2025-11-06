@@ -510,7 +510,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Staff Member</p>
+                    <p className="text-xs text-muted-foreground mb-1">Reported By</p>
                     <p className="font-medium">{incident?.staffName}</p>
                   </div>
                   <div>

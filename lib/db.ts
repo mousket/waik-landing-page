@@ -229,7 +229,15 @@ export function getIncidentById(id: string): Incident | null {
 }
 
 export function getIncidentsByStaffId(staffId: string): Incident[] {
-  return db.incidents.filter((i) => i.staffId === staffId)
+  return db.incidents.filter((incident) => {
+    // Include if staff created the incident
+    if (incident.staffId === staffId) return true
+
+    // Include if staff has any questions assigned to them
+    const hasAssignedQuestions = incident.questions.some((question) => question.assignedTo?.includes(staffId))
+
+    return hasAssignedQuestions
+  })
 }
 
 export async function updateIncident(id: string, updates: Partial<Incident>): Promise<Incident | null> {
