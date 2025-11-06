@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createIncident, addQuestion } from "@/lib/db"
 
-// Mock questions based on Scott's document
 const MOCK_QUESTIONS = [
   "Was the floor wet or cluttered at the time of the incident?",
   "Were the bed's brakes locked when the incident occurred?",
@@ -13,22 +12,40 @@ const MOCK_QUESTIONS = [
   "Had the resident been assessed for fall risk?",
   "What was the lighting like in the area where the incident occurred?",
   "Were there any environmental hazards present (loose rugs, cords, etc.)?",
+  "How is the resident doing now? What is their current state? Do they have any visible injuries, bruises, or complaints of pain?",
+  "What is the condition of the room and environment? Is there anything notable about the room, furniture placement, or environmental factors that could be relevant?",
 ]
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { residentName, roomNumber, narrative, reportedBy, reportedByName } = body
+    const { residentName, roomNumber, narrative, residentState, environmentNotes, reportedBy, reportedByName } = body
+
+    console.log("[v0] Creating incident with data:", {
+      residentName,
+      roomNumber,
+      narrative,
+      residentState,
+      environmentNotes,
+    })
 
     // Validate required fields
     if (!residentName || !roomNumber || !narrative) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    let fullDescription = narrative
+    if (residentState) {
+      fullDescription += `\n\nResident State: ${residentState}`
+    }
+    if (environmentNotes) {
+      fullDescription += `\n\nEnvironment Notes: ${environmentNotes}`
+    }
+
     // Create the incident
     const incident = createIncident({
       title: `Incident - ${residentName} (Room ${roomNumber})`,
-      description: narrative,
+      description: fullDescription,
       residentName,
       roomNumber,
       status: "open",
@@ -37,25 +54,30 @@ export async function POST(request: NextRequest) {
       reportedByName: reportedByName || "Unknown User",
     })
 
-    // Add 10 mock questions to the incident
+    console.log("[v0] Incident created with ID:", incident.id)
+
+    let questionsAdded = 0
     MOCK_QUESTIONS.forEach((questionText) => {
-      addQuestion(incident.id, {
+      const success = addQuestion(incident.id, {
         question: questionText,
         askedBy: "ai-agent",
         askedByName: "WAiK Agent",
-        assignedTo: [], // Not assigned to anyone initially
+        assignedTo: [],
         source: "ai-generated",
         generatedBy: "ai-agent",
       })
+      if (success) questionsAdded++
     })
+
+    console.log("[v0] Questions added:", questionsAdded)
 
     return NextResponse.json({
       success: true,
       incidentId: incident.id,
-      questionsGenerated: MOCK_QUESTIONS.length,
+      questionsGenerated: questionsAdded,
     })
   } catch (error) {
-    console.error("[API] Error creating incident:", error)
+    console.error("[v0] Error creating incident:", error)
     return NextResponse.json({ error: "Failed to create incident" }, { status: 500 })
   }
 }

@@ -21,12 +21,20 @@ export interface Answer {
 
 export interface Question {
   id: string
-  incidentId: string
-  questionText: string
+  incidentId?: string
+  question: string
   askedBy: string
+  askedByName?: string
   askedAt: string
   assignedTo?: string[]
-  answer?: Answer
+  answer?: {
+    text: string
+    answeredBy: string
+    answeredAt: string
+    method?: "text" | "voice"
+  }
+  source?: "ai-generated" | "manual"
+  generatedBy?: string
 }
 
 export interface HumanReport {
