@@ -60,7 +60,7 @@ type IntelligenceMessage = {
 
 export default function AdminIncidentDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const { userId, userRole } = useAuthStore()
+  const { userId, role } = useAuthStore()
   const [incident, setIncident] = useState<Incident | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -514,9 +514,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   console.log("[v0] Auth Store Values:", {
     userId,
-    userRole,
-    userRoleType: typeof userRole,
-    isAdmin: userRole === "admin",
+    role,
+    roleType: typeof role,
+    isAdmin: role === "admin",
   })
 
   const answeredQuestions = incident.questions.filter((q) => q.answer)
@@ -524,12 +524,12 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const canGenerateAIReport = answeredQuestions.length >= 5
 
   console.log("[v0] WAiK Agent Debug Info:", {
-    userRole,
+    role,
     answeredQuestionsCount: answeredQuestions.length,
     canGenerateAIReport,
     hasAIReport: !!incident?.aiReport,
     isGeneratingAIReport,
-    shouldShowButton: userRole === "admin",
+    shouldShowButton: role === "admin",
   })
 
   return (
@@ -653,7 +653,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                           <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
                             {incident.title}
                           </CardTitle>
-                          {userRole === "admin" && (
+                          {role === "admin" && (
                             <Button onClick={() => setIsEditingIncident(true)} variant="outline" size="sm">
                               <Edit2 className="mr-2 h-4 w-4" />
                               Edit
@@ -733,7 +733,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
               </Card>
             </div>
 
-            {userRole === "admin" && incident.status !== "closed" && (
+            {role === "admin" && incident.status !== "closed" && (
               <Card className="border-destructive/20 bg-destructive/5">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -1379,7 +1379,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">AI-powered analysis and recommendations</p>
               </div>
-              {userRole === "admin" && (
+              {role === "admin" && (
                 <Button
                   onClick={handleGenerateAIReport}
                   disabled={!canGenerateAIReport || isGeneratingAIReport || !!incident.aiReport}
