@@ -59,7 +59,7 @@ const VOICE_PROMPTS: VoicePrompt[] = [
 
 export default function CreateIncidentPage() {
   const router = useRouter()
-  const { userId, userRole, name } = useAuthStore()
+  const { userId, role, name } = useAuthStore()
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -276,7 +276,7 @@ export default function CreateIncidentPage() {
 
       // Wait a moment before redirecting
       setTimeout(() => {
-        if (userRole === "admin") {
+        if (role === "admin") {
           router.push("/admin/dashboard")
         } else {
           router.push("/staff/dashboard")
