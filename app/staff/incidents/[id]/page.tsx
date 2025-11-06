@@ -492,27 +492,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
                       {incident?.title}
                     </CardTitle>
-                    <div className="space-y-2 mt-2">
-                      <CardDescription>
-                        {incident?.initialReport?.narrative || incident?.description || "No description available"}
-                      </CardDescription>
-                      {incident?.initialReport?.enhancedNarrative &&
-                        incident.initialReport.narrative !== incident.initialReport.enhancedNarrative && (
-                          <details className="mt-2">
-                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-                              <Sparkles className="h-3 w-3" />
-                              View AI-enhanced version
-                            </summary>
-                            <div className="mt-2 p-3 bg-accent/5 rounded-md border border-accent/20">
-                              <Badge variant="secondary" className="mb-2">
-                                <Sparkles className="h-3 w-3 mr-1" />
-                                AI-Enhanced
-                              </Badge>
-                              <p className="text-sm text-foreground">{incident.initialReport.enhancedNarrative}</p>
-                            </div>
-                          </details>
-                        )}
-                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={incident?.priority === "high" ? "destructive" : "secondary"}>
@@ -543,6 +522,61 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   </div>
                 </div>
               </CardHeader>
+              <CardContent className="pt-0">
+                <Separator className="mb-4" />
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Incident Narrative
+                    </h3>
+                    <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                      {incident?.initialReport?.narrative || incident?.description || "No narrative provided."}
+                    </p>
+                  </div>
+
+                  {incident?.initialReport?.enhancedNarrative &&
+                    incident.initialReport.narrative !== incident.initialReport.enhancedNarrative && (
+                      <details className="mt-4">
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          View AI-enhanced version
+                        </summary>
+                        <div className="mt-2 p-3 bg-accent/5 rounded-md border border-accent/20">
+                          <Badge variant="secondary" className="mb-2">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            AI-Enhanced
+                          </Badge>
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
+                            {incident.initialReport.enhancedNarrative}
+                          </p>
+                        </div>
+                      </details>
+                    )}
+
+                  {(incident?.initialReport?.residentState || incident?.initialReport?.environmentNotes) && (
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {incident.initialReport.residentState && (
+                        <div className="p-3 bg-muted/40 rounded-md border border-muted">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Resident State</p>
+                          <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                            {incident.initialReport.residentState}
+                          </p>
+                        </div>
+                      )}
+                      {incident.initialReport.environmentNotes && (
+                        <div className="p-3 bg-muted/40 rounded-md border border-muted">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                            Environment Notes
+                          </p>
+                          <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                            {incident.initialReport.environmentNotes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
 
