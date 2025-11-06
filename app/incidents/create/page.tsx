@@ -72,6 +72,16 @@ export default function CreateIncidentPage() {
   const [environmentNotes, setEnvironmentNotes] = useState("")
   const [canAddMore, setCanAddMore] = useState(false)
   const recognitionRef = useRef<any>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleNext = () => {
+    if (currentStep < 6) {
+      setCurrentStep(currentStep + 1)
+    }
+    if (autoSpeak && currentStep < 6) {
+      speakPrompt(VOICE_PROMPTS[currentStep - 1].question)
+    }
+  }
 
   useEffect(() => {
     // Initialize speech recognition
@@ -207,38 +217,6 @@ export default function CreateIncidentPage() {
     startVoiceRecording()
   }
 
-  const handleNext = () => {
-    const currentPrompt = VOICE_PROMPTS[currentStep - 1]
-
-    // Validate current step
-    if (currentPrompt.field === "residentName" && !residentName.trim()) {
-      toast.error("Please provide the resident's name")
-      return
-    }
-    if (currentPrompt.field === "roomNumber" && !roomNumber.trim()) {
-      toast.error("Please provide the room number")
-      return
-    }
-    if (currentPrompt.field === "narrative" && !narrative.trim()) {
-      toast.error("Please provide a description of the incident")
-      return
-    }
-
-    if (currentStep === 5) {
-      // Submit the incident
-      handleSubmit()
-    } else {
-      // Move to next step
-      const nextStep = (currentStep + 1) as Step
-      setCurrentStep(nextStep)
-      setCanAddMore(false)
-      const nextPrompt = VOICE_PROMPTS[nextStep - 1]
-      if (autoSpeak) {
-        speakPrompt(nextPrompt.question)
-      }
-    }
-  }
-
   const handleSubmit = async () => {
     setIsProcessing(true)
     setCurrentStep(6)
@@ -315,6 +293,12 @@ export default function CreateIncidentPage() {
     currentPrompt.field === "residentState" ||
     currentPrompt.field === "environmentNotes"
 
+  useEffect(() => {
+    if (textareaRef.current && isListening) {
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight
+    }
+  }, [narrative, residentState, environmentNotes, isListening])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
       <Card className="w-full max-w-3xl shadow-2xl border-2">
@@ -381,10 +365,11 @@ export default function CreateIncidentPage() {
                 </Label>
                 {isLongFormField ? (
                   <Textarea
+                    ref={textareaRef}
                     value={getCurrentValue()}
                     onChange={(e) => setCurrentValue(e.target.value)}
                     placeholder="Type or use voice input..."
-                    className="min-h-[200px] text-base resize-none"
+                    className="min-h-[200px] max-h-[60vh] text-base resize-none overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent"
                   />
                 ) : (
                   <Input
