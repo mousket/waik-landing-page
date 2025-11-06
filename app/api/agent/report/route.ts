@@ -148,6 +148,10 @@ export async function POST(request: NextRequest) {
     console.log("[v0] - Unanswered:", followUpQuestionsAdded)
     console.log("[v0] ========================================")
 
+    console.log("[v0] ⏳ Adding 3-second delay for demo animation...")
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    console.log("[v0] ✅ Demo delay complete, returning response")
+
     return NextResponse.json({
       success: true,
       incidentId: incident.id,
