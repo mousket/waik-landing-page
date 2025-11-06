@@ -231,6 +231,9 @@ export default function CreateIncidentPage() {
 
     try {
       console.log("[v0] Submitting incident report...")
+      console.log("[v0] User role:", role)
+      console.log("[v0] User ID:", userId)
+      console.log("[v0] User name:", name)
 
       const response = await fetch("/api/agent/report", {
         method: "POST",
@@ -251,15 +254,19 @@ export default function CreateIncidentPage() {
       }
 
       const data = await response.json()
-      console.log("[v0] Incident created:", data)
+      console.log("[v0] Incident created successfully:", data)
+
+      setIsProcessing(false)
 
       toast.success("Incident reported successfully!")
 
-      // Wait a moment before redirecting
       setTimeout(() => {
+        console.log("[v0] Redirecting to dashboard for role:", role)
         if (role === "admin") {
+          console.log("[v0] Redirecting to /admin/dashboard")
           router.push("/admin/dashboard")
         } else {
+          console.log("[v0] Redirecting to /staff/dashboard")
           router.push("/staff/dashboard")
         }
       }, 2000)
@@ -435,23 +442,30 @@ export default function CreateIncidentPage() {
               {isProcessing ? (
                 <>
                   <div className="relative">
-                    <Loader2 className="h-20 w-20 text-primary animate-spin" />
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 rounded-full blur-xl animate-pulse" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/30 to-accent/30 rounded-full blur-2xl animate-pulse" />
+                    <Loader2 className="h-20 w-20 text-primary animate-spin relative z-10" />
                   </div>
                   <div className="text-center space-y-2">
-                    <p className="text-xl font-semibold">Analyzing Report...</p>
-                    <p className="text-muted-foreground">Creating incident and generating follow-up questions</p>
+                    <p className="text-xl font-semibold">Creating Incident Report...</p>
+                    <p className="text-muted-foreground">Analyzing details and generating follow-up questions</p>
                   </div>
                   <div className="w-full max-w-md bg-muted rounded-full h-2 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-primary to-accent animate-[shimmer_2s_infinite]" />
+                    <div className="h-full bg-gradient-to-r from-primary via-accent to-primary animate-[shimmer_1.5s_ease-in-out_infinite] bg-[length:200%_100%]" />
                   </div>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="h-20 w-20 text-green-500" />
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-green-500/30 rounded-full blur-2xl animate-pulse" />
+                    <CheckCircle2 className="h-20 w-20 text-green-500 relative z-10 animate-[scale-in_0.5s_ease-out]" />
+                  </div>
                   <div className="text-center space-y-2">
                     <p className="text-xl font-semibold text-green-600">Report Submitted Successfully!</p>
-                    <p className="text-muted-foreground">Redirecting to dashboard...</p>
+                    <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+                    <span>Incident created and questions generated</span>
                   </div>
                 </>
               )}
