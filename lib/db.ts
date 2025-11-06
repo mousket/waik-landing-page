@@ -286,6 +286,72 @@ export async function updateAIReport(incidentId: string, aiReport: Incident["aiR
 // QUESTION & ANSWER FUNCTIONS
 // ============================================================================
 
+export function createIncident(data: {
+  title: string
+  description: string
+  residentName: string
+  roomNumber: string
+  status: Incident["status"]
+  priority: Incident["priority"]
+  reportedBy: string
+  reportedByName: string
+}): Incident {
+  const id = `inc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const now = new Date().toISOString()
+
+  const incident: Incident = {
+    id,
+    title: data.title,
+    description: data.description,
+    status: data.status,
+    priority: data.priority,
+    residentName: data.residentName,
+    residentRoom: data.roomNumber,
+    staffId: data.reportedBy,
+    staffName: data.reportedByName,
+    createdAt: now,
+    updatedAt: now,
+    questions: [],
+  }
+
+  db.incidents.push(incident)
+  return incident
+}
+
+export function addQuestion(
+  incidentId: string,
+  data: {
+    question: string
+    askedBy: string
+    askedByName: string
+    assignedTo?: string[]
+    source?: "ai-generated" | "manual"
+    generatedBy?: string
+  },
+): boolean {
+  const incident = getIncidentById(incidentId)
+  if (!incident) return false
+
+  const questionId = `q-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const now = new Date().toISOString()
+
+  const question: Incident["questions"][0] = {
+    id: questionId,
+    question: data.question,
+    askedBy: data.askedBy,
+    askedByName: data.askedByName,
+    askedAt: now,
+    assignedTo: data.assignedTo || [],
+    source: data.source,
+    generatedBy: data.generatedBy,
+  }
+
+  incident.questions.push(question)
+  incident.updatedAt = now
+
+  return true
+}
+
 export async function addQuestionToIncident(incidentId: string, question: Incident["questions"][0]): Promise<boolean> {
   await initializeDb()
 

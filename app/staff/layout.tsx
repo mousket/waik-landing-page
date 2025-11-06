@@ -157,7 +157,7 @@ export default function StaffLayout({
               <Button
                 className="w-full justify-start bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
                 onClick={() => {
-                  router.push("/staff/report")
+                  router.push("/incidents/create")
                   setIsMobileMenuOpen(false)
                 }}
               >
