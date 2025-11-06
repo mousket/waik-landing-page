@@ -352,6 +352,12 @@ export function addQuestion(
     assignedTo?: string[]
     source?: "ai-generated" | "manual"
     generatedBy?: string
+    answer?: {
+      text: string
+      answeredBy: string
+      answeredAt?: string
+      method?: "text" | "voice"
+    }
   },
 ): boolean {
   const incident = getIncidentById(incidentId)
@@ -372,10 +378,24 @@ export function addQuestion(
     assignedTo: data.assignedTo || [],
     source: data.source,
     generatedBy: data.generatedBy,
+    answer: data.answer
+      ? {
+          text: data.answer.text,
+          answeredBy: data.answer.answeredBy,
+          answeredAt: data.answer.answeredAt || now,
+          method: data.answer.method || "voice",
+        }
+      : undefined,
   }
 
   incident.questions.push(question)
   incident.updatedAt = now
+
+  console.log("[v0] [DB] ✅ Question added:", {
+    id: questionId,
+    hasAnswer: !!data.answer,
+    question: data.question.substring(0, 50) + "...",
+  })
 
   return true
 }
