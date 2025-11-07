@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { useAuthStore } from "@/lib/auth-store"
 import { escapeHtml } from "@/lib/utils"
+import { markdownToHtml } from "@/lib/utils/markdown-to-html"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -83,15 +84,15 @@ const applyCustomHeadings = (html: string) =>
 
 const formatPlainTextAsHtml = (value: string) => `<p>${escapeHtml(value).replace(/\n+/g, "<br />")}</p>`
 
-const formatAiContent = (value?: string | null) => {
-  if (!value) return null
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const html = ensureSummaryHtml(trimmed)
-  return applyCustomHeadings(html)
-}
+// const formatAiContent = (value?: string | null) => {
+//   if (!value) return null
+//   const trimmed = value.trim()
+//   if (!trimmed) return null
+//   const html = ensureSummaryHtml(trimmed)
+//   return applyCustomHeadings(html)
+// }
 
-function formatDate(dateString: string | undefined, formatString: string): string {
+const formatDate = (dateString: string | undefined, formatString: string): string => {
   if (!dateString) return "Invalid date"
 
   try {
@@ -531,10 +532,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const originalNarrative = originalNarrativeRaw.trim()
   const residentStateRaw = incident?.initialReport?.residentState?.trim()
   const environmentNotesRaw = incident?.initialReport?.environmentNotes?.trim()
+  // Replace original narrative formatting with markdownToHtml
   const narrativeHtml = enhancedNarrativeHtml
-    ? ensureSummaryHtml(enhancedNarrativeHtml)
+    ? markdownToHtml(enhancedNarrativeHtml)
     : originalNarrative
-      ? formatPlainTextAsHtml(originalNarrative)
+      ? `<p>${originalNarrative.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br />")}</p>`
       : "<p>No narrative provided.</p>"
   const showOriginalNarrative = Boolean(enhancedNarrativeHtml && originalNarrative)
   const residentStateHtml = residentStateRaw ? formatPlainTextAsHtml(residentStateRaw) : null
@@ -1343,6 +1345,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </div>
           </TabsContent>
 
+          {/* Update WAiK Agent tab to use markdown parser */}
           <TabsContent value="waik" className="space-y-6 mt-6">
             <div className="mb-4">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
@@ -1363,14 +1366,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {formatAiContent(incident.aiReport.summary) ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.summary)! }}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No summary available.</p>
-                    )}
+                    <div
+                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.summary || "") }}
+                    />
                   </CardContent>
                 </Card>
 
@@ -1382,14 +1381,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {formatAiContent(incident.aiReport.insights) ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.insights)! }}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No insights available.</p>
-                    )}
+                    <div
+                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.insights || "") }}
+                    />
                   </CardContent>
                 </Card>
 
@@ -1401,14 +1396,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {formatAiContent(incident.aiReport.recommendations) ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.recommendations)! }}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No recommendations available.</p>
-                    )}
+                    <div
+                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.recommendations || "") }}
+                    />
                   </CardContent>
                 </Card>
 
@@ -1420,14 +1411,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {formatAiContent(incident.aiReport.actions) ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.actions)! }}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No action items available.</p>
-                    )}
+                    <div
+                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.actions || "") }}
+                    />
                   </CardContent>
                 </Card>
 

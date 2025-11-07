@@ -38,6 +38,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { getDisplayNarrative } from "@/lib/utils/enhance-narrative"
+import { markdownToHtml } from "@/lib/utils/markdown-to-html"
 
 function formatDate(dateString: string | undefined, formatString: string): string {
   if (!dateString) return "Invalid date"
@@ -704,7 +705,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                           <div
                             className="text-sm leading-relaxed text-foreground incident-enhanced-html"
                             dangerouslySetInnerHTML={{
-                              __html: incident.initialReport.enhancedNarrative,
+                              __html: markdownToHtml(incident.initialReport.enhancedNarrative),
                             }}
                           />
                         </>
