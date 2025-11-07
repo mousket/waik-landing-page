@@ -1196,6 +1196,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
             <Separator className="my-4" />
 
+            {/* START OF UPDATED SECTION */}
             <Card className="border-accent/20 bg-white shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg text-accent">Send New Question to Staff</CardTitle>
@@ -1214,39 +1215,73 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                   />
                 </div>
 
-                <div>
-                  <Label className="mb-2 block">Assign to Staff Members (Optional)</Label>
-                  <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto">
-                    {staffList.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No staff members available</p>
-                    ) : (
-                      staffList.map((staff) => (
-                        <div key={staff.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`new-${staff.id}`}
-                            checked={selectedStaff.includes(staff.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedStaff([...selectedStaff, staff.id])
-                              } else {
-                                setSelectedStaff(selectedStaff.filter((id) => id !== staff.id))
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`new-${staff.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                          >
-                            {staff.name}
-                          </label>
-                        </div>
-                      ))
-                    )}
+                {/* Employee Assignment Section - Same UI as Pending Questions */}
+                <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-primary" />
+                    <Label className="text-sm font-semibold">Assign to Employee(s) (Optional)</Label>
                   </div>
+
+                  {/* Search Input */}
+                  <Input
+                    placeholder="Start typing a name..."
+                    value={employeeSearchQuery}
+                    onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+
+                  {/* Employee Selection */}
+                  {employeeSearchQuery && (
+                    <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
+                      {filteredEmployees.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No employees found</p>
+                      ) : (
+                        filteredEmployees.map((emp) => (
+                          <div key={emp.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`new-q-${emp.id}`}
+                              checked={selectedStaff.includes(emp.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedStaff([...selectedStaff, emp.id])
+                                } else {
+                                  setSelectedStaff(selectedStaff.filter((id) => id !== emp.id))
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`new-q-${emp.id}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                            >
+                              {emp.name}
+                              <Badge variant="outline" className="text-xs">
+                                {emp.role}
+                              </Badge>
+                            </label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selected Employees Display */}
                   {selectedStaff.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {selectedStaff.length} staff member{selectedStaff.length > 1 ? "s" : ""} selected
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedStaff.map((empId) => {
+                        const emp = staffList.find((s) => s.id === empId)
+                        return (
+                          <Badge key={empId} variant="secondary" className="flex items-center gap-1">
+                            {emp?.name}
+                            <button
+                              onClick={() => setSelectedStaff(selectedStaff.filter((id) => id !== empId))}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        )
+                      })}
+                    </div>
                   )}
                 </div>
 
@@ -1260,6 +1295,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                 </Button>
               </CardContent>
             </Card>
+            {/* END OF UPDATED SECTION */}
           </TabsContent>
 
           <TabsContent value="intelligence" className="space-y-6 mt-6">

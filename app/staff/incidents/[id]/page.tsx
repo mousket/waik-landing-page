@@ -12,7 +12,6 @@ import { escapeHtml } from "@/lib/utils"
 import { markdownToHtml } from "@/lib/utils/markdown-to-html"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   ArrowLeft,
   MessageSquare,
@@ -28,12 +27,11 @@ import {
   CheckCircle2,
   Send,
   Loader2,
-  UserPlus,
-  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Incident, User as Staff } from "@/lib/types"
 import { format } from "date-fns"
+import { Textarea } from "@/components/ui/textarea"
 
 const formatInlineHtml = (value: string) => escapeHtml(value).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
 
@@ -699,177 +697,234 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             {unansweredQuestions.length > 0 && (
               <Card className="bg-white shadow-lg border-accent/40">
                 <CardHeader>
-                  <CardTitle className="text-lg text-accent">
-                    Pending Questions ({unansweredQuestions.length})
-                  </CardTitle>
-                  <CardDescription>Questions awaiting response - Navigate using tabs below</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg text-accent">
+                        Pending Questions ({unansweredQuestions.length})
+                      </CardTitle>
+                      <CardDescription>Answer questions assigned to you using text or voice</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={qaMode === "text" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setQaMode("text")}
+                      >
+                        <Type className="h-4 w-4 mr-2" />
+                        Text
+                      </Button>
+                      <Button
+                        variant={qaMode === "voice" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setQaMode("voice")
+                          handleStartVoiceMode()
+                        }}
+                      >
+                        <Mic className="h-4 w-4 mr-2" />
+                        Voice
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Question Navigation Tabs */}
-                  <div className="flex gap-2 flex-wrap">
-                    {unansweredQuestions.map((q, idx) => (
-                      <button
-                        key={q.id}
-                        onClick={() => setCurrentPendingQuestionTab(idx)}
-                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
-                          idx === currentPendingQuestionTab
-                            ? "bg-accent text-accent-foreground shadow-md"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        <span className="font-medium">Q{idx + 1}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {qaMode === "text" ? (
+                    // Text Mode
+                    <>
+                      {/* Question Navigation */}
+                      <div className="flex gap-2 flex-wrap">
+                        {unansweredQuestions.map((q, idx) => (
+                          <button
+                            key={q.id}
+                            onClick={() => setCurrentTextQuestionIndex(idx)}
+                            className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                              idx === currentTextQuestionIndex
+                                ? "bg-accent text-accent-foreground shadow-md"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            }`}
+                          >
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            <span className="font-medium">Q{idx + 1}</span>
+                          </button>
+                        ))}
+                      </div>
 
-                  {/* Current Question Display */}
-                  <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
-                    <div className="flex items-start gap-3">
-                      <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="font-medium text-lg leading-relaxed">
-                          {unansweredQuestions[currentPendingQuestionTab]?.questionText}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <p className="text-xs text-muted-foreground">
-                            Asked by{" "}
-                            <span className="font-medium">
-                              {unansweredQuestions[currentPendingQuestionTab]?.askedBy}
-                            </span>
-                          </p>
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(
-                              unansweredQuestions[currentPendingQuestionTab]?.askedAt,
-                              "MMM d, yyyy 'at' h:mm a",
-                            )}
-                          </p>
-                        </div>
-                        {unansweredQuestions[currentPendingQuestionTab]?.assignedTo &&
-                          unansweredQuestions[currentPendingQuestionTab].assignedTo!.length > 0 && (
+                      {/* Current Question */}
+                      <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                        <div className="flex items-start gap-3">
+                          <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="font-medium text-lg leading-relaxed">
+                              {unansweredQuestions[currentTextQuestionIndex]?.questionText}
+                            </p>
                             <div className="flex items-center gap-2 mt-2">
-                              <UserPlus className="h-3 w-3 text-muted-foreground" />
                               <p className="text-xs text-muted-foreground">
-                                Assigned to:{" "}
-                                {unansweredQuestions[currentPendingQuestionTab]
-                                  .assignedTo!.map((empId) => {
-                                    const emp = staffList.find((s) => s.id === empId)
-                                    return emp?.name || empId
-                                  })
-                                  .join(", ")}
+                                Asked by{" "}
+                                <span className="font-medium">
+                                  {unansweredQuestions[currentTextQuestionIndex]?.askedBy}
+                                </span>
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(
+                                  unansweredQuestions[currentTextQuestionIndex]?.askedAt,
+                                  "MMM d, yyyy 'at' h:mm a",
+                                )}
                               </p>
                             </div>
-                          )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Assignment Section */}
-                  <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
-                    <div className="flex items-center gap-2">
-                      <UserPlus className="h-4 w-4 text-primary" />
-                      <Label className="text-sm font-semibold">Assign to Employee(s)</Label>
-                    </div>
+                      {/* Answer Input */}
+                      <div className="space-y-3">
+                        <Label htmlFor="answer-input">Your Answer</Label>
+                        <Textarea
+                          id="answer-input"
+                          placeholder="Type your answer here..."
+                          value={answers[unansweredQuestions[currentTextQuestionIndex]?.id] || ""}
+                          onChange={(e) =>
+                            setAnswers({
+                              ...answers,
+                              [unansweredQuestions[currentTextQuestionIndex]?.id]: e.target.value,
+                            })
+                          }
+                          rows={5}
+                        />
+                      </div>
 
-                    {/* Search Input */}
-                    <Input
-                      placeholder="Start typing a name..."
-                      value={employeeSearchQuery}
-                      onChange={(e) => setEmployeeSearchQuery(e.target.value)}
-                      className="w-full"
-                    />
-
-                    {/* Employee Selection */}
-                    {employeeSearchQuery && (
-                      <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
-                        {filteredEmployees.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No employees found</p>
+                      {/* Save Button */}
+                      <Button onClick={handleSaveProgress} disabled={saving} className="w-full">
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
                         ) : (
-                          filteredEmployees.map((emp) => (
-                            <div key={emp.id} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={emp.id}
-                                checked={selectedEmployees.includes(emp.id)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedEmployees([...selectedEmployees, emp.id])
-                                  } else {
-                                    setSelectedEmployees(selectedEmployees.filter((id) => id !== emp.id))
-                                  }
-                                }}
+                          <>
+                            <Send className="mr-2 h-4 w-4" />
+                            Save Answer
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Navigation */}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => setCurrentTextQuestionIndex(Math.max(0, currentTextQuestionIndex - 1))}
+                          disabled={currentTextQuestionIndex === 0}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <ArrowLeft className="mr-2 h-4 w-4" />
+                          Previous
+                        </Button>
+                        <Button
+                          onClick={() =>
+                            setCurrentTextQuestionIndex(
+                              Math.min(unansweredQuestions.length - 1, currentTextQuestionIndex + 1),
+                            )
+                          }
+                          disabled={currentTextQuestionIndex === unansweredQuestions.length - 1}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Next
+                          <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    // Voice Mode
+                    <>
+                      <div className="text-center space-y-4 py-8">
+                        <div className="mx-auto w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center">
+                          {isRecording ? (
+                            <Mic className="h-10 w-10 text-accent animate-pulse" />
+                          ) : isSpeaking ? (
+                            <Volume2 className="h-10 w-10 text-accent animate-pulse" />
+                          ) : (
+                            <Mic className="h-10 w-10 text-accent" />
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-lg font-semibold mb-2">
+                            Question {currentQuestionIndex + 1} of {unansweredQuestions.length}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {isSpeaking
+                              ? "Listening to question..."
+                              : isRecording
+                                ? "Recording your answer..."
+                                : "Ready to answer"}
+                          </p>
+                        </div>
+
+                        {isEditingTranscript && (
+                          <Card className="border-primary/20">
+                            <CardContent className="pt-6">
+                              <Label htmlFor="transcript-edit">Review and edit your answer</Label>
+                              <Textarea
+                                id="transcript-edit"
+                                value={currentTranscript}
+                                onChange={(e) => setCurrentTranscript(e.target.value)}
+                                rows={5}
+                                className="mt-2"
                               />
-                              <label
-                                htmlFor={emp.id}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
-                              >
-                                {emp.name}
-                                <Badge variant="outline" className="text-xs">
-                                  {emp.role}
-                                </Badge>
-                              </label>
-                            </div>
-                          ))
+                              <div className="flex gap-2 mt-4">
+                                <Button onClick={handleSaveCurrentAnswer} disabled={saving} className="flex-1">
+                                  {saving ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                                      Save Answer
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  onClick={() => {
+                                    setCurrentTranscript("")
+                                    setIsEditingTranscript(false)
+                                    setTimeout(
+                                      () => speakQuestion(unansweredQuestions[currentQuestionIndex].questionText),
+                                      300,
+                                    )
+                                  }}
+                                  variant="outline"
+                                >
+                                  Re-record
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {!isEditingTranscript && (
+                          <div className="flex gap-2 justify-center">
+                            {isRecording ? (
+                              <Button onClick={stopRecording} variant="destructive" size="lg">
+                                <MicOff className="mr-2 h-5 w-5" />
+                                Stop Recording
+                              </Button>
+                            ) : (
+                              <Button onClick={startRecording} size="lg" disabled={isSpeaking}>
+                                <Mic className="mr-2 h-5 w-5" />
+                                Start Recording
+                              </Button>
+                            )}
+                            <Button onClick={() => setQaMode("text")} variant="outline" size="lg">
+                              Switch to Text
+                            </Button>
+                          </div>
                         )}
                       </div>
-                    )}
-
-                    {/* Selected Employees Display */}
-                    {selectedEmployees.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEmployees.map((empId) => {
-                          const emp = staffList.find((s) => s.id === empId)
-                          return (
-                            <Badge key={empId} variant="secondary" className="flex items-center gap-1">
-                              {emp?.name}
-                              <button
-                                onClick={() => setSelectedEmployees(selectedEmployees.filter((id) => id !== empId))}
-                                className="ml-1 hover:text-destructive"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    <Button
-                      onClick={() => handleAssignQuestion(unansweredQuestions[currentPendingQuestionTab].id)}
-                      disabled={selectedEmployees.length === 0}
-                      size="sm"
-                      className="w-full"
-                    >
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Assign to {selectedEmployees.length} Employee{selectedEmployees.length !== 1 ? "s" : ""}
-                    </Button>
-                  </div>
-
-                  {/* Navigation Buttons */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setCurrentPendingQuestionTab(Math.max(0, currentPendingQuestionTab - 1))}
-                      disabled={currentPendingQuestionTab === 0}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Previous
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        setCurrentPendingQuestionTab(
-                          Math.min(unansweredQuestions.length - 1, currentPendingQuestionTab + 1),
-                        )
-                      }
-                      disabled={currentPendingQuestionTab === unansweredQuestions.length - 1}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      Next
-                      <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
-                    </Button>
-                  </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
