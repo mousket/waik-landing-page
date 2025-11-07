@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { useAuthStore } from "@/lib/auth-store"
+import { escapeHtml } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   ArrowLeft,
-  Save,
   MessageSquare,
   FileText,
   Sparkles,
@@ -23,14 +25,71 @@ import {
   Type,
   Volume2,
   CheckCircle2,
-  Circle,
   Send,
   Loader2,
+  UserPlus,
+  X,
 } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import type { Incident } from "@/lib/types"
+import type { Incident, User as Staff } from "@/lib/types"
 import { format } from "date-fns"
+
+const formatInlineHtml = (value: string) => escapeHtml(value).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+
+const formatSummaryAsHtml = (value: string) => {
+  const blocks = value
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+
+  const htmlBlocks = blocks.map((block) => {
+    const lines = block
+      .split(/\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (lines.length === 0) return ""
+
+    const bulletLines = lines.filter((line) => line.startsWith("- "))
+    const nonBulletLines = lines.filter((line) => !line.startsWith("- "))
+
+    const parts: string[] = []
+
+    if (nonBulletLines.length > 0) {
+      parts.push(`<p>${formatInlineHtml(nonBulletLines.join(" "))}</p>`)
+    }
+
+    if (bulletLines.length > 0) {
+      const items = bulletLines.map((line) => `<li>${formatInlineHtml(line.slice(2))}</li>`).join("")
+      parts.push(`<ul>${items}</ul>`)
+    }
+
+    return parts.join("")
+  })
+
+  return htmlBlocks.join("")
+}
+
+const ensureSummaryHtml = (value: string) => (/<[^>]+>/.test(value) ? value : formatSummaryAsHtml(value))
+
+const applyCustomHeadings = (html: string) =>
+  html
+    .replace(/###([^#]+?)###/g, (_, content) => `<h3>${formatInlineHtml(content.trim())}</h3>`)
+    .replace(/##([^#]+?)##/g, (_, content) => `<h2>${formatInlineHtml(content.trim())}</h2>`)
+    .replace(/####([^#]+?)####/g, (_, content) => `<h4>${formatInlineHtml(content.trim())}</h4>`)
+    .replace(/<p>###\s*(.+?)<\/p>/g, (_, content) => `<h2>${formatInlineHtml(content.trim())}</h2>`)
+    .replace(/<p>##\s*(.+?)<\/p>/g, (_, content) => `<h2>${formatInlineHtml(content.trim())}</h2>`)
+    .replace(/<p>####\s*(.+?)<\/p>/g, (_, content) => `<h3>${formatInlineHtml(content.trim())}</h3>`)
+
+const formatPlainTextAsHtml = (value: string) => `<p>${escapeHtml(value).replace(/\n+/g, "<br />")}</p>`
+
+const formatAiContent = (value?: string | null) => {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const html = ensureSummaryHtml(trimmed)
+  return applyCustomHeadings(html)
+}
 
 function formatDate(dateString: string | undefined, formatString: string): string {
   if (!dateString) return "Invalid date"
@@ -54,6 +113,13 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
+  const [staffList, setStaffList] = useState<Staff[]>([])
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("")
+
+  const [currentPendingQuestionTab, setCurrentPendingQuestionTab] = useState(0)
+  const [currentAnsweredQuestionTab, setCurrentAnsweredQuestionTab] = useState(0)
+
   const [currentTextQuestionIndex, setCurrentTextQuestionIndex] = useState(0)
 
   const [qaMode, setQaMode] = useState<"text" | "voice">("text")
@@ -76,6 +142,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   useEffect(() => {
     fetchIncident()
+    fetchEmployeeList()
 
     if (typeof window !== "undefined") {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -92,6 +159,18 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       }
     }
   }, [params.id])
+
+  const fetchEmployeeList = async () => {
+    try {
+      const response = await fetch("/api/users")
+      if (response.ok) {
+        const users = await response.json()
+        setStaffList(users)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching employee list:", error)
+    }
+  }
 
   const fetchIncident = async () => {
     try {
@@ -112,6 +191,33 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       toast.error("Failed to load incident details")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleAssignQuestion = async (questionId: string) => {
+    if (selectedEmployees.length === 0) {
+      toast.error("Please select at least one employee")
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}/assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assignedTo: selectedEmployees,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to assign question")
+
+      toast.success(`Question assigned to ${selectedEmployees.length} employee(s)`)
+      setSelectedEmployees([])
+      setEmployeeSearchQuery("")
+      await fetchIncident()
+    } catch (error) {
+      console.error("[v0] Error assigning question:", error)
+      toast.error("Failed to assign question")
     }
   }
 
@@ -151,7 +257,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
         return newAnswers
       })
 
-      // Move to next unanswered question
       const remainingQuestions = incident.questions.filter((q) => !q.answer && q.id !== currentQuestion.id)
       if (remainingQuestions.length > 0) {
         setCurrentTextQuestionIndex(0)
@@ -417,6 +522,24 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const unansweredQuestions = incident?.questions.filter((q) => !q.answer) || []
   const answeredQuestions = incident?.questions.filter((q) => q.answer) || []
 
+  const filteredEmployees = staffList.filter((emp) =>
+    emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()),
+  )
+
+  const enhancedNarrativeHtml = incident?.initialReport?.enhancedNarrative?.trim()
+  const originalNarrativeRaw = incident?.initialReport?.narrative ?? incident?.description ?? ""
+  const originalNarrative = originalNarrativeRaw.trim()
+  const residentStateRaw = incident?.initialReport?.residentState?.trim()
+  const environmentNotesRaw = incident?.initialReport?.environmentNotes?.trim()
+  const narrativeHtml = enhancedNarrativeHtml
+    ? ensureSummaryHtml(enhancedNarrativeHtml)
+    : originalNarrative
+      ? formatPlainTextAsHtml(originalNarrative)
+      : "<p>No narrative provided.</p>"
+  const showOriginalNarrative = Boolean(enhancedNarrativeHtml && originalNarrative)
+  const residentStateHtml = residentStateRaw ? formatPlainTextAsHtml(residentStateRaw) : null
+  const environmentNotesHtml = environmentNotesRaw ? formatPlainTextAsHtml(environmentNotesRaw) : null
+
   const aiContent = incident
     ? {
         summary: "AI-generated summary will appear here once the AI Summary feature is implemented.",
@@ -454,7 +577,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-2 bg-white/50 p-2">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto gap-2 bg-white/50 p-2">
             <TabsTrigger value="overview" className="data-[state=active]:bg-white">
               <FileText className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Overview</span>
@@ -475,23 +598,68 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               <span className="hidden sm:inline">Insights</span>
               <span className="sm:hidden">AI</span>
             </TabsTrigger>
-            {incident?.aiReport && (
-              <TabsTrigger value="waik" className="data-[state=active]:bg-white">
-                <Target className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">WAiK Agent</span>
-                <span className="sm:hidden">WAiK</span>
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="waik" className="data-[state=active]:bg-white">
+              <Target className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">WAiK Agent</span>
+              <span className="sm:hidden">WAiK</span>
+            </TabsTrigger>
           </TabsList>
 
+          {/* Overview tab - Show enhanced narrative in overview (like admin page) */}
           <TabsContent value="overview" className="space-y-6 mt-6">
             <Card className="border-primary/20 bg-white shadow-lg">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex-1">
+                  <div className="flex-1 space-y-4">
                     <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
                       {incident?.title}
                     </CardTitle>
+                    <div className="space-y-3">
+                      {enhancedNarrativeHtml && (
+                        <Badge variant="secondary" className="w-fit uppercase tracking-wide text-[10px]">
+                          AI-enhanced summary
+                        </Badge>
+                      )}
+                      <div
+                        className="text-sm leading-relaxed text-muted-foreground incident-enhanced-html"
+                        dangerouslySetInnerHTML={{ __html: narrativeHtml }}
+                      />
+                    </div>
+                    {showOriginalNarrative && (
+                      <div className="mt-4 rounded-lg border border-muted bg-muted/40 p-4 space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Original voice narrative
+                        </p>
+                        <div
+                          className="text-sm leading-relaxed text-muted-foreground"
+                          dangerouslySetInnerHTML={{
+                            __html: formatPlainTextAsHtml(originalNarrative),
+                          }}
+                        />
+                      </div>
+                    )}
+                    {(residentStateHtml || environmentNotesHtml) && (
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {residentStateHtml && (
+                          <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Resident state</p>
+                            <div
+                              className="text-sm leading-relaxed text-muted-foreground"
+                              dangerouslySetInnerHTML={{ __html: residentStateHtml }}
+                            />
+                          </div>
+                        )}
+                        {environmentNotesHtml && (
+                          <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Environment notes</p>
+                            <div
+                              className="text-sm leading-relaxed text-muted-foreground"
+                              dangerouslySetInnerHTML={{ __html: environmentNotesHtml }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={incident?.priority === "high" ? "destructive" : "secondary"}>
@@ -522,513 +690,327 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
-                <Separator className="mb-4" />
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Incident Narrative
-                    </h3>
-                    <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-                      {incident?.initialReport?.narrative || incident?.description || "No narrative provided."}
-                    </p>
-                  </div>
-
-                  {incident?.initialReport?.enhancedNarrative &&
-                    incident.initialReport.narrative !== incident.initialReport.enhancedNarrative && (
-                      <details className="mt-4">
-                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" />
-                          View AI-enhanced version
-                        </summary>
-                        <div className="mt-2 p-3 bg-accent/5 rounded-md border border-accent/20">
-                          <Badge variant="secondary" className="mb-2">
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            AI-Enhanced
-                          </Badge>
-                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-                            {incident.initialReport.enhancedNarrative}
-                          </p>
-                        </div>
-                      </details>
-                    )}
-
-                  {(incident?.initialReport?.residentState || incident?.initialReport?.environmentNotes) && (
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {incident.initialReport.residentState && (
-                        <div className="p-3 bg-muted/40 rounded-md border border-muted">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Resident State</p>
-                          <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-                            {incident.initialReport.residentState}
-                          </p>
-                        </div>
-                      )}
-                      {incident.initialReport.environmentNotes && (
-                        <div className="p-3 bg-muted/40 rounded-md border border-muted">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                            Environment Notes
-                          </p>
-                          <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-                            {incident.initialReport.environmentNotes}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="qa" className="space-y-6 mt-6">
-            <Card className="bg-white shadow-lg border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  Answer Questions
-                </CardTitle>
-                <CardDescription>Choose how you'd like to answer questions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <Button
-                    variant={qaMode === "text" ? "default" : "outline"}
-                    onClick={() => setQaMode("text")}
-                    className="flex-1"
-                  >
-                    <Type className="mr-2 h-4 w-4" />
-                    Text Mode
-                  </Button>
-                  <Button
-                    variant={qaMode === "voice" ? "default" : "outline"}
-                    onClick={() => {
-                      setQaMode("voice")
-                      if (unansweredQuestions.length > 0) {
-                        handleStartVoiceMode()
-                      }
-                    }}
-                    className="flex-1"
-                  >
-                    <Mic className="mr-2 h-4 w-4" />
-                    Voice Mode
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {qaMode === "text" && unansweredQuestions.length > 0 && (
+            {unansweredQuestions.length > 0 && (
               <Card className="bg-white shadow-lg border-accent/40">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-accent text-base sm:text-lg">
-                    <Type className="h-5 w-5" />
-                    Text Mode - Question {currentTextQuestionIndex + 1} of {unansweredQuestions.length}
+                <CardHeader>
+                  <CardTitle className="text-lg text-accent">
+                    Pending Questions ({unansweredQuestions.length})
                   </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Type your answer and save to continue
-                  </CardDescription>
+                  <CardDescription>Questions awaiting response - Navigate using tabs below</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 sm:space-y-6">
-                  {/* Question Progress Tabs */}
+                <CardContent className="space-y-4">
+                  {/* Question Navigation Tabs */}
                   <div className="flex gap-2 flex-wrap">
                     {unansweredQuestions.map((q, idx) => (
                       <button
                         key={q.id}
-                        onClick={() => setCurrentTextQuestionIndex(idx)}
-                        className={`flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm transition-all ${
-                          idx === currentTextQuestionIndex
+                        onClick={() => setCurrentPendingQuestionTab(idx)}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                          idx === currentPendingQuestionTab
                             ? "bg-accent text-accent-foreground shadow-md"
-                            : answers[q.id]?.trim()
-                              ? "bg-green-100 text-green-700 hover:bg-green-200"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
                         }`}
                       >
-                        {answers[q.id]?.trim() ? (
-                          <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                        ) : (
-                          <Circle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                        )}
+                        <MessageSquare className="h-3.5 w-3.5" />
                         <span className="font-medium">Q{idx + 1}</span>
                       </button>
                     ))}
                   </div>
 
                   {/* Current Question Display */}
-                  <div className="p-4 sm:p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
-                    <div className="flex items-start gap-2 sm:gap-3">
-                      <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-accent mt-1 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm sm:text-base lg:text-lg leading-relaxed break-words">
-                          {unansweredQuestions[currentTextQuestionIndex]?.questionText}
+                  <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                    <div className="flex items-start gap-3">
+                      <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-medium text-lg leading-relaxed">
+                          {unansweredQuestions[currentPendingQuestionTab]?.questionText}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Asked{" "}
-                          {formatDate(
-                            unansweredQuestions[currentTextQuestionIndex]?.askedAt,
-                            "MMM d, yyyy 'at' h:mm a",
+                        <div className="flex items-center gap-2 mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            Asked by{" "}
+                            <span className="font-medium">
+                              {unansweredQuestions[currentPendingQuestionTab]?.askedBy}
+                            </span>
+                          </p>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(
+                              unansweredQuestions[currentPendingQuestionTab]?.askedAt,
+                              "MMM d, yyyy 'at' h:mm a",
+                            )}
+                          </p>
+                        </div>
+                        {unansweredQuestions[currentPendingQuestionTab]?.assignedTo &&
+                          unansweredQuestions[currentPendingQuestionTab].assignedTo!.length > 0 && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <UserPlus className="h-3 w-3 text-muted-foreground" />
+                              <p className="text-xs text-muted-foreground">
+                                Assigned to:{" "}
+                                {unansweredQuestions[currentPendingQuestionTab]
+                                  .assignedTo!.map((empId) => {
+                                    const emp = staffList.find((s) => s.id === empId)
+                                    return emp?.name || empId
+                                  })
+                                  .join(", ")}
+                              </p>
+                            </div>
                           )}
-                        </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Answer Input */}
-                  <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground">Your Answer:</label>
-                    <Textarea
-                      placeholder="Type your answer here..."
-                      value={answers[unansweredQuestions[currentTextQuestionIndex]?.id] || ""}
-                      onChange={(e) =>
-                        setAnswers({
-                          ...answers,
-                          [unansweredQuestions[currentTextQuestionIndex]?.id]: e.target.value,
-                        })
-                      }
-                      className="min-h-[120px] sm:min-h-[150px] text-sm sm:text-base resize-none"
+                  {/* Assignment Section */}
+                  <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-semibold">Assign to Employee(s)</Label>
+                    </div>
+
+                    {/* Search Input */}
+                    <Input
+                      placeholder="Start typing a name..."
+                      value={employeeSearchQuery}
+                      onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                      className="w-full"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      {answers[unansweredQuestions[currentTextQuestionIndex]?.id]?.length || 0} characters
-                    </p>
+
+                    {/* Employee Selection */}
+                    {employeeSearchQuery && (
+                      <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
+                        {filteredEmployees.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No employees found</p>
+                        ) : (
+                          filteredEmployees.map((emp) => (
+                            <div key={emp.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={emp.id}
+                                checked={selectedEmployees.includes(emp.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedEmployees([...selectedEmployees, emp.id])
+                                  } else {
+                                    setSelectedEmployees(selectedEmployees.filter((id) => id !== emp.id))
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={emp.id}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                              >
+                                {emp.name}
+                                <Badge variant="outline" className="text-xs">
+                                  {emp.role}
+                                </Badge>
+                              </label>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* Selected Employees Display */}
+                    {selectedEmployees.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedEmployees.map((empId) => {
+                          const emp = staffList.find((s) => s.id === empId)
+                          return (
+                            <Badge key={empId} variant="secondary" className="flex items-center gap-1">
+                              {emp?.name}
+                              <button
+                                onClick={() => setSelectedEmployees(selectedEmployees.filter((id) => id !== empId))}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={() => handleAssignQuestion(unansweredQuestions[currentPendingQuestionTab].id)}
+                      disabled={selectedEmployees.length === 0}
+                      size="sm"
+                      className="w-full"
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Assign to {selectedEmployees.length} Employee{selectedEmployees.length !== 1 ? "s" : ""}
+                    </Button>
                   </div>
 
-                  {/* Navigation and Save Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  {/* Navigation Buttons */}
+                  <div className="flex gap-2">
                     <Button
-                      onClick={() => setCurrentTextQuestionIndex(Math.max(0, currentTextQuestionIndex - 1))}
-                      disabled={currentTextQuestionIndex === 0}
+                      onClick={() => setCurrentPendingQuestionTab(Math.max(0, currentPendingQuestionTab - 1))}
+                      disabled={currentPendingQuestionTab === 0}
                       variant="outline"
-                      className="w-full sm:w-auto"
+                      className="flex-1"
                     >
                       <ArrowLeft className="mr-2 h-4 w-4" />
                       Previous
                     </Button>
-
-                    <Button onClick={handleSaveProgress} disabled={saving} className="flex-1" size="lg">
-                      <Save className="mr-2 h-4 w-4" />
-                      {saving ? "Saving..." : "Save & Continue"}
-                    </Button>
-
                     <Button
                       onClick={() =>
-                        setCurrentTextQuestionIndex(
-                          Math.min(unansweredQuestions.length - 1, currentTextQuestionIndex + 1),
+                        setCurrentPendingQuestionTab(
+                          Math.min(unansweredQuestions.length - 1, currentPendingQuestionTab + 1),
                         )
                       }
-                      disabled={currentTextQuestionIndex === unansweredQuestions.length - 1}
+                      disabled={currentPendingQuestionTab === unansweredQuestions.length - 1}
                       variant="outline"
-                      className="w-full sm:w-auto"
+                      className="flex-1"
                     >
                       Next
                       <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                     </Button>
                   </div>
-
-                  {/* Progress Indicator */}
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                      <span>Progress</span>
-                      <span>
-                        {Object.values(answers).filter((a) => a.trim()).length} / {unansweredQuestions.length} drafted
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-accent transition-all duration-300"
-                        style={{
-                          width: `${(Object.values(answers).filter((a) => a.trim()).length / unansweredQuestions.length) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             )}
 
-            {qaMode === "voice" && unansweredQuestions.length > 0 && (
+            {answeredQuestions.length > 0 && (
               <Card className="bg-white shadow-lg border-primary/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-primary text-base sm:text-lg">
-                    <Mic className="h-5 w-5" />
-                    Voice Mode - Question {currentQuestionIndex + 1} of {unansweredQuestions.length}
+                <CardHeader>
+                  <CardTitle className="text-lg text-primary">
+                    Answered Questions ({answeredQuestions.length})
                   </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Listen to the question and speak your answer
-                  </CardDescription>
+                  <CardDescription>Questions that have been responded to - Navigate using tabs below</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 sm:space-y-6">
+                <CardContent className="space-y-4">
+                  {/* Question Navigation Tabs */}
                   <div className="flex gap-2 flex-wrap">
-                    {unansweredQuestions.map((q, idx) => (
+                    {answeredQuestions.map((q, idx) => (
                       <button
                         key={q.id}
-                        onClick={() => {
-                          setCurrentQuestionIndex(idx)
-                          setCurrentTranscript("")
-                          setIsEditingTranscript(false)
-                          if (synthesis) {
-                            synthesis.cancel()
-                          }
-                          if (recognition && isRecording) {
-                            recognition.stop()
-                          }
-                          setTimeout(() => {
-                            speakQuestion(unansweredQuestions[idx].questionText)
-                          }, 300)
-                        }}
-                        className={`flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm transition-all ${
-                          idx === currentQuestionIndex
+                        onClick={() => setCurrentAnsweredQuestionTab(idx)}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                          idx === currentAnsweredQuestionTab
                             ? "bg-primary text-primary-foreground shadow-md"
-                            : voiceAnswers[q.id]
-                              ? "bg-green-100 text-green-700 hover:bg-green-200"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
                         }`}
                       >
-                        {voiceAnswers[q.id] ? (
-                          <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                        ) : (
-                          <Circle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                        )}
+                        <CheckCircle2 className="h-3.5 w-3.5" />
                         <span className="font-medium">Q{idx + 1}</span>
                       </button>
                     ))}
                   </div>
 
-                  {/* Current Question */}
-                  <div className="p-6 border-2 border-primary/20 rounded-lg bg-primary/5">
-                    <div className="flex items-start gap-3">
-                      <Volume2 className={`h-5 w-5 text-primary mt-1 ${isSpeaking ? "animate-pulse" : ""}`} />
-                      <div className="flex-1">
-                        <p className="font-medium text-lg leading-relaxed">
-                          {unansweredQuestions[currentQuestionIndex]?.questionText}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Asked{" "}
-                          {formatDate(unansweredQuestions[currentQuestionIndex]?.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recording Status */}
-                  <div className="flex flex-col items-center gap-4 py-8">
-                    {isSpeaking && (
-                      <div className="text-center">
-                        <Volume2 className="h-12 w-12 text-primary mx-auto mb-2 animate-pulse" />
-                        <p className="text-sm font-medium">Reading question...</p>
-                      </div>
-                    )}
-
-                    {isRecording && (
-                      <div className="text-center">
-                        <div className="relative">
-                          <Mic className="h-16 w-16 text-destructive mx-auto" />
-                          <div className="absolute inset-0 animate-ping">
-                            <Mic className="h-16 w-16 text-destructive/30 mx-auto" />
+                  {/* Current Question & Answer Display */}
+                  <div className="space-y-4">
+                    <div className="p-6 border-2 border-primary/20 rounded-lg bg-primary/5">
+                      <div className="flex items-start gap-3">
+                        <Badge variant="outline" className="mt-1">
+                          Q
+                        </Badge>
+                        <div className="flex-1">
+                          <p className="font-medium text-lg leading-relaxed">
+                            {answeredQuestions[currentAnsweredQuestionTab]?.questionText}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Asked by{" "}
+                              <span className="font-medium">
+                                {answeredQuestions[currentAnsweredQuestionTab]?.askedBy}
+                              </span>
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(
+                                answeredQuestions[currentAnsweredQuestionTab]?.askedAt,
+                                "MMM d, yyyy 'at' h:mm a",
+                              )}
+                            </p>
                           </div>
                         </div>
-                        <p className="text-sm font-medium mt-2">Listening...</p>
-                        <p className="text-xs text-muted-foreground">Speak your answer now</p>
                       </div>
-                    )}
+                    </div>
 
-                    {!isSpeaking && !isRecording && !isEditingTranscript && (
-                      <div className="text-center">
-                        <Mic className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">Ready to record</p>
+                    <div className="p-6 border-2 border-green-200 rounded-lg bg-green-50">
+                      <div className="flex items-start gap-3">
+                        <Badge className="bg-primary mt-1">A</Badge>
+                        <div className="flex-1">
+                          <p className="text-lg leading-relaxed">
+                            {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answerText}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Answered by{" "}
+                              <span className="font-medium">
+                                {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredBy}
+                              </span>
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(
+                                answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredAt,
+                                "MMM d, yyyy 'at' h:mm a",
+                              )}
+                            </p>
+                            <Badge variant="secondary" className="text-xs">
+                              {answeredQuestions[currentAnsweredQuestionTab]?.answer?.method === "voice" ? (
+                                <>
+                                  <Mic className="h-3 w-3 mr-1" /> voice
+                                </>
+                              ) : (
+                                <>
+                                  <Type className="h-3 w-3 mr-1" /> text
+                                </>
+                              )}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
 
-                  {currentTranscript && (
-                    <div className="p-6 border-2 rounded-lg bg-green-50 border-green-200 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-green-900">Your Answer (Review & Edit):</p>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          <Mic className="h-3 w-3 mr-1" />
-                          Voice
-                        </Badge>
-                      </div>
-                      <Textarea
-                        value={currentTranscript}
-                        onChange={(e) => setCurrentTranscript(e.target.value)}
-                        className="min-h-[120px] bg-white border-green-300 focus:border-green-500 text-base"
-                        placeholder="Your transcribed answer will appear here..."
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleSaveCurrentAnswer}
-                          disabled={saving || !currentTranscript.trim()}
-                          className="flex-1 bg-green-600 hover:bg-green-700"
-                          size="lg"
-                        >
-                          <Save className="mr-2 h-4 w-4" />
-                          {saving ? "Saving..." : "Save & Continue"}
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setCurrentTranscript("")
-                            setIsEditingTranscript(false)
-                            toast.info("Answer discarded. Record again.")
-                          }}
-                          variant="outline"
-                          disabled={saving}
-                        >
-                          Discard
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2 sm:space-y-3">
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        onClick={() => speakQuestion(unansweredQuestions[currentQuestionIndex]?.questionText || "")}
-                        disabled={isSpeaking || isRecording || saving}
-                        variant="outline"
-                        className="flex-1 min-w-[140px]"
-                      >
-                        <Volume2 className="mr-2 h-4 w-4" />
-                        Repeat Question
-                      </Button>
-
-                      {!isRecording && !isEditingTranscript ? (
-                        <Button
-                          onClick={startRecording}
-                          disabled={isSpeaking || saving}
-                          variant="default"
-                          className="flex-1 min-w-[140px]"
-                        >
-                          <Mic className="mr-2 h-4 w-4" />
-                          Start Recording
-                        </Button>
-                      ) : isRecording ? (
-                        <Button onClick={stopRecording} variant="destructive" className="flex-1 min-w-[140px]">
-                          <MicOff className="mr-2 h-4 w-4" />
-                          Stop Recording
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => {
-                          const newIndex = Math.max(0, currentQuestionIndex - 1)
-                          setCurrentQuestionIndex(newIndex)
-                          setCurrentTranscript("")
-                          setIsEditingTranscript(false)
-                          if (synthesis) {
-                            synthesis.cancel()
-                          }
-                          if (recognition && isRecording) {
-                            recognition.stop()
-                          }
-                          setTimeout(() => {
-                            speakQuestion(unansweredQuestions[newIndex].questionText)
-                          }, 300)
-                        }}
-                        disabled={currentQuestionIndex === 0 || isSpeaking || isRecording || saving}
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Previous
-                      </Button>
-
-                      <Button
-                        onClick={() => {
-                          const newIndex = Math.min(unansweredQuestions.length - 1, currentQuestionIndex + 1)
-                          setCurrentQuestionIndex(newIndex)
-                          setCurrentTranscript("")
-                          setIsEditingTranscript(false)
-                          if (synthesis) {
-                            synthesis.cancel()
-                          }
-                          if (recognition && isRecording) {
-                            recognition.stop()
-                          }
-                          setTimeout(() => {
-                            speakQuestion(unansweredQuestions[newIndex].questionText)
-                          }, 300)
-                        }}
-                        disabled={
-                          currentQuestionIndex === unansweredQuestions.length - 1 || isSpeaking || isRecording || saving
-                        }
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        Next
-                        <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
-                      </Button>
-                    </div>
+                  {/* Navigation Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setCurrentAnsweredQuestionTab(Math.max(0, currentAnsweredQuestionTab - 1))}
+                      disabled={currentAnsweredQuestionTab === 0}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        setCurrentAnsweredQuestionTab(
+                          Math.min(answeredQuestions.length - 1, currentAnsweredQuestionTab + 1),
+                        )
+                      }
+                      disabled={currentAnsweredQuestionTab === answeredQuestions.length - 1}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Next
+                      <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {/* No questions message */}
-            {unansweredQuestions.length === 0 && (
+            {unansweredQuestions.length === 0 && answeredQuestions.length === 0 && (
               <Card className="bg-white shadow-lg">
                 <CardContent className="py-12 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <p className="font-medium mb-2">All questions answered!</p>
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <p className="font-medium mb-2">No questions for this incident</p>
                   <p className="text-sm text-muted-foreground">
-                    Great job completing all the questions for this incident.
+                    Questions will appear here when an admin sends follow-up questions.
                   </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Answered questions section */}
-            {answeredQuestions.length > 0 && (
-              <Card className="bg-white shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-primary">Your Previous Answers ({answeredQuestions.length})</CardTitle>
-                  <CardDescription>Questions you've already responded to</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {answeredQuestions.map((question, index) => (
-                    <div key={question.id} className="space-y-2">
-                      {index > 0 && <Separator />}
-                      <div className="space-y-2 pt-2">
-                        <div className="flex items-start gap-2">
-                          <Badge variant="outline" className="mt-1">
-                            Q
-                          </Badge>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{question.questionText}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Asked {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-2 ml-8 mt-2">
-                          <Badge className="bg-primary mt-1">A</Badge>
-                          <div className="flex-1">
-                            <p className="text-sm">{question.answer?.answerText}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <p className="text-xs text-muted-foreground">
-                                Answered {formatDate(question.answer?.answeredAt, "MMM d, yyyy 'at' h:mm a")}
-                              </p>
-                              <Badge variant="secondary" className="text-xs">
-                                {question.answer?.method === "voice" ? (
-                                  <>
-                                    <Mic className="h-3 w-3 mr-1" /> voice
-                                  </>
-                                ) : (
-                                  <>
-                                    <Type className="h-3 w-3 mr-1" /> text
-                                  </>
-                                )}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
+          {/* Intelligence tab - unchanged */}
           <TabsContent value="intelligence" className="space-y-6 mt-6">
             <Card className="border-primary/20 bg-white shadow-lg h-[600px] sm:h-[650px] lg:h-[calc(100vh-16rem)] flex flex-col">
               <CardHeader className="flex-shrink-0 pb-3 sm:pb-4">
@@ -1248,6 +1230,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </Card>
           </TabsContent>
 
+          {/* Summary tab - unchanged */}
           <TabsContent value="summary" className="space-y-6 mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="border-accent/20 bg-white shadow-md">
@@ -1360,25 +1343,34 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </div>
           </TabsContent>
 
-          {incident?.aiReport && (
-            <TabsContent value="waik" className="space-y-6 mt-6">
-              <div className="mb-4">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                  WAiK AI Agent
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">AI-powered analysis and recommendations</p>
-              </div>
+          <TabsContent value="waik" className="space-y-6 mt-6">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                WAiK Intelligence
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                WAiK summaries, insights, recommendations, and action items
+              </p>
+            </div>
 
+            {incident?.aiReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">AI Summary</CardTitle>
+                      <CardTitle className="text-base">WAiK Summary</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.summary}</p>
+                    {formatAiContent(incident.aiReport.summary) ? (
+                      <div
+                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.summary)! }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No summary available.</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1386,11 +1378,18 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Brain className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">AI Insights</CardTitle>
+                      <CardTitle className="text-base">WAiK Insights</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.insights}</p>
+                    {formatAiContent(incident.aiReport.insights) ? (
+                      <div
+                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.insights)! }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No insights available.</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1398,11 +1397,18 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Lightbulb className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">AI Recommendations</CardTitle>
+                      <CardTitle className="text-base">WAiK Recommendations</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.recommendations}</p>
+                    {formatAiContent(incident.aiReport.recommendations) ? (
+                      <div
+                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.recommendations)! }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No recommendations available.</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1410,11 +1416,18 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">AI Actions</CardTitle>
+                      <CardTitle className="text-base">WAiK Recommended Action Items</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.actions}</p>
+                    {formatAiContent(incident.aiReport.actions) ? (
+                      <div
+                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                        dangerouslySetInnerHTML={{ __html: formatAiContent(incident.aiReport.actions)! }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No action items available.</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1443,8 +1456,18 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
-          )}
+            ) : (
+              <Card className="border-purple-200 bg-gradient-to-br from-purple-50/30 to-blue-50/30">
+                <CardContent className="py-12 text-center">
+                  <Brain className="h-16 w-16 text-purple-400 mx-auto mb-4 opacity-50" />
+                  <p className="font-medium mb-2 text-purple-900">WAiK Analysis Pending</p>
+                  <p className="text-sm text-purple-700/70">
+                    The WAiK AI analysis will be available once generated by an administrator.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
     </div>
