@@ -844,48 +844,57 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                 {answeredQuestions.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">No answered questions yet</p>
                 ) : (
-                  answeredQuestions.map((question, index) => (
-                    <div key={question.id} className="space-y-2">
-                      {index > 0 && <Separator />}
-                      <div className="space-y-2 pt-2">
-                        <div className="flex items-start gap-2">
-                          <Badge variant="outline" className="mt-1">
-                            Q
-                          </Badge>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{question.questionText}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <p className="text-xs text-muted-foreground">
-                                Asked by <span className="font-medium">{question.askedBy}</span>
-                              </p>
-                              <span className="text-xs text-muted-foreground">•</span>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                              </p>
+                  <Tabs defaultValue={answeredQuestions[0]?.id} className="w-full">
+                    <TabsList className="w-full justify-start flex-wrap h-auto gap-2 bg-muted/30 p-2">
+                      {answeredQuestions.map((question, index) => (
+                        <TabsTrigger key={question.id} value={question.id} className="data-[state=active]:bg-white">
+                          Question {index + 1}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+
+                    {answeredQuestions.map((question) => (
+                      <TabsContent key={question.id} value={question.id} className="mt-4 space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-start gap-2">
+                            <Badge variant="outline" className="mt-1">
+                              Q
+                            </Badge>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{question.questionText}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <p className="text-xs text-muted-foreground">
+                                  Asked by <span className="font-medium">{question.askedBy}</span>
+                                </p>
+                                <span className="text-xs text-muted-foreground">•</span>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2 ml-8 mt-2">
+                            <Badge className="bg-primary mt-1">A</Badge>
+                            <div className="flex-1">
+                              <p className="text-sm">{question.answer?.answerText}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <p className="text-xs text-muted-foreground">
+                                  Answered by <span className="font-medium">{question.answer?.answeredBy}</span>
+                                </p>
+                                <span className="text-xs text-muted-foreground">•</span>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(question.answer!.answeredAt, "MMM d, yyyy 'at' h:mm a")}
+                                </p>
+                                <Badge variant="secondary" className="text-xs">
+                                  {question.answer?.method}
+                                </Badge>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-start gap-2 ml-8 mt-2">
-                          <Badge className="bg-primary mt-1">A</Badge>
-                          <div className="flex-1">
-                            <p className="text-sm">{question.answer?.answerText}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <p className="text-xs text-muted-foreground">
-                                Answered by <span className="font-medium">{question.answer?.answeredBy}</span>
-                              </p>
-                              <span className="text-xs text-muted-foreground">•</span>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDate(question.answer!.answeredAt, "MMM d, yyyy 'at' h:mm a")}
-                              </p>
-                              <Badge variant="secondary" className="text-xs">
-                                {question.answer?.method}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                      </TabsContent>
+                    ))}
+                  </Tabs>
                 )}
               </CardContent>
             </Card>
@@ -901,55 +910,144 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                 {unansweredQuestions.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">No pending questions</p>
                 ) : (
-                  unansweredQuestions.map((question, index) => (
-                    <div key={question.id} className="space-y-2">
-                      {index > 0 && <Separator />}
-                      <div className="flex items-start gap-2 pt-2">
-                        <Badge variant="outline" className="mt-1">
-                          Q
-                        </Badge>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{question.questionText}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-muted-foreground">
-                              Asked by <span className="font-medium">{question.askedBy}</span>
-                            </p>
-                            <span className="text-xs text-muted-foreground">•</span>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                            </p>
-                          </div>
-                          {question.assignedTo && question.assignedTo.length > 0 && (
-                            <div className="flex items-center gap-2 mt-2">
-                              <UserPlus className="h-3 w-3 text-muted-foreground" />
-                              <p className="text-xs text-muted-foreground">
-                                Assigned to:{" "}
-                                {question.assignedTo
-                                  .map((staffId) => {
-                                    const staff = staffList.find((s) => s.id === staffId)
-                                    return staff?.name || staffId
-                                  })
-                                  .join(", ")}
-                              </p>
+                  <Tabs defaultValue={unansweredQuestions[0]?.id} className="w-full">
+                    <TabsList className="w-full justify-start flex-wrap h-auto gap-2 bg-muted/30 p-2">
+                      {unansweredQuestions.map((question, index) => (
+                        <TabsTrigger key={question.id} value={question.id} className="data-[state=active]:bg-white">
+                          Question {index + 1}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+
+                    {unansweredQuestions.map((question) => (
+                      <TabsContent key={question.id} value={question.id} className="mt-4 space-y-4">
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-2">
+                            <Badge variant="outline" className="mt-1">
+                              Q
+                            </Badge>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{question.questionText}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <p className="text-xs text-muted-foreground">
+                                  Asked by <span className="font-medium">{question.askedBy}</span>
+                                </p>
+                                <span className="text-xs text-muted-foreground">•</span>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                                </p>
+                              </div>
                             </div>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteQuestion(question.id)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          <div className="ml-8 p-4 bg-muted/30 rounded-lg border border-muted space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <UserPlus className="h-4 w-4 text-accent" />
+                              Assign to Employees
+                            </div>
+
+                            {question.assignedTo && question.assignedTo.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {question.assignedTo.map((staffId) => {
+                                  const staff = staffList.find((s) => s.id === staffId)
+                                  return (
+                                    <Badge key={staffId} variant="secondary">
+                                      {staff?.name || staffId}
+                                    </Badge>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            <div className="space-y-2">
+                              <Input
+                                type="text"
+                                placeholder="Search employees by name..."
+                                className="w-full"
+                                onChange={(e) => {
+                                  const searchTerm = e.target.value.toLowerCase()
+                                  // This will filter in real-time as we type
+                                }}
+                              />
+
+                              <div className="space-y-2 border rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
+                                {staffList.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No employees available</p>
+                                ) : (
+                                  staffList.map((staff) => {
+                                    const isAssigned = question.assignedTo?.includes(staff.id) || false
+                                    return (
+                                      <div key={staff.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                          id={`${question.id}-${staff.id}`}
+                                          checked={isAssigned}
+                                          onCheckedChange={async (checked) => {
+                                            try {
+                                              const updatedAssignees = checked
+                                                ? [...(question.assignedTo || []), staff.id]
+                                                : (question.assignedTo || []).filter((id) => id !== staff.id)
+
+                                              const response = await fetch(
+                                                `/api/incidents/${params.id}/questions/${question.id}`,
+                                                {
+                                                  method: "PATCH",
+                                                  headers: { "Content-Type": "application/json" },
+                                                  body: JSON.stringify({
+                                                    assignedTo: updatedAssignees,
+                                                  }),
+                                                },
+                                              )
+
+                                              if (response.ok) {
+                                                toast.success(
+                                                  checked
+                                                    ? `Assigned to ${staff.name}`
+                                                    : `Unassigned from ${staff.name}`,
+                                                )
+                                                fetchIncident()
+                                              } else {
+                                                toast.error("Failed to update assignment")
+                                              }
+                                            } catch (error) {
+                                              console.error("[v0] Error updating assignment:", error)
+                                              toast.error("Failed to update assignment")
+                                            }
+                                          }}
+                                        />
+                                        <label
+                                          htmlFor={`${question.id}-${staff.id}`}
+                                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                                        >
+                                          {staff.name}
+                                          <span className="text-xs text-muted-foreground ml-2">({staff.role})</span>
+                                        </label>
+                                      </div>
+                                    )
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 ml-8">
                             <Badge variant="secondary" className="text-xs">
-                              Awaiting response
+                              {question.assignedTo && question.assignedTo.length > 0
+                                ? `Assigned to ${question.assignedTo.length} employee${question.assignedTo.length > 1 ? "s" : ""}`
+                                : "Not assigned yet"}
                             </Badge>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteQuestion(question.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
+                      </TabsContent>
+                    ))}
+                  </Tabs>
                 )}
 
                 <Separator className="my-4" />
