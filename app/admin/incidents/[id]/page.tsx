@@ -35,10 +35,12 @@ import {
   X,
   CheckCircle,
   Lock,
+  CheckCircle2,
+  Type,
 } from "lucide-react"
 import { toast } from "sonner"
 import { getDisplayNarrative } from "@/lib/utils/enhance-narrative"
-import { markdownToHtml } from "@/lib/utils/markdown-to-html"
+import { markdownTohtml } from "@/lib/utils/markdown-to-html"
 
 function formatDate(dateString: string | undefined, formatString: string): string {
   if (!dateString) return "Invalid date"
@@ -98,6 +100,11 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
 
+  const [currentPendingQuestionTab, setCurrentPendingQuestionTab] = useState(0)
+  const [currentAnsweredQuestionTab, setCurrentAnsweredQuestionTab] = useState(0)
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("")
+
   useEffect(() => {
     fetchIncident()
     fetchStaffList()
@@ -130,7 +137,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   const fetchStaffList = async () => {
     try {
-      const response = await fetch("/api/users?role=staff")
+      const response = await fetch("/api/users")
       if (response.ok) {
         const users = await response.json()
         setStaffList(users)
@@ -353,6 +360,33 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     }
   }
 
+  const handleAssignQuestion = async (questionId: string) => {
+    if (selectedEmployees.length === 0) {
+      toast.error("Please select at least one employee")
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}/assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assignedTo: selectedEmployees,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to assign question")
+
+      toast.success(`Question assigned to ${selectedEmployees.length} employee(s)`)
+      setSelectedEmployees([])
+      setEmployeeSearchQuery("")
+      await fetchIncident()
+    } catch (error) {
+      console.error("[v0] Error assigning question:", error)
+      toast.error("Failed to assign question")
+    }
+  }
+
   const handleIntelligenceSubmit = async () => {
     if (!intelligenceInput.trim() || !incident) return
 
@@ -534,6 +568,10 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     shouldShowButton: role === "admin",
   })
 
+  const filteredEmployees = staffList.filter((emp) =>
+    emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()),
+  )
+
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
       <div className="absolute inset-0 -z-10">
@@ -705,7 +743,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                           <div
                             className="text-sm leading-relaxed text-foreground incident-enhanced-html"
                             dangerouslySetInnerHTML={{
-                              __html: markdownToHtml(incident.initialReport.enhancedNarrative),
+                              __html: markdownTohtml(incident.initialReport.enhancedNarrative),
                             }}
                           />
                         </>
@@ -833,283 +871,393 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
           </TabsContent>
 
           <TabsContent value="qa" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                  Answered Questions ({answeredQuestions.length})
-                </CardTitle>
-                <CardDescription>Questions that have been answered by staff</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {answeredQuestions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No answered questions yet</p>
-                ) : (
-                  <Tabs defaultValue={answeredQuestions[0]?.id} className="w-full">
-                    <TabsList className="w-full justify-start flex-wrap h-auto gap-2 bg-muted/30 p-2">
-                      {answeredQuestions.map((question, index) => (
-                        <TabsTrigger key={question.id} value={question.id} className="data-[state=active]:bg-white">
-                          Question {index + 1}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+            {answeredQuestions.length > 0 && (
+              <Card className="bg-white shadow-lg border-primary/20">
+                <CardHeader>
+                  <CardTitle className="text-lg text-primary">
+                    Answered Questions ({answeredQuestions.length})
+                  </CardTitle>
+                  <CardDescription>Questions that have been responded to - Navigate using tabs below</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Question Navigation Tabs */}
+                  <div className="flex gap-2 flex-wrap">
+                    {answeredQuestions.map((q, idx) => (
+                      <button
+                        key={q.id}
+                        onClick={() => setCurrentAnsweredQuestionTab(idx)}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                          idx === currentAnsweredQuestionTab
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span className="font-medium">Q{idx + 1}</span>
+                      </button>
+                    ))}
+                  </div>
 
-                    {answeredQuestions.map((question) => (
-                      <TabsContent key={question.id} value={question.id} className="mt-4 space-y-4">
-                        <div className="space-y-2">
-                          <div className="flex items-start gap-2">
-                            <Badge variant="outline" className="mt-1">
-                              Q
-                            </Badge>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{question.questionText}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <p className="text-xs text-muted-foreground">
-                                  Asked by <span className="font-medium">{question.askedBy}</span>
-                                </p>
-                                <span className="text-xs text-muted-foreground">•</span>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-2 ml-8 mt-2">
-                            <Badge className="bg-primary mt-1">A</Badge>
-                            <div className="flex-1">
-                              <p className="text-sm">{question.answer?.answerText}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <p className="text-xs text-muted-foreground">
-                                  Answered by <span className="font-medium">{question.answer?.answeredBy}</span>
-                                </p>
-                                <span className="text-xs text-muted-foreground">•</span>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatDate(question.answer!.answeredAt, "MMM d, yyyy 'at' h:mm a")}
-                                </p>
-                                <Badge variant="secondary" className="text-xs">
-                                  {question.answer?.method}
-                                </Badge>
-                              </div>
-                            </div>
+                  {/* Current Question & Answer Display */}
+                  <div className="space-y-4">
+                    <div className="p-6 border-2 border-primary/20 rounded-lg bg-primary/5">
+                      <div className="flex items-start gap-3">
+                        <Badge variant="outline" className="mt-1">
+                          Q
+                        </Badge>
+                        <div className="flex-1">
+                          <p className="font-medium text-lg leading-relaxed">
+                            {answeredQuestions[currentAnsweredQuestionTab]?.questionText}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Asked by{" "}
+                              <span className="font-medium">
+                                {answeredQuestions[currentAnsweredQuestionTab]?.askedBy}
+                              </span>
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(
+                                answeredQuestions[currentAnsweredQuestionTab]?.askedAt,
+                                "MMM d, yyyy 'at' h:mm a",
+                              )}
+                            </p>
                           </div>
                         </div>
-                      </TabsContent>
+                      </div>
+                    </div>
+
+                    <div className="p-6 border-2 border-green-200 rounded-lg bg-green-50">
+                      <div className="flex items-start gap-3">
+                        <Badge className="bg-primary mt-1">A</Badge>
+                        <div className="flex-1">
+                          <p className="text-lg leading-relaxed">
+                            {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answerText}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Answered by{" "}
+                              <span className="font-medium">
+                                {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredBy}
+                              </span>
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(
+                                answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredAt,
+                                "MMM d, yyyy 'at' h:mm a",
+                              )}
+                            </p>
+                            <Badge variant="secondary" className="text-xs">
+                              {answeredQuestions[currentAnsweredQuestionTab]?.answer?.method === "voice" ? (
+                                <>
+                                  <Mic className="h-3 w-3 mr-1" /> voice
+                                </>
+                              ) : (
+                                <>
+                                  <Type className="h-3 w-3 mr-1" /> text
+                                </>
+                              )}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Navigation Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setCurrentAnsweredQuestionTab(Math.max(0, currentAnsweredQuestionTab - 1))}
+                      disabled={currentAnsweredQuestionTab === 0}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        setCurrentAnsweredQuestionTab(
+                          Math.min(answeredQuestions.length - 1, currentAnsweredQuestionTab + 1),
+                        )
+                      }
+                      disabled={currentAnsweredQuestionTab === answeredQuestions.length - 1}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Next
+                      <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {unansweredQuestions.length > 0 && (
+              <Card className="bg-white shadow-lg border-accent/40">
+                <CardHeader>
+                  <CardTitle className="text-lg text-accent">
+                    Pending Questions ({unansweredQuestions.length})
+                  </CardTitle>
+                  <CardDescription>Questions awaiting response - Navigate using tabs below</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Question Navigation Tabs */}
+                  <div className="flex gap-2 flex-wrap">
+                    {unansweredQuestions.map((q, idx) => (
+                      <button
+                        key={q.id}
+                        onClick={() => setCurrentPendingQuestionTab(idx)}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                          idx === currentPendingQuestionTab
+                            ? "bg-accent text-accent-foreground shadow-md"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        <span className="font-medium">Q{idx + 1}</span>
+                      </button>
                     ))}
-                  </Tabs>
-                )}
-              </CardContent>
-            </Card>
+                  </div>
+
+                  {/* Current Question Display */}
+                  <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                    <div className="flex items-start gap-3">
+                      <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-medium text-lg leading-relaxed">
+                          {unansweredQuestions[currentPendingQuestionTab]?.questionText}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            Asked by{" "}
+                            <span className="font-medium">
+                              {unansweredQuestions[currentPendingQuestionTab]?.askedBy}
+                            </span>
+                          </p>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(
+                              unansweredQuestions[currentPendingQuestionTab]?.askedAt,
+                              "MMM d, yyyy 'at' h:mm a",
+                            )}
+                          </p>
+                        </div>
+                        {unansweredQuestions[currentPendingQuestionTab]?.assignedTo &&
+                          unansweredQuestions[currentPendingQuestionTab].assignedTo!.length > 0 && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <UserPlus className="h-3 w-3 text-muted-foreground" />
+                              <p className="text-xs text-muted-foreground">
+                                Assigned to:{" "}
+                                {unansweredQuestions[currentPendingQuestionTab]
+                                  .assignedTo!.map((empId) => {
+                                    const emp = staffList.find((s) => s.id === empId)
+                                    return emp?.name || empId
+                                  })
+                                  .join(", ")}
+                              </p>
+                            </div>
+                          )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteQuestion(unansweredQuestions[currentPendingQuestionTab].id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Assignment Section */}
+                  <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-semibold">Assign to Employee(s)</Label>
+                    </div>
+
+                    {/* Search Input */}
+                    <Input
+                      placeholder="Start typing a name..."
+                      value={employeeSearchQuery}
+                      onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                      className="w-full"
+                    />
+
+                    {/* Employee Selection */}
+                    {employeeSearchQuery && (
+                      <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
+                        {filteredEmployees.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No employees found</p>
+                        ) : (
+                          filteredEmployees.map((emp) => (
+                            <div key={emp.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={emp.id}
+                                checked={selectedEmployees.includes(emp.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedEmployees([...selectedEmployees, emp.id])
+                                  } else {
+                                    setSelectedEmployees(selectedEmployees.filter((id) => id !== emp.id))
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={emp.id}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                              >
+                                {emp.name}
+                                <Badge variant="outline" className="text-xs">
+                                  {emp.role}
+                                </Badge>
+                              </label>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* Selected Employees Display */}
+                    {selectedEmployees.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedEmployees.map((empId) => {
+                          const emp = staffList.find((s) => s.id === empId)
+                          return (
+                            <Badge key={empId} variant="secondary" className="flex items-center gap-1">
+                              {emp?.name}
+                              <button
+                                onClick={() => setSelectedEmployees(selectedEmployees.filter((id) => id !== empId))}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={() => handleAssignQuestion(unansweredQuestions[currentPendingQuestionTab].id)}
+                      disabled={selectedEmployees.length === 0}
+                      size="sm"
+                      className="w-full"
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Assign to {selectedEmployees.length} Employee{selectedEmployees.length !== 1 ? "s" : ""}
+                    </Button>
+                  </div>
+
+                  {/* Navigation Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setCurrentPendingQuestionTab(Math.max(0, currentPendingQuestionTab - 1))}
+                      disabled={currentPendingQuestionTab === 0}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        setCurrentPendingQuestionTab(
+                          Math.min(unansweredQuestions.length - 1, currentPendingQuestionTab + 1),
+                        )
+                      }
+                      disabled={currentPendingQuestionTab === unansweredQuestions.length - 1}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Next
+                      <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* No questions message */}
+            {unansweredQuestions.length === 0 && answeredQuestions.length === 0 && (
+              <Card className="bg-white shadow-lg">
+                <CardContent className="py-12 text-center">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <p className="font-medium mb-2">No questions for this incident</p>
+                  <p className="text-sm text-muted-foreground">
+                    You can send follow-up questions to staff using the form below.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            <Separator className="my-4" />
 
             <Card className="border-accent/20 bg-white shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg text-accent">
-                  Follow-up Questions ({unansweredQuestions.length})
-                </CardTitle>
-                <CardDescription>Questions awaiting staff response</CardDescription>
+                <CardTitle className="text-lg text-accent">Send New Question to Staff</CardTitle>
+                <CardDescription>Ask staff for additional information about this incident</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {unansweredQuestions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No pending questions</p>
-                ) : (
-                  <Tabs defaultValue={unansweredQuestions[0]?.id} className="w-full">
-                    <TabsList className="w-full justify-start flex-wrap h-auto gap-2 bg-muted/30 p-2">
-                      {unansweredQuestions.map((question, index) => (
-                        <TabsTrigger key={question.id} value={question.id} className="data-[state=active]:bg-white">
-                          Question {index + 1}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+                <div>
+                  <Label htmlFor="new-question">Question</Label>
+                  <Textarea
+                    id="new-question"
+                    placeholder="Type your question here..."
+                    value={newQuestion}
+                    onChange={(e) => setNewQuestion(e.target.value)}
+                    rows={3}
+                    className="mt-2"
+                  />
+                </div>
 
-                    {unansweredQuestions.map((question) => (
-                      <TabsContent key={question.id} value={question.id} className="mt-4 space-y-4">
-                        <div className="space-y-4">
-                          <div className="flex items-start gap-2">
-                            <Badge variant="outline" className="mt-1">
-                              Q
-                            </Badge>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{question.questionText}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <p className="text-xs text-muted-foreground">
-                                  Asked by <span className="font-medium">{question.askedBy}</span>
-                                </p>
-                                <span className="text-xs text-muted-foreground">•</span>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatDate(question.askedAt, "MMM d, yyyy 'at' h:mm a")}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteQuestion(question.id)}
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          <div className="ml-8 p-4 bg-muted/30 rounded-lg border border-muted space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                              <UserPlus className="h-4 w-4 text-accent" />
-                              Assign to Employees
-                            </div>
-
-                            {question.assignedTo && question.assignedTo.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {question.assignedTo.map((staffId) => {
-                                  const staff = staffList.find((s) => s.id === staffId)
-                                  return (
-                                    <Badge key={staffId} variant="secondary">
-                                      {staff?.name || staffId}
-                                    </Badge>
-                                  )
-                                })}
-                              </div>
-                            )}
-
-                            <div className="space-y-2">
-                              <Input
-                                type="text"
-                                placeholder="Search employees by name..."
-                                className="w-full"
-                                onChange={(e) => {
-                                  const searchTerm = e.target.value.toLowerCase()
-                                  // This will filter in real-time as we type
-                                }}
-                              />
-
-                              <div className="space-y-2 border rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
-                                {staffList.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">No employees available</p>
-                                ) : (
-                                  staffList.map((staff) => {
-                                    const isAssigned = question.assignedTo?.includes(staff.id) || false
-                                    return (
-                                      <div key={staff.id} className="flex items-center space-x-2">
-                                        <Checkbox
-                                          id={`${question.id}-${staff.id}`}
-                                          checked={isAssigned}
-                                          onCheckedChange={async (checked) => {
-                                            try {
-                                              const updatedAssignees = checked
-                                                ? [...(question.assignedTo || []), staff.id]
-                                                : (question.assignedTo || []).filter((id) => id !== staff.id)
-
-                                              const response = await fetch(
-                                                `/api/incidents/${params.id}/questions/${question.id}`,
-                                                {
-                                                  method: "PATCH",
-                                                  headers: { "Content-Type": "application/json" },
-                                                  body: JSON.stringify({
-                                                    assignedTo: updatedAssignees,
-                                                  }),
-                                                },
-                                              )
-
-                                              if (response.ok) {
-                                                toast.success(
-                                                  checked
-                                                    ? `Assigned to ${staff.name}`
-                                                    : `Unassigned from ${staff.name}`,
-                                                )
-                                                fetchIncident()
-                                              } else {
-                                                toast.error("Failed to update assignment")
-                                              }
-                                            } catch (error) {
-                                              console.error("[v0] Error updating assignment:", error)
-                                              toast.error("Failed to update assignment")
-                                            }
-                                          }}
-                                        />
-                                        <label
-                                          htmlFor={`${question.id}-${staff.id}`}
-                                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
-                                        >
-                                          {staff.name}
-                                          <span className="text-xs text-muted-foreground ml-2">({staff.role})</span>
-                                        </label>
-                                      </div>
-                                    )
-                                  })
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 ml-8">
-                            <Badge variant="secondary" className="text-xs">
-                              {question.assignedTo && question.assignedTo.length > 0
-                                ? `Assigned to ${question.assignedTo.length} employee${question.assignedTo.length > 1 ? "s" : ""}`
-                                : "Not assigned yet"}
-                            </Badge>
-                          </div>
+                <div>
+                  <Label className="mb-2 block">Assign to Staff Members (Optional)</Label>
+                  <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto">
+                    {staffList.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No staff members available</p>
+                    ) : (
+                      staffList.map((staff) => (
+                        <div key={staff.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`new-${staff.id}`}
+                            checked={selectedStaff.includes(staff.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedStaff([...selectedStaff, staff.id])
+                              } else {
+                                setSelectedStaff(selectedStaff.filter((id) => id !== staff.id))
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`new-${staff.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {staff.name}
+                          </label>
                         </div>
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                )}
-
-                <Separator className="my-4" />
-
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="new-question">Send Follow-up Question to Staff</Label>
-                    <Textarea
-                      id="new-question"
-                      placeholder="Type your question here..."
-                      value={newQuestion}
-                      onChange={(e) => setNewQuestion(e.target.value)}
-                      rows={3}
-                      className="mt-2"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="mb-2 block">Assign to Staff Members (Optional)</Label>
-                    <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto">
-                      {staffList.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No staff members available</p>
-                      ) : (
-                        staffList.map((staff) => (
-                          <div key={staff.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={staff.id}
-                              checked={selectedStaff.includes(staff.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedStaff([...selectedStaff, staff.id])
-                                } else {
-                                  setSelectedStaff(selectedStaff.filter((id) => id !== staff.id))
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={staff.id}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                            >
-                              {staff.name}
-                            </label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    {selectedStaff.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {selectedStaff.length} staff member{selectedStaff.length > 1 ? "s" : ""} selected
-                      </p>
+                      ))
                     )}
                   </div>
-
-                  <Button
-                    onClick={sendQuestion}
-                    disabled={isAddingQuestion || !newQuestion.trim()}
-                    className="w-full sm:w-auto"
-                  >
-                    <Send className="mr-2 h-4 w-4" />
-                    {isAddingQuestion ? "Sending..." : "Send Question"}
-                  </Button>
+                  {selectedStaff.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {selectedStaff.length} staff member{selectedStaff.length > 1 ? "s" : ""} selected
+                    </p>
+                  )}
                 </div>
+
+                <Button
+                  onClick={sendQuestion}
+                  disabled={isAddingQuestion || !newQuestion.trim()}
+                  className="w-full sm:w-auto"
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {isAddingQuestion ? "Sending..." : "Send Question"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

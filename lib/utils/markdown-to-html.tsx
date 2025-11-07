@@ -61,3 +61,5 @@ export function markdownToHtml(markdown: string): string {
 
   return processedLines.join("")
 }
+
+export { markdownToHtml as markdownTohtml }
