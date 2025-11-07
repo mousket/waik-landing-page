@@ -695,25 +695,40 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                         Incident Narrative
                       </h3>
-                      <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-                        {incident.initialReport?.narrative || incident.description || "No narrative provided."}
-                      </p>
+                      {incident.initialReport?.enhancedNarrative ? (
+                        <>
+                          <Badge variant="secondary" className="mb-2">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            AI-Enhanced
+                          </Badge>
+                          <div
+                            className="text-sm leading-relaxed text-foreground incident-enhanced-html"
+                            dangerouslySetInnerHTML={{
+                              __html: incident.initialReport.enhancedNarrative,
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                          {incident.initialReport?.narrative || incident.description || "No narrative provided."}
+                        </p>
+                      )}
                     </div>
 
-                    {incident.initialReport?.enhancedNarrative &&
+                    {incident.initialReport?.narrative &&
+                      incident.initialReport?.enhancedNarrative &&
                       incident.initialReport.narrative !== incident.initialReport.enhancedNarrative && (
                         <details className="mt-4">
                           <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            View AI-enhanced version
+                            <FileText className="h-3 w-3" />
+                            View original voice transcript
                           </summary>
-                          <div className="mt-2 p-3 bg-accent/5 rounded-md border border-accent/20">
-                            <Badge variant="secondary" className="mb-2">
-                              <Sparkles className="h-3 w-3 mr-1" />
-                              AI-Enhanced
-                            </Badge>
+                          <div className="mt-2 p-3 bg-muted/40 rounded-md border border-muted">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                              Original Transcript
+                            </p>
                             <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-                              {incident.initialReport.enhancedNarrative}
+                              {incident.initialReport.narrative}
                             </p>
                           </div>
                         </details>
