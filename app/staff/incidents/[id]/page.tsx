@@ -835,8 +835,58 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       </div>
                     </>
                   ) : (
-                    // Voice Mode
                     <>
+                      {/* Question Navigation Tabs */}
+                      <div className="flex gap-2 flex-wrap">
+                        {unansweredQuestions.map((q, idx) => (
+                          <button
+                            key={q.id}
+                            onClick={() => {
+                              setCurrentQuestionIndex(idx)
+                              setCurrentTranscript("")
+                              setIsEditingTranscript(false)
+                              setTimeout(() => speakQuestion(q.questionText), 300)
+                            }}
+                            className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                              idx === currentQuestionIndex
+                                ? "bg-accent text-accent-foreground shadow-md"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            }`}
+                          >
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            <span className="font-medium">Q{idx + 1}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Current Question Display */}
+                      <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                        <div className="flex items-start gap-3">
+                          <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="font-medium text-lg leading-relaxed">
+                              {unansweredQuestions[currentQuestionIndex]?.questionText}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <p className="text-xs text-muted-foreground">
+                                Asked by{" "}
+                                <span className="font-medium">
+                                  {unansweredQuestions[currentQuestionIndex]?.askedBy}
+                                </span>
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(
+                                  unansweredQuestions[currentQuestionIndex]?.askedAt,
+                                  "MMM d, yyyy 'at' h:mm a",
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Voice Recording Interface */}
                       <div className="text-center space-y-4 py-8">
                         <div className="mx-auto w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center">
                           {isRecording ? (
@@ -1523,7 +1573,9 @@ type IntelligenceMessage = {
   timestamp: Date
 }
 
-function getAIContent(incidentId: string) {
+// Mock AI Content function - This is where the original issue was.
+// It should return an object or null, not be a function that returns an object or null.
+const getAIContent = (incidentId: string) => {
   const aiContent: Record<
     string,
     {
