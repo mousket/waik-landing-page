@@ -614,77 +614,66 @@ export default function CompanionCreatePage() {
                 )}
               </>
             ) : (
-              <div className="max-w-md w-full p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6">
-                <div className="text-center space-y-4">
-                  <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
-                  <h2 className="text-3xl font-bold text-white">Report Complete</h2>
-                  <div className="text-7xl font-bold text-white drop-shadow-lg">{reportScore}/10</div>
-                  <p className="text-white/80 text-sm leading-relaxed">{reportFeedback}</p>
+              <div className="w-full max-w-md overflow-y-auto px-4 py-8">
+                <div className="p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6 mb-8">
+                  <div className="text-center space-y-4">
+                    <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
+                    <h2 className="text-3xl font-bold text-white">Report Complete</h2>
+                    <div className="text-7xl font-bold text-white drop-shadow-lg">{reportScore}/10</div>
+                    <p className="text-white/80 text-sm leading-relaxed">{reportFeedback}</p>
+                  </div>
+
+                  <Button
+                    onClick={() => setShowDetailedReport(!showDetailedReport)}
+                    variant="outline"
+                    className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
+                    size="lg"
+                  >
+                    {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
+                  </Button>
+
+                  {showDetailedReport && reportDetails && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                      <div className="space-y-3 bg-green-500/20 p-4 rounded-2xl border border-green-400/30">
+                        <h3 className="font-semibold text-green-300 flex items-center gap-2">
+                          <CheckCircle2 className="h-5 w-5" />
+                          What You Did Well
+                        </h3>
+                        <ul className="space-y-2">
+                          {reportDetails.whatYouDidWell.map((item, index) => (
+                            <li key={index} className="flex gap-2 text-sm text-white/90">
+                              <span className="text-green-400 shrink-0">[+]</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="space-y-3 bg-orange-500/20 p-4 rounded-2xl border border-orange-400/30">
+                        <h3 className="font-semibold text-orange-300 flex items-center gap-2">
+                          <span className="text-orange-400 text-lg">[!]</span>
+                          What Was Missed
+                        </h3>
+                        <ul className="space-y-2">
+                          {reportDetails.whatWasMissed.map((item, index) => (
+                            <li key={index} className="flex gap-2 text-sm text-white/90">
+                              <span className="text-orange-400 shrink-0">[!]</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleFinish}
+                    className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
+                    size="lg"
+                  >
+                    Finish & Return to Dashboard
+                  </Button>
                 </div>
-
-                {!showDetailedReport ? (
-                  <div className="space-y-4">
-                    <Button
-                      onClick={() => setShowDetailedReport(true)}
-                      variant="outline"
-                      className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
-                      size="lg"
-                    >
-                      Show Detailed Report Card
-                    </Button>
-                    <Button
-                      onClick={handleFinish}
-                      className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
-                      size="lg"
-                    >
-                      Finish & Return to Dashboard
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {reportDetails && (
-                      <>
-                        <div className="space-y-3 bg-green-500/20 p-4 rounded-2xl border border-green-400/30">
-                          <h3 className="font-semibold text-green-300 flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5" />
-                            What You Did Well
-                          </h3>
-                          <ul className="space-y-2">
-                            {reportDetails.whatYouDidWell.map((item, index) => (
-                              <li key={index} className="flex gap-2 text-sm text-white/90">
-                                <span className="text-green-400 shrink-0">[+]</span>
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        <div className="space-y-3 bg-orange-500/20 p-4 rounded-2xl border border-orange-400/30">
-                          <h3 className="font-semibold text-orange-300 flex items-center gap-2">
-                            <span className="text-orange-400 text-lg">[!]</span>
-                            What Was Missed
-                          </h3>
-                          <ul className="space-y-2">
-                            {reportDetails.whatWasMissed.map((item, index) => (
-                              <li key={index} className="flex gap-2 text-sm text-white/90">
-                                <span className="text-orange-400 shrink-0">[!]</span>
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </>
-                    )}
-
-                    <Button
-                      onClick={handleFinish}
-                      className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
-                      size="lg"
-                    >
-                      Finish & Return to Dashboard
-                    </Button>
-                  </div>
-                )}
               </div>
             )}
           </div>
