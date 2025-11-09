@@ -337,6 +337,24 @@ export default function CompanionCreatePage() {
     }
   }
 
+  const speakWhenReady = (text: string, maxWaitMs = 2000) => {
+    const startTime = Date.now()
+
+    const attemptSpeak = () => {
+      if (!isSpeakingRef.current) {
+        speak(text)
+      } else if (Date.now() - startTime < maxWaitMs) {
+        setTimeout(attemptSpeak, 100)
+      } else {
+        console.log("[v0] ⚠️ Timeout waiting for speech to end, forcing speak")
+        stopSpeaking()
+        setTimeout(() => speak(text), 200)
+      }
+    }
+
+    attemptSpeak()
+  }
+
   const handleStartConversation = () => {
     console.log("[v0] 🚀 Starting conversation!")
     console.log("[v0] 🔊 Voices loaded:", voicesLoaded)
@@ -378,7 +396,7 @@ export default function CompanionCreatePage() {
       case "greeting":
         setCurrentStep("narrative-1")
         setTimeout(() => {
-          speak(AI_MESSAGES["narrative-1"])
+          speakWhenReady(AI_MESSAGES["narrative-1"])
         }, 500)
         break
 
@@ -386,7 +404,7 @@ export default function CompanionCreatePage() {
         narrative1Ref.current = userResponse
         setCurrentStep("narrative-2")
         setTimeout(() => {
-          speak(AI_MESSAGES["narrative-2"])
+          speakWhenReady(AI_MESSAGES["narrative-2"])
         }, 500)
         break
 
@@ -394,7 +412,7 @@ export default function CompanionCreatePage() {
         narrative2Ref.current = userResponse
         setCurrentStep("narrative-3")
         setTimeout(() => {
-          speak(AI_MESSAGES["narrative-3"])
+          speakWhenReady(AI_MESSAGES["narrative-3"])
         }, 500)
         break
 
@@ -402,7 +420,7 @@ export default function CompanionCreatePage() {
         narrative3Ref.current = userResponse
         setCurrentStep("narrative-4")
         setTimeout(() => {
-          speak(AI_MESSAGES["narrative-4"])
+          speakWhenReady(AI_MESSAGES["narrative-4"])
         }, 500)
         break
 
@@ -410,13 +428,13 @@ export default function CompanionCreatePage() {
         narrative4Ref.current = userResponse
         setIsProcessing(true)
         setCurrentStep("analyzing")
-        speak(AI_MESSAGES.analyzing)
+        speakWhenReady(AI_MESSAGES.analyzing)
 
         setTimeout(() => {
           setIsProcessing(false)
           setCurrentStep("follow-up-1")
           setTimeout(() => {
-            speak(AI_MESSAGES["follow-up-1"])
+            speakWhenReady(AI_MESSAGES["follow-up-1"])
           }, 1000)
         }, 3000)
         break
@@ -425,7 +443,7 @@ export default function CompanionCreatePage() {
         followUp1Ref.current = userResponse
         setCurrentStep("follow-up-2")
         setTimeout(() => {
-          speak(AI_MESSAGES["follow-up-2"])
+          speakWhenReady(AI_MESSAGES["follow-up-2"])
         }, 500)
         break
 
@@ -433,7 +451,7 @@ export default function CompanionCreatePage() {
         followUp2Ref.current = userResponse
         setCurrentStep("follow-up-3")
         setTimeout(() => {
-          speak(AI_MESSAGES["follow-up-3"])
+          speakWhenReady(AI_MESSAGES["follow-up-3"])
         }, 500)
         break
 
@@ -441,7 +459,7 @@ export default function CompanionCreatePage() {
         followUp3Ref.current = userResponse
         setCurrentStep("follow-up-4")
         setTimeout(() => {
-          speak(AI_MESSAGES["follow-up-4"])
+          speakWhenReady(AI_MESSAGES["follow-up-4"])
         }, 500)
         break
 
@@ -449,7 +467,7 @@ export default function CompanionCreatePage() {
         followUp4Ref.current = userResponse
         setIsProcessing(true)
         setCurrentStep("saving")
-        speak(AI_MESSAGES.saving)
+        speakWhenReady(AI_MESSAGES.saving)
 
         try {
           const combinedNarrative = `Resident: ${narrative1Ref.current}\n\nIncident Details: ${narrative2Ref.current}\n\nResident State: ${narrative3Ref.current}\n\nEnvironment: ${narrative4Ref.current}`
@@ -488,7 +506,7 @@ export default function CompanionCreatePage() {
 
           setTimeout(() => {
             const combinedMessage = `Thank you. The report is complete and saved. Your initial narrative scored ${data.score} out of 10. ${data.feedback}`
-            speak(combinedMessage)
+            speakWhenReady(combinedMessage)
           }, 1000)
         } catch (error) {
           console.error("[v0] ❌ Error creating report:", error)
