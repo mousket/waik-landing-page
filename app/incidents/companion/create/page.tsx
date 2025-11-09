@@ -583,10 +583,10 @@ export default function CompanionCreatePage() {
         </div>
       ) : (
         <>
-          <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 space-y-8">
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 space-y-8 overflow-y-auto pb-24">
             {currentStep !== "report-card" ? (
               <>
-                <div className="relative w-64 h-64 sm:w-80 sm:h-80">
+                <div className="relative w-64 h-64 sm:w-80 sm:h-80 shrink-0">
                   <CompanionWaveAnimation isListening={isListening} isSpeaking={isSpeaking} />
                 </div>
 
@@ -595,8 +595,8 @@ export default function CompanionCreatePage() {
                 </div>
 
                 {(currentText || interimTranscript) && (
-                  <div className="max-w-2xl w-full p-4 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl">
-                    <p className="text-sm text-white/90">
+                  <div className="max-w-2xl w-full p-4 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl max-h-64 overflow-y-auto">
+                    <p className="text-sm text-white/90 break-words">
                       <span className="font-semibold">You:</span> {currentText}
                       <span className="text-white/60 italic">{interimTranscript}</span>
                     </p>
@@ -604,17 +604,19 @@ export default function CompanionCreatePage() {
                 )}
 
                 {currentText.trim() && !isProcessing && (
-                  <Button
-                    onClick={handleSubmit}
-                    size="lg"
-                    className="bg-white text-indigo-600 hover:bg-white/90 font-semibold px-8"
-                  >
-                    Submit Response
-                  </Button>
+                  <div className="w-full max-w-2xl flex justify-center pb-4">
+                    <Button
+                      onClick={handleSubmit}
+                      size="lg"
+                      className="bg-white text-indigo-600 hover:bg-white/90 font-semibold px-8 shadow-xl"
+                    >
+                      Submit Response
+                    </Button>
+                  </div>
                 )}
               </>
             ) : (
-              <div className="w-full max-w-md h-full overflow-y-auto px-4 py-8 pb-32">
+              <div className="w-full max-w-md h-full pb-8">
                 <div className="p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6">
                   <div className="text-center space-y-4">
                     <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
@@ -678,7 +680,7 @@ export default function CompanionCreatePage() {
             )}
           </div>
 
-          <div className="relative z-10 pb-6 flex justify-center">
+          <div className="relative z-20 pb-6 flex justify-center pointer-events-none">
             <div className="px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full">
               <p className="text-sm text-white/80">
                 {isListening
