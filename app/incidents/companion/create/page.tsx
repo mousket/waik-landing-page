@@ -10,7 +10,10 @@ import { CompanionWaveAnimation } from "@/components/companion-wave-animation"
 
 type ConversationStep =
   | "greeting"
-  | "narrative"
+  | "narrative-1" // Resident name and room
+  | "narrative-2" // What happened
+  | "narrative-3" // Resident state
+  | "narrative-4" // Environment
   | "analyzing"
   | "follow-up-1"
   | "follow-up-2"
@@ -22,7 +25,14 @@ type ConversationStep =
 
 const AI_MESSAGES = {
   greeting:
-    "Hello! I'm WAiK, your AI assistant. I'm here to help you report an incident. Can you tell me what happened? Please describe the incident in detail, including the resident's name, room number, and what occurred.",
+    "Hello! I'm WAiK, your AI assistant. I'm here to help you report an incident. Let's start by gathering the basic information.",
+  "narrative-1": "Can you please tell me the resident's name and room number?",
+  "narrative-2":
+    "Thank you. Now, can you tell me everything that happened? Please describe the incident in as much detail as possible.",
+  "narrative-3":
+    "Got it. Now tell me about the resident's state - their physical condition, mental state, clothing, and overall disposition at the time of the incident.",
+  "narrative-4":
+    "Almost done with the basics. Please tell me about the environment - describe the room, the circumstances surrounding the fall, and any details that could have influenced or contributed to what happened.",
   analyzing: "Thank you. Let me analyze that and prepare some follow-up questions...",
   "follow-up-1": "Was the floor wet or cluttered at the time of the incident?",
   "follow-up-2": "What was the resident wearing on their feet?",
@@ -60,7 +70,10 @@ export default function CompanionCreatePage() {
   const isListeningRef = useRef(false)
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const narrativeRef = useRef("")
+  const narrative1Ref = useRef("") // Name and room
+  const narrative2Ref = useRef("") // What happened
+  const narrative3Ref = useRef("") // Resident state
+  const narrative4Ref = useRef("") // Environment
   const followUp1Ref = useRef("")
   const followUp2Ref = useRef("")
   const followUp3Ref = useRef("")
@@ -363,7 +376,38 @@ export default function CompanionCreatePage() {
 
     switch (currentStep) {
       case "greeting":
-        narrativeRef.current = userResponse
+        setCurrentStep("narrative-1")
+        setTimeout(() => {
+          speak(AI_MESSAGES["narrative-1"])
+        }, 500)
+        break
+
+      case "narrative-1":
+        narrative1Ref.current = userResponse
+        setCurrentStep("narrative-2")
+        setTimeout(() => {
+          speak(AI_MESSAGES["narrative-2"])
+        }, 500)
+        break
+
+      case "narrative-2":
+        narrative2Ref.current = userResponse
+        setCurrentStep("narrative-3")
+        setTimeout(() => {
+          speak(AI_MESSAGES["narrative-3"])
+        }, 500)
+        break
+
+      case "narrative-3":
+        narrative3Ref.current = userResponse
+        setCurrentStep("narrative-4")
+        setTimeout(() => {
+          speak(AI_MESSAGES["narrative-4"])
+        }, 500)
+        break
+
+      case "narrative-4":
+        narrative4Ref.current = userResponse
         setIsProcessing(true)
         setCurrentStep("analyzing")
         speak(AI_MESSAGES.analyzing)
@@ -409,11 +453,13 @@ export default function CompanionCreatePage() {
 
         try {
           console.log("[v0] 📡 Calling API to create report...")
+          const combinedNarrative = `Resident: ${narrative1Ref.current}\n\nIncident Details: ${narrative2Ref.current}\n\nResident State: ${narrative3Ref.current}\n\nEnvironment: ${narrative4Ref.current}`
+
           const response = await fetch("/api/agent/report-conversational", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              narrative: narrativeRef.current,
+              narrative: combinedNarrative,
               followUp1: followUp1Ref.current,
               followUp2: followUp2Ref.current,
               followUp3: followUp3Ref.current,
@@ -444,7 +490,7 @@ export default function CompanionCreatePage() {
           setIsProcessing(false)
           setCurrentStep("report-card")
           setTimeout(() => {
-            const scoreMessage = `Thank you. Your report scored ${data.score} out of 10.`
+            const scoreMessage = `Thank you. The report is complete and saved. Your initial narrative scored ${data.score} out of 10.`
             speak(scoreMessage)
             setTimeout(() => {
               speak(data.feedback)
@@ -454,7 +500,6 @@ export default function CompanionCreatePage() {
           console.error("[v0] ❌ Error creating report:", error)
           toast.error("Failed to create report. Please try again.")
           setIsProcessing(false)
-          // Optionally navigate back or reset the flow
         }
         break
     }
@@ -473,6 +518,10 @@ export default function CompanionCreatePage() {
 
   const getCurrentMessage = () => {
     if (currentStep === "greeting") return AI_MESSAGES.greeting
+    if (currentStep === "narrative-1") return AI_MESSAGES["narrative-1"]
+    if (currentStep === "narrative-2") return AI_MESSAGES["narrative-2"]
+    if (currentStep === "narrative-3") return AI_MESSAGES["narrative-3"]
+    if (currentStep === "narrative-4") return AI_MESSAGES["narrative-4"]
     if (currentStep === "analyzing") return AI_MESSAGES.analyzing
     if (currentStep === "follow-up-1") return AI_MESSAGES["follow-up-1"]
     if (currentStep === "follow-up-2") return AI_MESSAGES["follow-up-2"]
@@ -576,6 +625,7 @@ export default function CompanionCreatePage() {
                   <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
                   <h2 className="text-3xl font-bold text-white">Report Complete</h2>
                   <div className="text-7xl font-bold text-white drop-shadow-lg">{reportScore}/10</div>
+                  <p className="text-white/80 text-sm leading-relaxed">{reportFeedback}</p>
                 </div>
 
                 {!showDetailedReport ? (
