@@ -64,9 +64,11 @@ export default function StaffReportPage() {
   const [isExiting, setIsExiting] = useState(false)
   const [browserSupport, setBrowserSupport] = useState(true)
   const [voicesLoaded, setVoicesLoaded] = useState(false)
+  const [conversationStarted, setConversationStarted] = useState(false)
 
   const recognitionRef = useRef<any>(null)
   const synthRef = useRef<SpeechSynthesis | null>(null)
+  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
 
   useEffect(() => {
     // Check browser support
@@ -81,19 +83,36 @@ export default function StaffReportPage() {
       const loadVoices = () => {
         const voices = window.speechSynthesis.getVoices()
         console.log("[v0] Speech synthesis voices loaded:", voices.length)
+
         if (voices.length > 0) {
+          const samanthaVoice = voices.find((v) => v.name.includes("Samantha"))
+          const defaultEnglishVoice = voices.find((v) => v.lang.startsWith("en") && v.default)
+          const anyEnglishVoice = voices.find((v) => v.lang.startsWith("en"))
+
+          selectedVoiceRef.current = samanthaVoice || defaultEnglishVoice || anyEnglishVoice || voices[0]
+
+          console.log("[v0] Selected voice:", selectedVoiceRef.current?.name)
           setVoicesLoaded(true)
           return true
         }
         return false
       }
 
-      // Try loading voices immediately
-      if (!loadVoices()) {
-        // If voices aren't loaded yet, wait for the event
+      window.speechSynthesis.cancel() // Clear any pending speech
+      const voices = window.speechSynthesis.getVoices()
+
+      if (voices.length > 0) {
+        loadVoices()
+      } else {
+        // Wait for voices to load
         window.speechSynthesis.onvoiceschanged = () => {
+          console.log("[v0] Voices changed event fired")
           loadVoices()
         }
+
+        const utterance = new SpeechSynthesisUtterance("")
+        window.speechSynthesis.speak(utterance)
+        window.speechSynthesis.cancel()
       }
 
       // Initialize Speech Recognition
@@ -134,13 +153,16 @@ export default function StaffReportPage() {
   }, [])
 
   useEffect(() => {
-    if (voicesLoaded && !isSpeaking && currentQuestionIndex === 0) {
-      console.log("[v0] Voices ready, starting conversation")
+    if (voicesLoaded && !conversationStarted && currentQuestionIndex === 0 && !isPaused) {
+      console.log("[v0] Voices ready, auto-starting conversation in 1 second")
+      setConversationStarted(true)
+
       setTimeout(() => {
+        console.log("[v0] Starting initial question")
         speakQuestion(0)
-      }, 500)
+      }, 1000)
     }
-  }, [voicesLoaded])
+  }, [voicesLoaded, conversationStarted, currentQuestionIndex, isPaused])
 
   const speakQuestion = (questionIndex: number) => {
     if (!synthRef.current || isPaused || !voicesLoaded) {
@@ -151,13 +173,14 @@ export default function StaffReportPage() {
     const question = conversationScript[questionIndex]
     const utterance = new SpeechSynthesisUtterance(question.question)
 
-    const voices = window.speechSynthesis.getVoices()
-    if (voices.length > 0) {
-      const englishVoice = voices.find((v) => v.lang.startsWith("en"))
-      if (englishVoice) {
-        utterance.voice = englishVoice
-      }
+    if (selectedVoiceRef.current) {
+      utterance.voice = selectedVoiceRef.current
+      console.log("[v0] Using voice:", selectedVoiceRef.current.name)
     }
+
+    utterance.rate = 0.9
+    utterance.pitch = 1.0
+    utterance.volume = 1.0
 
     utterance.onstart = () => {
       console.log("[v0] Started speaking question:", questionIndex)
@@ -189,6 +212,12 @@ export default function StaffReportPage() {
       setIsSpeaking(false)
     }
 
+    if (synthRef.current.speaking) {
+      console.log("[v0] Already speaking, canceling previous utterance")
+      synthRef.current.cancel()
+    }
+
+    console.log("[v0] Speaking question:", questionIndex)
     synthRef.current.speak(utterance)
   }
 
@@ -202,13 +231,13 @@ export default function StaffReportPage() {
     console.log("[v0] Speaking acknowledgment:", text)
     const utterance = new SpeechSynthesisUtterance(text)
 
-    const voices = window.speechSynthesis.getVoices()
-    if (voices.length > 0) {
-      const englishVoice = voices.find((v) => v.lang.startsWith("en"))
-      if (englishVoice) {
-        utterance.voice = englishVoice
-      }
+    if (selectedVoiceRef.current) {
+      utterance.voice = selectedVoiceRef.current
     }
+
+    utterance.rate = 0.9
+    utterance.pitch = 1.0
+    utterance.volume = 1.0
 
     utterance.onstart = () => {
       console.log("[v0] Started speaking acknowledgment")
@@ -357,7 +386,7 @@ export default function StaffReportPage() {
 
     setTimeout(() => {
       speakQuestion(currentQuestionIndex)
-    }, 300)
+    }, 500)
   }
 
   const handleExit = () => {
@@ -376,6 +405,10 @@ export default function StaffReportPage() {
     // Speak exit message
     const exitMessage = "Thank you for starting this process. You can resume anytime you want."
     const utterance = new SpeechSynthesisUtterance(exitMessage)
+
+    if (selectedVoiceRef.current) {
+      utterance.voice = selectedVoiceRef.current
+    }
 
     utterance.onend = () => {
       setTimeout(() => {
