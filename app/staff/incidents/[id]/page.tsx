@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
 import { useAuthStore } from "@/lib/auth-store"
 import { escapeHtml } from "@/lib/utils"
 import { markdownToHtml } from "@/lib/utils/markdown-to-html"
@@ -540,19 +539,101 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const residentStateHtml = residentStateRaw ? formatPlainTextAsHtml(residentStateRaw) : null
   const environmentNotesHtml = environmentNotesRaw ? formatPlainTextAsHtml(environmentNotesRaw) : null
 
-  const aiContent = incident
-    ? {
-        summary: "AI-generated summary will appear here once the AI Summary feature is implemented.",
+  // Mock AI Content function - This is where the original issue was.
+  // It should return an object or null, not be a function that returns an object or null.
+  const getAIContent = (incidentId: string) => {
+    const aiContent: Record<
+      string,
+      {
+        summary: string
         insights: {
-          whatHappened: "Detailed analysis of what happened will appear here.",
-          residentImpact: "Analysis of impact on the resident will appear here.",
-          prevention: "Prevention recommendations will appear here.",
-          futureActions: "Future action recommendations will appear here.",
-        },
-        recommendations: ["AI recommendations will appear here once implemented."],
-        actions: ["AI action items will appear here once implemented."],
+          whatHappened: string
+          residentImpact: string
+          prevention: string
+          futureActions: string
+        }
+        recommendations: string[]
+        actions: string[]
       }
-    : null
+    > = {
+      "inc-1": {
+        summary:
+          "Resident Margaret Thompson experienced a fall at 8:15 AM while attempting to get out of bed in Room 204. Staff member Sarah Johnson discovered the resident on the floor during morning rounds. The resident sustained minor bruising on the left hip, which was assessed by nursing staff and treated with an ice pack.",
+        insights: {
+          whatHappened:
+            "Resident fell while attempting to get out of bed unassisted during morning rounds. The fall occurred at approximately 8:15 AM when the resident was trying to reach the bathroom.",
+          residentImpact:
+            "Minor bruising on left hip area. No fractures or serious injuries detected. Resident remained alert and oriented. Ice pack applied immediately, and nursing assessment completed within 15 minutes of discovery.",
+          prevention:
+            "Bed rails should have been raised during the night. Call button was not within easy reach of the resident. The resident may have been attempting to avoid disturbing staff during busy morning rounds.",
+          futureActions:
+            "Implement bed alarm system for high-risk residents. Ensure call buttons are always within reach and test functionality during each shift. Increase frequency of morning rounds in rooms with fall-risk residents. Review and update fall prevention care plan.",
+        },
+        recommendations: [
+          "Install bed alarm system to alert staff when resident attempts to get out of bed unassisted",
+          "Conduct comprehensive fall risk assessment and update care plan with specific interventions",
+          "Review room layout to ensure bathroom accessibility and consider installing grab bars",
+        ],
+        actions: [
+          "Schedule physical therapy evaluation within 48 hours to assess mobility and recommend assistive devices",
+          "Update resident's care plan to include fall prevention protocols and increased monitoring",
+          "Conduct staff training session on fall prevention best practices and proper use of bed alarms",
+        ],
+      },
+      "inc-2": {
+        summary:
+          "Morning medication for resident Robert Williams in Room 312 was administered 30 minutes late due to staffing constraints during the morning shift. The delay occurred on January 21st at 10:00 AM, affecting the resident's scheduled 9:30 AM medication administration.",
+        insights: {
+          whatHappened:
+            "Medication administration was delayed by 30 minutes due to unexpected staffing shortage during morning shift. The primary medication nurse was assisting with an emergency in another wing, and backup protocols were not immediately activated.",
+          residentImpact:
+            "No adverse effects reported from the 30-minute delay. Resident took medication without issue once administered. Vital signs remained stable throughout the morning. Resident was informed of the delay and expressed understanding.",
+          prevention:
+            "Staffing levels were below optimal during peak medication administration hours. Backup medication administration protocols were not clearly communicated to available staff. Emergency response in another wing created cascading delays.",
+          futureActions:
+            "Review and adjust staffing schedules to ensure adequate coverage during peak medication times. Implement clear backup protocols for medication administration. Create a medication administration priority system for time-sensitive medications. Cross-train additional staff members on medication administration procedures.",
+        },
+        recommendations: [
+          "Adjust morning shift staffing schedule to ensure minimum two qualified medication administrators are available",
+          "Implement digital medication tracking system with automated alerts for approaching administration times",
+          "Create and document clear backup protocols for medication administration during emergencies",
+        ],
+        actions: [
+          "Review and update medication administration schedule to identify and prioritize time-critical medications",
+          "Initiate hiring process for additional qualified nursing staff to improve coverage ratios",
+          "Implement digital medication management system with real-time tracking and automated reminders",
+        ],
+      },
+      "inc-3": {
+        summary:
+          "Resident Elizabeth Davis in Room 108, who has a documented lactose intolerance, was served a meal containing dairy products on January 22nd at lunch. The error was discovered by staff before the resident consumed the meal, preventing any adverse reaction.",
+        insights: {
+          whatHappened:
+            "Kitchen staff prepared and delivered a meal containing dairy products to a resident with documented lactose intolerance. The error occurred during lunch service when a substitute kitchen worker was unfamiliar with the dietary restriction flagging system.",
+          residentImpact:
+            "No adverse effects as the error was caught by nursing staff before the resident consumed the meal. Replacement meal was provided within 15 minutes. Resident expressed appreciation for staff vigilance and was not distressed by the incident.",
+          prevention:
+            "Dietary restriction information was not prominently displayed on the meal tray. Substitute kitchen staff had not received adequate training on the dietary restriction system. Communication gap between dietary department and nursing staff during shift change.",
+          futureActions:
+            "Implement visual dietary restriction alert system on all meal trays and in kitchen preparation area. Ensure all kitchen staff, including substitutes, receive comprehensive training on dietary restrictions. Establish mandatory meal verification checklist before delivery. Create regular audit system for dietary compliance.",
+        },
+        recommendations: [
+          "Create highly visible dietary restriction alerts using color-coded labels on meal trays and resident room cards",
+          "Update kitchen communication protocols to include mandatory dietary restriction verification before meal preparation",
+          "Implement pre-delivery meal verification process where nursing staff confirms dietary compliance",
+        ],
+        actions: [
+          "Install visual dietary alert system with color-coded labels and digital displays in kitchen and on meal trays",
+          "Conduct comprehensive dietary restriction training for all kitchen and nursing staff within one week",
+          "Establish meal verification checklist that requires sign-off from both kitchen and nursing staff before delivery",
+        ],
+      },
+    }
+
+    return aiContent[incidentId] || null
+  }
+
+  const aiContent = incident ? getAIContent(incident.id) : null
 
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
@@ -577,7 +658,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto gap-2 bg-white/50 p-2">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-2 bg-white/50 p-2">
             <TabsTrigger value="overview" className="data-[state=active]:bg-white">
               <FileText className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Overview</span>
@@ -592,11 +673,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               <Brain className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Intelligence</span>
               <span className="sm:hidden">Intel</span>
-            </TabsTrigger>
-            <TabsTrigger value="summary" className="data-[state=active]:bg-white">
-              <Sparkles className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Insights</span>
-              <span className="sm:hidden">AI</span>
             </TabsTrigger>
             <TabsTrigger value="waik" className="data-[state=active]:bg-white">
               <Target className="h-4 w-4 mr-2" />
@@ -1337,119 +1413,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </Card>
           </TabsContent>
 
-          {/* Summary tab - unchanged */}
-          <TabsContent value="summary" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Incident Summary</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated summary based on incident details</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {aiContent ? (
-                    <p className="text-sm leading-relaxed">{aiContent.summary}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No AI content available for this incident</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-accent/20 lg:col-span-2 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Incident Insights</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated analysis answering key questions</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {aiContent ? (
-                    <>
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">What happened?</h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.whatHappened}</p>
-                      </div>
-                      <Separator />
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">What happened to the resident?</h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.residentImpact}</p>
-                      </div>
-                      <Separator />
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">
-                          How could we have prevented this incident?
-                        </h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.prevention}</p>
-                      </div>
-                      <Separator />
-                      <div>
-                        <h4 className="font-semibold text-sm mb-2 text-accent">
-                          What should we do to stop incidents like this in the future?
-                        </h4>
-                        <p className="text-sm leading-relaxed">{aiContent.insights.futureActions}</p>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No AI insights available for this incident</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Lightbulb className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Recommendations</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated recommendations for improvement</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {aiContent ? (
-                    <ul className="space-y-2">
-                      {aiContent.recommendations.map((rec, index) => (
-                        <li key={index} className="text-sm leading-relaxed flex items-start gap-2">
-                          <span className="text-accent mt-1">•</span>
-                          <span>{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      No AI recommendations available for this incident
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-accent" />
-                    <CardTitle className="text-base">Action Items</CardTitle>
-                  </div>
-                  <CardDescription>AI-generated action items to implement</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {aiContent ? (
-                    <ul className="space-y-2">
-                      {aiContent.actions.map((action, index) => (
-                        <li key={index} className="text-sm leading-relaxed flex items-start gap-2">
-                          <span className="text-accent mt-1">•</span>
-                          <span>{action}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No AI actions available for this incident</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
           {/* Update WAiK Agent tab to use markdown parser */}
           <TabsContent value="waik" className="space-y-6 mt-6">
             <div className="mb-4">
@@ -1571,98 +1534,4 @@ type IntelligenceMessage = {
   type: "user" | "ai"
   text: string
   timestamp: Date
-}
-
-// Mock AI Content function - This is where the original issue was.
-// It should return an object or null, not be a function that returns an object or null.
-const getAIContent = (incidentId: string) => {
-  const aiContent: Record<
-    string,
-    {
-      summary: string
-      insights: {
-        whatHappened: string
-        residentImpact: string
-        prevention: string
-        futureActions: string
-      }
-      recommendations: string[]
-      actions: string[]
-    }
-  > = {
-    "inc-1": {
-      summary:
-        "Resident Margaret Thompson experienced a fall at 8:15 AM while attempting to get out of bed in Room 204. Staff member Sarah Johnson discovered the resident on the floor during morning rounds. The resident sustained minor bruising on the left hip, which was assessed by nursing staff and treated with an ice pack.",
-      insights: {
-        whatHappened:
-          "Resident fell while attempting to get out of bed unassisted during morning rounds. The fall occurred at approximately 8:15 AM when the resident was trying to reach the bathroom.",
-        residentImpact:
-          "Minor bruising on left hip area. No fractures or serious injuries detected. Resident remained alert and oriented. Ice pack applied immediately, and nursing assessment completed within 15 minutes of discovery.",
-        prevention:
-          "Bed rails should have been raised during the night. Call button was not within easy reach of the resident. The resident may have been attempting to avoid disturbing staff during busy morning rounds.",
-        futureActions:
-          "Implement bed alarm system for high-risk residents. Ensure call buttons are always within reach and test functionality during each shift. Increase frequency of morning rounds in rooms with fall-risk residents. Review and update fall prevention care plan.",
-      },
-      recommendations: [
-        "Install bed alarm system to alert staff when resident attempts to get out of bed unassisted",
-        "Conduct comprehensive fall risk assessment and update care plan with specific interventions",
-        "Review room layout to ensure bathroom accessibility and consider installing grab bars",
-      ],
-      actions: [
-        "Schedule physical therapy evaluation within 48 hours to assess mobility and recommend assistive devices",
-        "Update resident's care plan to include fall prevention protocols and increased monitoring",
-        "Conduct staff training session on fall prevention best practices and proper use of bed alarms",
-      ],
-    },
-    "inc-2": {
-      summary:
-        "Morning medication for resident Robert Williams in Room 312 was administered 30 minutes late due to staffing constraints during the morning shift. The delay occurred on January 21st at 10:00 AM, affecting the resident's scheduled 9:30 AM medication administration.",
-      insights: {
-        whatHappened:
-          "Medication administration was delayed by 30 minutes due to unexpected staffing shortage during morning shift. The primary medication nurse was assisting with an emergency in another wing, and backup protocols were not immediately activated.",
-        residentImpact:
-          "No adverse effects reported from the 30-minute delay. Resident took medication without issue once administered. Vital signs remained stable throughout the morning. Resident was informed of the delay and expressed understanding.",
-        prevention:
-          "Staffing levels were below optimal during peak medication administration hours. Backup medication administration protocols were not clearly communicated to available staff. Emergency response in another wing created cascading delays.",
-        futureActions:
-          "Review and adjust staffing schedules to ensure adequate coverage during peak medication times. Implement clear backup protocols for medication administration. Create a medication administration priority system for time-sensitive medications. Cross-train additional staff members on medication administration procedures.",
-      },
-      recommendations: [
-        "Adjust morning shift staffing schedule to ensure minimum two qualified medication administrators are available",
-        "Implement digital medication tracking system with automated alerts for approaching administration times",
-        "Create and document clear backup protocols for medication administration during emergencies",
-      ],
-      actions: [
-        "Review and update medication administration schedule to identify and prioritize time-critical medications",
-        "Initiate hiring process for additional qualified nursing staff to improve coverage ratios",
-        "Implement digital medication management system with real-time tracking and automated reminders",
-      ],
-    },
-    "inc-3": {
-      summary:
-        "Resident Elizabeth Davis in Room 108, who has a documented lactose intolerance, was served a meal containing dairy products on January 22nd at lunch. The error was discovered by staff before the resident consumed the meal, preventing any adverse reaction.",
-      insights: {
-        whatHappened:
-          "Kitchen staff prepared and delivered a meal containing dairy products to a resident with documented lactose intolerance. The error occurred during lunch service when a substitute kitchen worker was unfamiliar with the dietary restriction flagging system.",
-        residentImpact:
-          "No adverse effects as the error was caught by nursing staff before the resident consumed the meal. Replacement meal was provided within 15 minutes. Resident expressed appreciation for staff vigilance and was not distressed by the incident.",
-        prevention:
-          "Dietary restriction information was not prominently displayed on the meal tray. Substitute kitchen staff had not received adequate training on the dietary restriction system. Communication gap between dietary department and nursing staff during shift change.",
-        futureActions:
-          "Implement visual dietary restriction alert system on all meal trays and in kitchen preparation area. Ensure all kitchen staff, including substitutes, receive comprehensive training on dietary restrictions. Establish mandatory meal verification checklist before delivery. Create regular audit system for dietary compliance.",
-      },
-      recommendations: [
-        "Create highly visible dietary restriction alerts using color-coded labels on meal trays and resident room cards",
-        "Update kitchen communication protocols to include mandatory dietary restriction verification before meal preparation",
-        "Implement pre-delivery meal verification process where nursing staff confirms dietary compliance",
-      ],
-      actions: [
-        "Install visual dietary alert system with color-coded labels and digital displays in kitchen and on meal trays",
-        "Conduct comprehensive dietary restriction training for all kitchen and nursing staff within one week",
-        "Establish meal verification checklist that requires sign-off from both kitchen and nursing staff before delivery",
-      ],
-    },
-  }
-
-  return aiContent[incidentId] || null
 }
