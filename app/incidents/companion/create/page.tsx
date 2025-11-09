@@ -452,7 +452,6 @@ export default function CompanionCreatePage() {
         speak(AI_MESSAGES.saving)
 
         try {
-          console.log("[v0] 📡 Calling API to create report...")
           const combinedNarrative = `Resident: ${narrative1Ref.current}\n\nIncident Details: ${narrative2Ref.current}\n\nResident State: ${narrative3Ref.current}\n\nEnvironment: ${narrative4Ref.current}`
 
           const response = await fetch("/api/agent/report-conversational", {
@@ -469,8 +468,6 @@ export default function CompanionCreatePage() {
             }),
           })
 
-          console.log("[v0] 📡 API response status:", response.status)
-
           if (!response.ok) {
             const errorText = await response.text()
             console.error("[v0] ❌ API error:", errorText)
@@ -478,7 +475,6 @@ export default function CompanionCreatePage() {
           }
 
           const data = await response.json()
-          console.log("[v0] ✅ Report created successfully:", data)
 
           setReportScore(data.score)
           setReportFeedback(data.feedback)
@@ -489,12 +485,10 @@ export default function CompanionCreatePage() {
 
           setIsProcessing(false)
           setCurrentStep("report-card")
+
           setTimeout(() => {
-            const scoreMessage = `Thank you. The report is complete and saved. Your initial narrative scored ${data.score} out of 10.`
-            speak(scoreMessage)
-            setTimeout(() => {
-              speak(data.feedback)
-            }, 2000)
+            const combinedMessage = `Thank you. The report is complete and saved. Your initial narrative scored ${data.score} out of 10. ${data.feedback}`
+            speak(combinedMessage)
           }, 1000)
         } catch (error) {
           console.error("[v0] ❌ Error creating report:", error)
