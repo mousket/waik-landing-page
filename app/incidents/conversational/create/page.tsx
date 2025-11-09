@@ -6,7 +6,7 @@ import { useAuthStore } from "@/lib/auth-store"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
-import { Mic, MicOff, Send, Loader2, Volume2, VolumeX, CheckCircle2 } from "lucide-react"
+import { Mic, MicOff, Send, Loader2, Volume2, VolumeX, CheckCircle2, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -357,24 +357,32 @@ export default function ConversationalCreatePage() {
   return (
     <div className="fixed inset-0 lg:left-72 bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur-lg px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold">Conversational Reporting</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">AI-guided incident documentation</p>
+      <div className="border-b bg-background/95 backdrop-blur-lg px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <Button variant="ghost" size="sm" onClick={handleFinish} className="gap-2 -ml-2">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Button>
+
+          <div className="text-center absolute left-1/2 -translate-x-1/2">
+            <h1 className="text-lg sm:text-xl font-bold">Conversational Reporting</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">AI-guided incident documentation</p>
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              setAutoSpeak(!autoSpeak)
+              if (autoSpeak) {
+                stopSpeaking()
+              }
+            }}
+            className="h-9 w-9 sm:h-10 sm:w-10"
+          >
+            {autoSpeak ? <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" />}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            setAutoSpeak(!autoSpeak)
-            if (autoSpeak) {
-              stopSpeaking()
-            }
-          }}
-          className="h-9 w-9 sm:h-10 sm:w-10"
-        >
-          {autoSpeak ? <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" />}
-        </Button>
       </div>
 
       {awaitingStart ? (
