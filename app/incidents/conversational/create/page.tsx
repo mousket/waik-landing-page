@@ -355,12 +355,12 @@ export default function ConversationalCreatePage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+    <div className="fixed inset-0 lg:left-72 bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur-lg px-4 py-3 flex items-center justify-between">
+      <div className="border-b bg-background/95 backdrop-blur-lg px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Conversational Reporting</h1>
-          <p className="text-sm text-muted-foreground">AI-guided incident documentation</p>
+          <h1 className="text-lg sm:text-xl font-bold">Conversational Reporting</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">AI-guided incident documentation</p>
         </div>
         <Button
           variant="outline"
@@ -371,18 +371,18 @@ export default function ConversationalCreatePage() {
               stopSpeaking()
             }
           }}
-          className="h-10 w-10"
+          className="h-9 w-9 sm:h-10 sm:w-10"
         >
-          {autoSpeak ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+          {autoSpeak ? <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" />}
         </Button>
       </div>
 
       {awaitingStart ? (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Card className="max-w-md w-full p-8 text-center space-y-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <Card className="max-w-md w-full p-6 sm:p-8 text-center space-y-4 sm:space-y-6 bg-gradient-to-br from-blue-500/10 via-indigo-500/10 to-purple-500/10 border-blue-500/20">
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold">Ready to Start?</h2>
-              <p className="text-muted-foreground leading-relaxed">
+              <h2 className="text-xl sm:text-2xl font-bold">Ready to Start?</h2>
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                 I'll guide you through reporting an incident using voice and text. Click the button below when you're
                 ready to begin.
               </p>
@@ -390,7 +390,7 @@ export default function ConversationalCreatePage() {
             <Button
               onClick={handleStartConversation}
               size="lg"
-              className="w-full bg-gradient-to-r from-primary to-accent"
+              className="w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:opacity-90"
               disabled={!voicesLoaded}
             >
               {voicesLoaded ? (
@@ -413,58 +413,60 @@ export default function ConversationalCreatePage() {
       ) : (
         <>
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message) => (
-              <div key={message.id} className={cn("flex", message.type === "ai" ? "justify-start" : "justify-end")}>
-                <Card
-                  className={cn(
-                    "max-w-[80%] p-4",
-                    message.type === "ai"
-                      ? "bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20"
-                      : "bg-muted",
-                  )}
-                >
-                  <p className="text-sm leading-relaxed">{message.text}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                </Card>
-              </div>
-            ))}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            <div className="max-w-4xl mx-auto space-y-4">
+              {messages.map((message) => (
+                <div key={message.id} className={cn("flex", message.type === "ai" ? "justify-start" : "justify-end")}>
+                  <Card
+                    className={cn(
+                      "max-w-[85%] sm:max-w-[80%] p-3 sm:p-4",
+                      message.type === "ai"
+                        ? "bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border-blue-500/20"
+                        : "bg-muted",
+                    )}
+                  >
+                    <p className="text-sm leading-relaxed">{message.text}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </Card>
+                </div>
+              ))}
 
-            {isProcessing && (
-              <div className="flex justify-start">
-                <Card className="max-w-[80%] p-4 bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <p className="text-sm">Processing...</p>
-                  </div>
-                </Card>
-              </div>
-            )}
+              {isProcessing && (
+                <div className="flex justify-start">
+                  <Card className="max-w-[85%] sm:max-w-[80%] p-3 sm:p-4 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border-blue-500/20">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <p className="text-sm">Processing...</p>
+                    </div>
+                  </Card>
+                </div>
+              )}
 
-            {currentStep === "report-card" && reportScore !== null && (
-              <div className="flex justify-center">
-                <Card className="max-w-md w-full p-6 bg-gradient-to-br from-green-500/10 to-blue-500/10 border-green-500/20">
-                  <div className="text-center space-y-4">
-                    <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-                    <h2 className="text-2xl font-bold">Report Quality Score</h2>
-                    <div className="text-6xl font-bold text-green-600">{reportScore}/10</div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{reportFeedback}</p>
-                    <Button onClick={handleFinish} className="w-full" size="lg">
-                      Finish & Return to Dashboard
-                    </Button>
-                  </div>
-                </Card>
-              </div>
-            )}
+              {currentStep === "report-card" && reportScore !== null && (
+                <div className="flex justify-center">
+                  <Card className="max-w-md w-full p-6 bg-gradient-to-br from-green-500/10 to-blue-500/10 border-green-500/20">
+                    <div className="text-center space-y-4">
+                      <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
+                      <h2 className="text-2xl font-bold">Report Quality Score</h2>
+                      <div className="text-6xl font-bold text-green-600">{reportScore}/10</div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{reportFeedback}</p>
+                      <Button onClick={handleFinish} className="w-full" size="lg">
+                        Finish & Return to Dashboard
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              )}
 
-            <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
           {/* Input Area */}
           {currentStep !== "report-card" && currentStep !== "complete" && (
-            <div className="border-t bg-background/95 backdrop-blur-lg p-4">
+            <div className="border-t bg-background/95 backdrop-blur-lg p-4 sm:p-6">
               <div className="max-w-4xl mx-auto space-y-3">
                 {isSpeaking && (
                   <Button onClick={stopSpeaking} variant="destructive" className="w-full animate-pulse">
@@ -479,7 +481,7 @@ export default function ConversationalCreatePage() {
                     value={currentInput}
                     onChange={(e) => setCurrentInput(e.target.value)}
                     placeholder="Type your response or use voice input..."
-                    className="min-h-[60px] max-h-[200px] resize-none"
+                    className="min-h-[60px] max-h-[200px] resize-none flex-1"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
@@ -487,7 +489,7 @@ export default function ConversationalCreatePage() {
                       }
                     }}
                   />
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 shrink-0">
                     <Button
                       onClick={isListening ? stopVoiceRecording : startVoiceRecording}
                       variant={isListening ? "destructive" : "outline"}
@@ -500,7 +502,7 @@ export default function ConversationalCreatePage() {
                     <Button
                       onClick={handleSend}
                       size="icon"
-                      className="h-[60px] w-[60px] bg-gradient-to-r from-primary to-accent"
+                      className="h-[60px] w-[60px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:opacity-90"
                       disabled={!currentInput.trim() || isProcessing || isListening}
                     >
                       <Send className="h-6 w-6" />

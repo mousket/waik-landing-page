@@ -157,7 +157,7 @@ export default function StaffLayout({
                 Dashboard
               </Button>
               <Button
-                className="w-full justify-start bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
+                className="w-full justify-start bg-gradient-to-r from-primary via-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
                 onClick={() => {
                   router.push("/incidents/create")
                   setIsMobileMenuOpen(false)
@@ -167,8 +167,7 @@ export default function StaffLayout({
                 New Incident
               </Button>
               <Button
-                variant="ghost"
-                className="w-full justify-start hover:bg-accent/10 hover:text-accent transition-colors"
+                className="w-full justify-start bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
                 onClick={() => {
                   router.push("/incidents/conversational/create")
                   setIsMobileMenuOpen(false)
