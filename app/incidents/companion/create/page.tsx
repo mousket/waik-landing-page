@@ -614,8 +614,8 @@ export default function CompanionCreatePage() {
                 )}
               </>
             ) : (
-              <div className="w-full max-w-md overflow-y-auto px-4 py-8">
-                <div className="p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6 mb-8">
+              <div className="w-full max-w-md h-full overflow-y-auto px-4 py-8 pb-32">
+                <div className="p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6">
                   <div className="text-center space-y-4">
                     <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
                     <h2 className="text-3xl font-bold text-white">Report Complete</h2>
