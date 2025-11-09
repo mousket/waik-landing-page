@@ -22,7 +22,7 @@ type ConversationStep =
 
 const AI_MESSAGES = {
   greeting:
-    "Hello! I'm here to help you report an incident. Can you tell me what happened? Please describe the incident in detail, including the resident's name, room number, and what occurred.",
+    "Hello! I'm WAiK, your AI assistant. I'm here to help you report an incident. Can you tell me what happened? Please describe the incident in detail, including the resident's name, room number, and what occurred.",
   analyzing: "Thank you. Let me analyze that and prepare some follow-up questions...",
   "follow-up-1": "Was the floor wet or cluttered at the time of the incident?",
   "follow-up-2": "What was the resident wearing on their feet?",
@@ -67,40 +67,59 @@ export default function CompanionCreatePage() {
   const followUp4Ref = useRef("")
 
   useEffect(() => {
+    console.log("[v0] 🎤 Initializing voice systems...")
+
     if (typeof window !== "undefined") {
       synthRef.current = window.speechSynthesis
+      console.log("[v0] ✅ Speech synthesis available:", !!synthRef.current)
     }
 
     const loadVoices = () => {
-      if (!synthRef.current) return false
+      if (!synthRef.current) {
+        console.log("[v0] ❌ No speech synthesis available")
+        return false
+      }
 
       const voices = synthRef.current.getVoices()
+      console.log("[v0] 🔊 Available voices:", voices.length)
+
       if (voices.length > 0) {
         const samanthaVoice = voices.find((v) => v.name.toLowerCase().includes("samantha"))
         const defaultEnglishVoice = voices.find((v) => v.lang.startsWith("en"))
         const selectedVoice = samanthaVoice || defaultEnglishVoice || voices[0]
 
+        console.log("[v0] ✅ Selected voice:", selectedVoice.name, selectedVoice.lang)
         setSelectedVoice(selectedVoice)
         setVoicesLoaded(true)
         return true
       }
+      console.log("[v0] ⏳ Waiting for voices to load...")
       return false
     }
 
     if (!loadVoices()) {
       if (synthRef.current) {
-        synthRef.current.onvoiceschanged = loadVoices
+        synthRef.current.onvoiceschanged = () => {
+          console.log("[v0] 🔄 Voices changed event triggered")
+          loadVoices()
+        }
       }
     }
 
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      console.log("[v0] ✅ Speech recognition available")
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
       recognitionRef.current = new SpeechRecognition()
       recognitionRef.current.continuous = true
       recognitionRef.current.interimResults = true
       recognitionRef.current.lang = "en-US"
 
+      recognitionRef.current.onstart = () => {
+        console.log("[v0] 🎤 Speech recognition STARTED")
+      }
+
       recognitionRef.current.onresult = (event: any) => {
+        console.log("[v0] 📝 Speech recognition result event")
         let finalTranscript = ""
         let interimText = ""
 
@@ -108,47 +127,61 @@ export default function CompanionCreatePage() {
           const transcript = event.results[i][0].transcript
           if (event.results[i].isFinal) {
             finalTranscript += transcript
+            console.log("[v0] ✅ Final transcript:", transcript)
           } else {
             interimText += transcript
+            console.log("[v0] 💭 Interim transcript:", transcript)
           }
         }
 
         if (finalTranscript) {
-          setCurrentText((prev) => prev + " " + finalTranscript)
+          setCurrentText((prev) => {
+            const newText = prev + " " + finalTranscript
+            console.log("[v0] 📝 Updated current text:", newText)
+            return newText
+          })
 
           if (speechEndTimerRef.current) {
             clearTimeout(speechEndTimerRef.current)
           }
           speechEndTimerRef.current = setTimeout(() => {
-            console.log("[v0] Auto-submitting after speech ended")
+            console.log("[v0] ⏰ Auto-submitting after 2 seconds of silence")
             handleSubmit()
           }, 2000)
         }
         setInterimTranscript(interimText)
 
         if ((finalTranscript || interimText) && isSpeakingRef.current) {
+          console.log("[v0] 🛑 User interrupted AI, stopping speech")
           stopSpeaking()
         }
       }
 
       recognitionRef.current.onerror = (event: any) => {
+        console.error("[v0] ❌ Speech recognition error:", event.error)
         if (event.error !== "no-speech") {
-          console.error("[v0] Speech recognition error:", event.error)
+          toast.error(`Speech recognition error: ${event.error}`)
         }
       }
 
       recognitionRef.current.onend = () => {
+        console.log("[v0] 🔚 Speech recognition ended")
         if (isListeningRef.current && currentStep !== "report-card" && currentStep !== "complete") {
+          console.log("[v0] 🔄 Restarting speech recognition...")
           try {
             recognitionRef.current.start()
           } catch (error) {
-            console.log("[v0] Recognition restart failed:", error)
+            console.log("[v0] ⚠️ Recognition restart failed:", error)
           }
         }
       }
+    } else {
+      console.error("[v0] ❌ Speech recognition NOT available in this browser")
+      toast.error("Speech recognition is not supported in this browser. Please use Chrome or Edge.")
     }
 
     return () => {
+      console.log("[v0] 🧹 Cleaning up voice systems...")
       if (recognitionRef.current) {
         recognitionRef.current.stop()
       }
@@ -162,9 +195,21 @@ export default function CompanionCreatePage() {
   }, [])
 
   const speak = (text: string) => {
-    if (!autoSpeak || !synthRef.current || !voicesLoaded || !selectedVoice) return
+    console.log("[v0] 💬 speak() called with text:", text.substring(0, 50) + "...")
+    console.log("[v0] 💬 autoSpeak:", autoSpeak, "voicesLoaded:", voicesLoaded, "selectedVoice:", !!selectedVoice)
+
+    if (!autoSpeak) {
+      console.log("[v0] 🔇 Auto-speak is disabled")
+      return
+    }
+
+    if (!synthRef.current || !voicesLoaded || !selectedVoice) {
+      console.log("[v0] ❌ Cannot speak - missing requirements")
+      return
+    }
 
     if (isSpeakingRef.current && currentUtteranceRef.current) {
+      console.log("[v0] 🛑 Already speaking, canceling current utterance")
       synthRef.current.cancel()
       currentUtteranceRef.current = null
       isSpeakingRef.current = false
@@ -176,7 +221,11 @@ export default function CompanionCreatePage() {
   }
 
   const speakImmediate = (text: string) => {
-    if (!synthRef.current || !selectedVoice) return
+    console.log("[v0] 🗣️ speakImmediate() called")
+    if (!synthRef.current || !selectedVoice) {
+      console.log("[v0] ❌ Cannot speak immediately - missing requirements")
+      return
+    }
 
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.voice = selectedVoice
@@ -185,75 +234,99 @@ export default function CompanionCreatePage() {
     utterance.volume = 1.0
 
     currentUtteranceRef.current = utterance
+    console.log("[v0] 🎙️ Created utterance with voice:", selectedVoice.name)
 
     utterance.onstart = () => {
+      console.log("[v0] ▶️ Speech STARTED")
       isSpeakingRef.current = true
       setIsSpeaking(true)
     }
 
     utterance.onend = () => {
+      console.log("[v0] ⏹️ Speech ENDED")
       isSpeakingRef.current = false
       setIsSpeaking(false)
       currentUtteranceRef.current = null
 
       if (!isListeningRef.current && currentStep !== "report-card" && currentStep !== "complete") {
+        console.log("[v0] 🎤 Starting listening after speech ended")
         startListening()
       }
     }
 
     utterance.onerror = (event) => {
-      if (event.error !== "canceled") {
-        console.error("[v0] Speech error:", event.error)
-      }
+      console.error("[v0] ❌ Speech synthesis error:", event.error)
       isSpeakingRef.current = false
       setIsSpeaking(false)
       currentUtteranceRef.current = null
     }
 
+    console.log("[v0] 📢 Calling speechSynthesis.speak()")
     synthRef.current.speak(utterance)
   }
 
   const stopSpeaking = () => {
+    console.log("[v0] 🛑 stopSpeaking() called")
     if (synthRef.current && isSpeakingRef.current) {
       synthRef.current.cancel()
       currentUtteranceRef.current = null
       isSpeakingRef.current = false
       setIsSpeaking(false)
+      console.log("[v0] ✅ Speech stopped")
     }
   }
 
   const startListening = () => {
-    if (!recognitionRef.current || isListeningRef.current) return
+    console.log("[v0] 🎤 startListening() called")
+    if (!recognitionRef.current) {
+      console.log("[v0] ❌ No recognition ref available")
+      return
+    }
+
+    if (isListeningRef.current) {
+      console.log("[v0] ⚠️ Already listening")
+      return
+    }
 
     try {
+      console.log("[v0] 🔊 Starting speech recognition...")
       recognitionRef.current.start()
       isListeningRef.current = true
       setIsListening(true)
+      console.log("[v0] ✅ Speech recognition started")
     } catch (error) {
-      console.log("[v0] Recognition already started")
+      console.error("[v0] ❌ Failed to start recognition:", error)
     }
   }
 
   const stopListening = () => {
+    console.log("[v0] 🛑 stopListening() called")
     if (recognitionRef.current && isListeningRef.current) {
       recognitionRef.current.stop()
       isListeningRef.current = false
       setIsListening(false)
+      console.log("[v0] ✅ Listening stopped")
     }
   }
 
   const handleStartConversation = () => {
+    console.log("[v0] 🚀 Starting conversation!")
+    console.log("[v0] 🔊 Voices loaded:", voicesLoaded)
+
     if (!voicesLoaded) {
       toast.error("Voice system is still loading. Please wait a moment.")
       return
     }
     setAwaitingStart(false)
     setTimeout(() => {
+      console.log("[v0] 💬 Speaking greeting message...")
       speak(AI_MESSAGES.greeting)
     }, 500)
   }
 
   const handleSubmit = async () => {
+    console.log("[v0] 📤 handleSubmit() called")
+
     if (speechEndTimerRef.current) {
       clearTimeout(speechEndTimerRef.current)
       speechEndTimerRef.current = null
@@ -261,7 +334,11 @@ export default function CompanionCreatePage() {
 
     stopListening()
     const userResponse = currentText.trim()
-    if (!userResponse) return
+
+    if (!userResponse) {
+      console.log("[v0] ⚠️ No user response to submit")
+      return
+    }
 
     console.log("[v0] 📝 User response:", userResponse)
     console.log("[v0] 📍 Current step:", currentStep)
@@ -359,6 +436,7 @@ export default function CompanionCreatePage() {
   }
 
   const handleFinish = () => {
+    console.log("[v0] 🏁 Finishing conversation")
     stopSpeaking()
     stopListening()
     if (role === "admin") {
