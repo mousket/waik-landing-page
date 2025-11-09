@@ -71,6 +71,7 @@ export default function CreateIncidentPage() {
   const [residentState, setResidentState] = useState("")
   const [environmentNotes, setEnvironmentNotes] = useState("")
   const [canAddMore, setCanAddMore] = useState(false)
+  const [voicesLoaded, setVoicesLoaded] = useState(false)
   const recognitionRef = useRef<any>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -92,6 +93,22 @@ export default function CreateIncidentPage() {
   }
 
   useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices()
+      console.log("[v0] Speech synthesis voices loaded:", voices.length)
+      if (voices.length > 0) {
+        setVoicesLoaded(true)
+      }
+    }
+
+    // Load voices immediately
+    loadVoices()
+
+    // Listen for voices changed event (some browsers load voices asynchronously)
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices
+    }
+
     // Initialize speech recognition
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -99,11 +116,6 @@ export default function CreateIncidentPage() {
       recognitionRef.current.continuous = false
       recognitionRef.current.interimResults = false
       recognitionRef.current.lang = "en-US"
-    }
-
-    // Speak the first prompt when page loads
-    if (autoSpeak) {
-      speakPrompt(VOICE_PROMPTS[0].question)
     }
 
     return () => {
@@ -114,20 +126,60 @@ export default function CreateIncidentPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (voicesLoaded && autoSpeak && currentStep === 1) {
+      // Delay initial prompt slightly to ensure everything is ready
+      const timer = setTimeout(() => {
+        speakPrompt(VOICE_PROMPTS[0].question)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [voicesLoaded])
+
   const speakPrompt = (text: string) => {
-    if (!autoSpeak) return
+    if (!autoSpeak) {
+      console.log("[v0] Auto-speak is disabled")
+      return
+    }
+
+    console.log("[v0] Attempting to speak:", text.substring(0, 50) + "...")
 
     window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 0.9
-    utterance.pitch = 1
-    utterance.volume = 1
 
-    utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 0.9
+      utterance.pitch = 1
+      utterance.volume = 1
 
-    window.speechSynthesis.speak(utterance)
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length > 0) {
+        const englishVoice = voices.find((v) => v.lang.startsWith("en"))
+        if (englishVoice) {
+          utterance.voice = englishVoice
+          console.log("[v0] Using voice:", englishVoice.name)
+        }
+      }
+
+      utterance.onstart = () => {
+        console.log("[v0] Speech started")
+        setIsSpeaking(true)
+      }
+      utterance.onend = () => {
+        console.log("[v0] Speech ended")
+        setIsSpeaking(false)
+      }
+      utterance.onerror = (event) => {
+        console.error("[v0] Speech error:", event.error)
+        setIsSpeaking(false)
+        if (event.error === "not-allowed") {
+          toast.error("Please enable audio permissions in your browser")
+        }
+      }
+
+      console.log("[v0] Starting speech synthesis...")
+      window.speechSynthesis.speak(utterance)
+    }, 100)
   }
 
   const stopSpeaking = () => {
@@ -229,7 +281,6 @@ export default function CreateIncidentPage() {
     setIsProcessing(true)
     setCurrentStep(6)
 
-    // Speak the final prompt
     if (autoSpeak) {
       speakPrompt(VOICE_PROMPTS[5].question)
     }
