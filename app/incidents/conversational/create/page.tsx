@@ -70,6 +70,8 @@ export default function ConversationalCreatePage() {
   const synthRef = useRef<SpeechSynthesis | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const isSpeakingRef = useRef(false)
 
   // Conversation data
   const narrativeRef = useRef("")
@@ -145,9 +147,22 @@ export default function ConversationalCreatePage() {
       return
     }
 
-    // Cancel any existing speech
-    synthRef.current.cancel()
-    setIsSpeaking(false)
+    // Only cancel if we're actually speaking
+    if (isSpeakingRef.current && currentUtteranceRef.current) {
+      synthRef.current.cancel()
+      currentUtteranceRef.current = null
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
+
+      // Wait a bit after canceling before starting new speech
+      setTimeout(() => speakImmediate(text), 100)
+    } else {
+      speakImmediate(text)
+    }
+  }
+
+  const speakImmediate = (text: string) => {
+    if (!synthRef.current || !selectedVoice) return
 
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.voice = selectedVoice
@@ -155,22 +170,29 @@ export default function ConversationalCreatePage() {
     utterance.pitch = 1.0
     utterance.volume = 1.0
 
+    currentUtteranceRef.current = utterance
+
     utterance.onstart = () => {
       console.log("[v0] 🔊 Speaking started")
+      isSpeakingRef.current = true
       setIsSpeaking(true)
     }
 
     utterance.onend = () => {
       console.log("[v0] 🔇 Speaking ended")
+      isSpeakingRef.current = false
       setIsSpeaking(false)
+      currentUtteranceRef.current = null
     }
 
     utterance.onerror = (event) => {
-      console.error("[v0] ❌ Speech error:", event.error)
+      // Only log non-canceled errors
       if (event.error !== "canceled") {
-        console.error("[v0] Speech synthesis error:", event.error)
+        console.error("[v0] ❌ Speech error:", event.error)
       }
+      isSpeakingRef.current = false
       setIsSpeaking(false)
+      currentUtteranceRef.current = null
     }
 
     console.log("[v0] 🎤 Speaking with voice:", selectedVoice.name)
@@ -178,10 +200,12 @@ export default function ConversationalCreatePage() {
   }
 
   const stopSpeaking = () => {
-    if (synthRef.current) {
+    if (synthRef.current && isSpeakingRef.current) {
       synthRef.current.cancel()
+      currentUtteranceRef.current = null
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
     }
-    setIsSpeaking(false)
   }
 
   const addAIMessage = (text: string) => {
