@@ -83,36 +83,50 @@ export default function StaffReportPage() {
       const loadVoices = () => {
         const voices = window.speechSynthesis.getVoices()
         console.log("[v0] Speech synthesis voices loaded:", voices.length)
+        console.log("[v0] Available voices:", voices.map((v) => `${v.name} (${v.lang})`).join(", "))
 
         if (voices.length > 0) {
+          // Try to find Samantha first
           const samanthaVoice = voices.find((v) => v.name.includes("Samantha"))
+          // Then try default English voice
           const defaultEnglishVoice = voices.find((v) => v.lang.startsWith("en") && v.default)
+          // Then any English voice
           const anyEnglishVoice = voices.find((v) => v.lang.startsWith("en"))
 
           selectedVoiceRef.current = samanthaVoice || defaultEnglishVoice || anyEnglishVoice || voices[0]
 
-          console.log("[v0] Selected voice:", selectedVoiceRef.current?.name)
+          console.log("[v0] Selected voice:", selectedVoiceRef.current?.name, "Lang:", selectedVoiceRef.current?.lang)
           setVoicesLoaded(true)
           return true
         }
         return false
       }
 
-      window.speechSynthesis.cancel() // Clear any pending speech
-      const voices = window.speechSynthesis.getVoices()
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+        synthRef.current = window.speechSynthesis
+      }
 
-      if (voices.length > 0) {
-        loadVoices()
-      } else {
+      // Try immediate load
+      if (!loadVoices()) {
         // Wait for voices to load
         window.speechSynthesis.onvoiceschanged = () => {
           console.log("[v0] Voices changed event fired")
           loadVoices()
         }
 
-        const utterance = new SpeechSynthesisUtterance("")
-        window.speechSynthesis.speak(utterance)
-        window.speechSynthesis.cancel()
+        setTimeout(() => {
+          const testUtterance = new SpeechSynthesisUtterance(" ")
+          window.speechSynthesis.speak(testUtterance)
+          window.speechSynthesis.cancel()
+
+          // Try loading again after forcing
+          setTimeout(() => {
+            if (!voicesLoaded) {
+              loadVoices()
+            }
+          }, 100)
+        }, 100)
       }
 
       // Initialize Speech Recognition
@@ -137,9 +151,6 @@ export default function StaffReportPage() {
         console.log("[v0] Speech recognition ended")
         setIsListening(false)
       }
-
-      // Initialize Speech Synthesis
-      synthRef.current = window.speechSynthesis
     }
 
     return () => {
@@ -154,122 +165,186 @@ export default function StaffReportPage() {
 
   useEffect(() => {
     if (voicesLoaded && !conversationStarted && currentQuestionIndex === 0 && !isPaused) {
-      console.log("[v0] Voices ready, auto-starting conversation in 1 second")
+      console.log("[v0] Voices ready, auto-starting conversation in 1.5 seconds")
       setConversationStarted(true)
 
       setTimeout(() => {
         console.log("[v0] Starting initial question")
         speakQuestion(0)
-      }, 1000)
+      }, 1500)
     }
   }, [voicesLoaded, conversationStarted, currentQuestionIndex, isPaused])
 
   const speakQuestion = (questionIndex: number) => {
-    if (!synthRef.current || isPaused || !voicesLoaded) {
-      console.log("[v0] Cannot speak - synthesis not ready, paused, or voices not loaded")
+    if (!synthRef.current) {
+      console.log("[v0] ❌ Cannot speak - synthRef not initialized")
+      return
+    }
+
+    if (isPaused) {
+      console.log("[v0] ❌ Cannot speak - paused")
+      return
+    }
+
+    if (!voicesLoaded) {
+      console.log("[v0] ❌ Cannot speak - voices not loaded")
       return
     }
 
     const question = conversationScript[questionIndex]
-    const utterance = new SpeechSynthesisUtterance(question.question)
+    console.log("[v0] 🎤 Preparing to speak question", questionIndex, ":", question.question.substring(0, 50) + "...")
 
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current
-      console.log("[v0] Using voice:", selectedVoiceRef.current.name)
+    // Cancel any ongoing speech
+    if (synthRef.current.speaking) {
+      console.log("[v0] ⚠️ Already speaking, canceling...")
+      synthRef.current.cancel()
+      // Wait a bit after canceling
+      setTimeout(() => speakQuestion(questionIndex), 200)
+      return
     }
 
-    utterance.rate = 0.9
+    const utterance = new SpeechSynthesisUtterance(question.question)
+
+    // Set voice
+    if (selectedVoiceRef.current) {
+      utterance.voice = selectedVoiceRef.current
+      console.log("[v0] 🔊 Using voice:", selectedVoiceRef.current.name)
+    } else {
+      console.log("[v0] ⚠️ No voice selected, using default")
+    }
+
+    // Set speech parameters
+    utterance.rate = 0.95
     utterance.pitch = 1.0
     utterance.volume = 1.0
+    utterance.lang = "en-US"
 
+    console.log(
+      "[v0] 📢 Utterance configured - Rate:",
+      utterance.rate,
+      "Pitch:",
+      utterance.pitch,
+      "Volume:",
+      utterance.volume,
+    )
+
+    // Event handlers
     utterance.onstart = () => {
-      console.log("[v0] Started speaking question:", questionIndex)
+      console.log("[v0] ✅ AUDIO STARTED - Speaking question:", questionIndex)
       setIsSpeaking(true)
-      // Make sure we're not listening while speaking
+
+      // Stop listening while speaking
       if (recognitionRef.current && isListening) {
         try {
           recognitionRef.current.stop()
+          setIsListening(false)
         } catch (e) {
-          // Ignore errors if already stopped
+          console.log("[v0] Error stopping recognition:", e)
         }
       }
     }
 
     utterance.onend = () => {
-      console.log("[v0] Finished speaking question:", questionIndex)
+      console.log("[v0] ✅ AUDIO ENDED - Finished question:", questionIndex)
       setIsSpeaking(false)
-      // Add a small delay before starting to listen to ensure clean state
+
+      // Start listening after speech ends
       if (!isPaused) {
         setTimeout(() => {
-          console.log("[v0] About to start listening after question:", questionIndex)
+          console.log("[v0] 🎙️ Starting to listen after question")
           startListening()
-        }, 300)
+        }, 500)
       }
     }
 
     utterance.onerror = (event) => {
-      console.log("[v0] Speech synthesis error:", event)
+      console.log("[v0] ❌ SPEECH ERROR:", event.error, "Message:", event)
+      setIsSpeaking(false)
+
+      // If synthesis fails, still try to continue
+      if (!isPaused) {
+        setTimeout(() => {
+          console.log("[v0] Error recovery - starting to listen anyway")
+          startListening()
+        }, 500)
+      }
+    }
+
+    // Attempt to speak
+    try {
+      console.log("[v0] 🚀 Calling speechSynthesis.speak()...")
+      synthRef.current.speak(utterance)
+      console.log("[v0] ✓ speak() called successfully")
+
+      // Fallback: If onstart doesn't fire within 2 seconds, something is wrong
+      setTimeout(() => {
+        if (!isSpeaking && synthRef.current && synthRef.current.speaking) {
+          console.log("[v0] ⚠️ Speech synthesis stuck - forcing resume")
+          synthRef.current.resume()
+        } else if (!isSpeaking) {
+          console.log("[v0] ❌ Speech never started - may need user interaction")
+          // Show a visual indicator or button for user to click to enable audio
+        }
+      }, 2000)
+    } catch (error) {
+      console.log("[v0] ❌ Exception calling speak():", error)
       setIsSpeaking(false)
     }
-
-    if (synthRef.current.speaking) {
-      console.log("[v0] Already speaking, canceling previous utterance")
-      synthRef.current.cancel()
-    }
-
-    console.log("[v0] Speaking question:", questionIndex)
-    synthRef.current.speak(utterance)
   }
 
   const speakAcknowledgment = (text: string, callback: () => void) => {
-    if (!synthRef.current || isPaused || !voicesLoaded) {
-      console.log("[v0] Cannot speak acknowledgment - synthesis not ready, paused, or voices not loaded")
-      callback() // Still call callback to continue flow
+    if (!synthRef.current || !voicesLoaded) {
+      console.log("[v0] Cannot speak acknowledgment - calling callback anyway")
+      callback()
       return
     }
 
-    console.log("[v0] Speaking acknowledgment:", text)
+    console.log("[v0] 🎤 Speaking acknowledgment:", text)
     const utterance = new SpeechSynthesisUtterance(text)
 
     if (selectedVoiceRef.current) {
       utterance.voice = selectedVoiceRef.current
     }
 
-    utterance.rate = 0.9
+    utterance.rate = 0.95
     utterance.pitch = 1.0
     utterance.volume = 1.0
+    utterance.lang = "en-US"
 
     utterance.onstart = () => {
-      console.log("[v0] Started speaking acknowledgment")
+      console.log("[v0] ✅ Acknowledgment started")
       setIsSpeaking(true)
-      // Stop listening if we're still listening
+
       if (recognitionRef.current && isListening) {
         try {
           recognitionRef.current.stop()
           setIsListening(false)
         } catch (e) {
-          // Ignore errors
+          console.log("[v0] Error stopping recognition:", e)
         }
       }
     }
 
     utterance.onend = () => {
-      console.log("[v0] Finished speaking acknowledgment, calling callback")
+      console.log("[v0] ✅ Acknowledgment ended")
       setIsSpeaking(false)
-      // Small delay before callback to ensure clean state transition
       setTimeout(() => {
         callback()
-      }, 200)
+      }, 300)
     }
 
     utterance.onerror = (event) => {
-      console.log("[v0] Acknowledgment speech error:", event)
+      console.log("[v0] ❌ Acknowledgment error:", event.error)
       setIsSpeaking(false)
-      // Still call callback even if there's an error
       callback()
     }
 
-    synthRef.current?.speak(utterance)
+    try {
+      synthRef.current.speak(utterance)
+    } catch (error) {
+      console.log("[v0] ❌ Exception in acknowledgment:", error)
+      callback()
+    }
   }
 
   const startListening = () => {
@@ -375,6 +450,7 @@ export default function StaffReportPage() {
   }
 
   const handleRepeatQuestion = () => {
+    console.log("[v0] 🔄 Repeat question requested")
     if (synthRef.current) {
       synthRef.current.cancel()
     }
