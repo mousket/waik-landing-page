@@ -136,7 +136,7 @@ export default function CompanionCreatePage() {
 
         if (finalTranscript) {
           setCurrentText((prev) => {
-            const newText = prev + " " + finalTranscript
+            const newText = (prev + " " + finalTranscript).trim()
             console.log("[v0] 📝 Updated current text:", newText)
             return newText
           })
@@ -150,23 +150,24 @@ export default function CompanionCreatePage() {
           }, 2000)
         }
         setInterimTranscript(interimText)
-
-        if ((finalTranscript || interimText) && isSpeakingRef.current) {
-          console.log("[v0] 🛑 User interrupted AI, stopping speech")
-          stopSpeaking()
-        }
       }
 
       recognitionRef.current.onerror = (event: any) => {
         console.error("[v0] ❌ Speech recognition error:", event.error)
-        if (event.error !== "no-speech") {
+        if (event.error !== "no-speech" && event.error !== "aborted") {
           toast.error(`Speech recognition error: ${event.error}`)
         }
       }
 
       recognitionRef.current.onend = () => {
         console.log("[v0] 🔚 Speech recognition ended")
-        if (isListeningRef.current && currentStep !== "report-card" && currentStep !== "complete") {
+        if (
+          isListeningRef.current &&
+          currentStep !== "report-card" &&
+          currentStep !== "complete" &&
+          currentStep !== "analyzing" &&
+          currentStep !== "saving"
+        ) {
           console.log("[v0] 🔄 Restarting speech recognition...")
           try {
             recognitionRef.current.start()
@@ -206,6 +207,11 @@ export default function CompanionCreatePage() {
     if (!synthRef.current || !voicesLoaded || !selectedVoice) {
       console.log("[v0] ❌ Cannot speak - missing requirements")
       return
+    }
+
+    if (isListeningRef.current) {
+      console.log("[v0] 🛑 Stopping listening while AI speaks")
+      stopListening()
     }
 
     if (isSpeakingRef.current && currentUtteranceRef.current) {
@@ -248,9 +254,17 @@ export default function CompanionCreatePage() {
       setIsSpeaking(false)
       currentUtteranceRef.current = null
 
-      if (!isListeningRef.current && currentStep !== "report-card" && currentStep !== "complete") {
+      if (
+        !isListeningRef.current &&
+        currentStep !== "report-card" &&
+        currentStep !== "complete" &&
+        currentStep !== "analyzing" &&
+        currentStep !== "saving"
+      ) {
         console.log("[v0] 🎤 Starting listening after speech ended")
-        startListening()
+        setTimeout(() => {
+          startListening()
+        }, 500)
       }
     }
 
@@ -285,6 +299,11 @@ export default function CompanionCreatePage() {
 
     if (isListeningRef.current) {
       console.log("[v0] ⚠️ Already listening")
+      return
+    }
+
+    if (isSpeakingRef.current) {
+      console.log("[v0] ⚠️ Cannot start listening while AI is speaking")
       return
     }
 
