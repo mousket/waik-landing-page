@@ -141,6 +141,24 @@ export default function ConversationalCreatePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  const speakWhenReady = (text: string, maxWait = 5000) => {
+    const startTime = Date.now()
+
+    const checkAndSpeak = () => {
+      if (!isSpeakingRef.current) {
+        speakImmediate(text)
+      } else if (Date.now() - startTime < maxWait) {
+        setTimeout(checkAndSpeak, 100)
+      } else {
+        console.log("[v0] ⚠️ Speech timeout, forcing new speech")
+        stopSpeaking()
+        setTimeout(() => speakImmediate(text), 200)
+      }
+    }
+
+    checkAndSpeak()
+  }
+
   const speak = (text: string) => {
     if (!autoSpeak || !synthRef.current || !voicesLoaded || !selectedVoice) {
       console.log("[v0] ❌ Cannot speak - missing requirements")
@@ -216,7 +234,7 @@ export default function ConversationalCreatePage() {
       timestamp: new Date(),
     }
     setMessages((prev) => [...prev, message])
-    speak(text)
+    speakWhenReady(text)
   }
 
   const addUserMessage = (text: string) => {
@@ -305,7 +323,7 @@ export default function ConversationalCreatePage() {
           setCurrentStep("follow-up-1")
           setTimeout(() => {
             addAIMessage(AI_MESSAGES["follow-up-1"])
-          }, 1000)
+          }, 1500)
         }, 3000)
         break
 
@@ -314,7 +332,7 @@ export default function ConversationalCreatePage() {
         setCurrentStep("follow-up-2")
         setTimeout(() => {
           addAIMessage(AI_MESSAGES["follow-up-2"])
-        }, 500)
+        }, 800)
         break
 
       case "follow-up-2":
@@ -322,7 +340,7 @@ export default function ConversationalCreatePage() {
         setCurrentStep("follow-up-3")
         setTimeout(() => {
           addAIMessage(AI_MESSAGES["follow-up-3"])
-        }, 500)
+        }, 800)
         break
 
       case "follow-up-3":
@@ -330,7 +348,7 @@ export default function ConversationalCreatePage() {
         setCurrentStep("follow-up-4")
         setTimeout(() => {
           addAIMessage(AI_MESSAGES["follow-up-4"])
-        }, 500)
+        }, 800)
         break
 
       case "follow-up-4":
@@ -367,12 +385,9 @@ export default function ConversationalCreatePage() {
           setIsProcessing(false)
           setCurrentStep("report-card")
           setTimeout(() => {
-            const scoreMessage = `Thank you. The report is complete and saved. Your initial narrative scored a ${data.score} out of 10.`
-            addAIMessage(scoreMessage)
-            setTimeout(() => {
-              addAIMessage(data.feedback)
-            }, 2000)
-          }, 1000)
+            const fullMessage = `Thank you. The report is complete and saved. Your initial narrative scored a ${data.score} out of 10. ${data.feedback}`
+            addAIMessage(fullMessage)
+          }, 1500)
         } catch (error) {
           console.error("[v0] Error creating report:", error)
           toast.error("Failed to create report. Please try again.")
