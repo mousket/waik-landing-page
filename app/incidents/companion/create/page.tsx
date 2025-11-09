@@ -119,7 +119,6 @@ export default function CompanionCreatePage() {
       }
 
       recognitionRef.current.onresult = (event: any) => {
-        console.log("[v0] 📝 Speech recognition result event")
         let finalTranscript = ""
         let interimText = ""
 
@@ -127,17 +126,14 @@ export default function CompanionCreatePage() {
           const transcript = event.results[i][0].transcript
           if (event.results[i].isFinal) {
             finalTranscript += transcript
-            console.log("[v0] ✅ Final transcript:", transcript)
           } else {
             interimText += transcript
-            console.log("[v0] 💭 Interim transcript:", transcript)
           }
         }
 
         if (finalTranscript) {
           setCurrentText((prev) => {
             const newText = (prev + " " + finalTranscript).trim()
-            console.log("[v0] 📝 Updated current text:", newText)
             return newText
           })
 
@@ -145,7 +141,6 @@ export default function CompanionCreatePage() {
             clearTimeout(speechEndTimerRef.current)
           }
           speechEndTimerRef.current = setTimeout(() => {
-            console.log("[v0] ⏰ Auto-submitting after 2 seconds of silence")
             handleSubmit()
           }, 2000)
         }
@@ -182,7 +177,6 @@ export default function CompanionCreatePage() {
     }
 
     return () => {
-      console.log("[v0] 🧹 Cleaning up voice systems...")
       if (recognitionRef.current) {
         recognitionRef.current.stop()
       }
@@ -269,7 +263,9 @@ export default function CompanionCreatePage() {
     }
 
     utterance.onerror = (event) => {
-      console.error("[v0] ❌ Speech synthesis error:", event.error)
+      if (event.error !== "canceled") {
+        console.error("[v0] ❌ Speech synthesis error:", event.error)
+      }
       isSpeakingRef.current = false
       setIsSpeaking(false)
       currentUtteranceRef.current = null
@@ -412,6 +408,7 @@ export default function CompanionCreatePage() {
         speak(AI_MESSAGES.saving)
 
         try {
+          console.log("[v0] 📡 Calling API to create report...")
           const response = await fetch("/api/agent/report-conversational", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -426,9 +423,17 @@ export default function CompanionCreatePage() {
             }),
           })
 
-          if (!response.ok) throw new Error("Failed to create report")
+          console.log("[v0] 📡 API response status:", response.status)
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error("[v0] ❌ API error:", errorText)
+            throw new Error(`Failed to create report: ${response.status}`)
+          }
 
           const data = await response.json()
+          console.log("[v0] ✅ Report created successfully:", data)
+
           setReportScore(data.score)
           setReportFeedback(data.feedback)
           setReportDetails({
@@ -446,9 +451,10 @@ export default function CompanionCreatePage() {
             }, 2000)
           }, 1000)
         } catch (error) {
-          console.error("[v0] Error creating report:", error)
+          console.error("[v0] ❌ Error creating report:", error)
           toast.error("Failed to create report. Please try again.")
           setIsProcessing(false)
+          // Optionally navigate back or reset the flow
         }
         break
     }
