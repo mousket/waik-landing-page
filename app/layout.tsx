@@ -34,8 +34,8 @@ const getSiteUrl = () => {
   }
 
   // 2. Vercel preview/production deployments (automatic)
-  if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim() !== "") {
-    const vercelUrl = `https://${process.env.VERCEL_URL}`
+  if (process.env.VERCEL_URL && process.env.NEXT_PUBLIC_VERCEL_URL.trim() !== "") {
+    const vercelUrl = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
     if (isValidUrl(vercelUrl)) {
       return vercelUrl
     }
