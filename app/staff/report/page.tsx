@@ -63,6 +63,7 @@ export default function StaffReportPage() {
   const [isComplete, setIsComplete] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [browserSupport, setBrowserSupport] = useState(true)
+  const [voicesLoaded, setVoicesLoaded] = useState(false)
 
   const recognitionRef = useRef<any>(null)
   const synthRef = useRef<SpeechSynthesis | null>(null)
@@ -75,6 +76,24 @@ export default function StaffReportPage() {
         setBrowserSupport(false)
         console.log("[v0] Browser does not support Web Speech API")
         return
+      }
+
+      const loadVoices = () => {
+        const voices = window.speechSynthesis.getVoices()
+        console.log("[v0] Speech synthesis voices loaded:", voices.length)
+        if (voices.length > 0) {
+          setVoicesLoaded(true)
+          return true
+        }
+        return false
+      }
+
+      // Try loading voices immediately
+      if (!loadVoices()) {
+        // If voices aren't loaded yet, wait for the event
+        window.speechSynthesis.onvoiceschanged = () => {
+          loadVoices()
+        }
       }
 
       // Initialize Speech Recognition
@@ -102,9 +121,6 @@ export default function StaffReportPage() {
 
       // Initialize Speech Synthesis
       synthRef.current = window.speechSynthesis
-
-      // Start the conversation
-      speakQuestion(0)
     }
 
     return () => {
@@ -117,14 +133,31 @@ export default function StaffReportPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (voicesLoaded && !isSpeaking && currentQuestionIndex === 0) {
+      console.log("[v0] Voices ready, starting conversation")
+      setTimeout(() => {
+        speakQuestion(0)
+      }, 500)
+    }
+  }, [voicesLoaded])
+
   const speakQuestion = (questionIndex: number) => {
-    if (!synthRef.current || isPaused) {
-      console.log("[v0] Cannot speak - synthesis not ready or paused")
+    if (!synthRef.current || isPaused || !voicesLoaded) {
+      console.log("[v0] Cannot speak - synthesis not ready, paused, or voices not loaded")
       return
     }
 
     const question = conversationScript[questionIndex]
     const utterance = new SpeechSynthesisUtterance(question.question)
+
+    const voices = window.speechSynthesis.getVoices()
+    if (voices.length > 0) {
+      const englishVoice = voices.find((v) => v.lang.startsWith("en"))
+      if (englishVoice) {
+        utterance.voice = englishVoice
+      }
+    }
 
     utterance.onstart = () => {
       console.log("[v0] Started speaking question:", questionIndex)
@@ -160,13 +193,22 @@ export default function StaffReportPage() {
   }
 
   const speakAcknowledgment = (text: string, callback: () => void) => {
-    if (!synthRef.current || isPaused) {
-      console.log("[v0] Cannot speak acknowledgment - synthesis not ready or paused")
+    if (!synthRef.current || isPaused || !voicesLoaded) {
+      console.log("[v0] Cannot speak acknowledgment - synthesis not ready, paused, or voices not loaded")
+      callback() // Still call callback to continue flow
       return
     }
 
     console.log("[v0] Speaking acknowledgment:", text)
     const utterance = new SpeechSynthesisUtterance(text)
+
+    const voices = window.speechSynthesis.getVoices()
+    if (voices.length > 0) {
+      const englishVoice = voices.find((v) => v.lang.startsWith("en"))
+      if (englishVoice) {
+        utterance.voice = englishVoice
+      }
+    }
 
     utterance.onstart = () => {
       console.log("[v0] Started speaking acknowledgment")
@@ -198,7 +240,7 @@ export default function StaffReportPage() {
       callback()
     }
 
-    synthRef.current.speak(utterance)
+    synthRef.current?.speak(utterance)
   }
 
   const startListening = () => {
@@ -278,7 +320,7 @@ export default function StaffReportPage() {
       // Move to next question
       const nextIndex = currentQuestionIndex + 1
       console.log("[v0] Moving to next question:", nextIndex, "out of", conversationScript.length)
-      
+
       // Update state before speaking
       setCurrentQuestionIndex(nextIndex)
 

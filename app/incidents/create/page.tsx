@@ -103,15 +103,15 @@ export default function CreateIncidentPage() {
       console.log("[v0] Speech synthesis voices loaded:", voices.length)
       if (voices.length > 0) {
         setVoicesLoaded(true)
+        return true
       }
+      return false
     }
 
-    // Load voices immediately
-    loadVoices()
-
-    // Listen for voices changed event (some browsers load voices asynchronously)
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.onvoiceschanged = loadVoices
+    if (!loadVoices()) {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.onvoiceschanged = loadVoices
+      }
     }
 
     // Initialize speech recognition
@@ -133,21 +133,22 @@ export default function CreateIncidentPage() {
 
   useEffect(() => {
     if (voicesLoaded && autoSpeak && currentStep === 1) {
-      // Delay initial prompt slightly to ensure everything is ready
       const timer = setTimeout(() => {
         speakPrompt(VOICE_PROMPTS[0].question)
-      }, 500)
+      }, 800)
       return () => clearTimeout(timer)
     }
-  }, [voicesLoaded])
+  }, [voicesLoaded, autoSpeak, currentStep])
 
   const speakPrompt = (text: string) => {
-    if (!autoSpeak) return
+    if (!autoSpeak || !voicesLoaded) {
+      console.log("[v0] Cannot speak - autoSpeak disabled or voices not loaded")
+      return
+    }
 
     window.speechSynthesis.cancel()
     setIsSpeaking(false)
 
-    // Wait for cancellation to complete before starting new speech
     setTimeout(() => {
       const utterance = new SpeechSynthesisUtterance(text)
       utterance.rate = 0.9
@@ -159,7 +160,10 @@ export default function CreateIncidentPage() {
         const englishVoice = voices.find((v) => v.lang.startsWith("en"))
         if (englishVoice) {
           utterance.voice = englishVoice
+          console.log("[v0] Selected voice:", englishVoice.name)
         }
+      } else {
+        console.log("[v0] Warning: No voices available")
       }
 
       utterance.onstart = () => {
