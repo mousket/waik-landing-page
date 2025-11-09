@@ -76,6 +76,9 @@ export default function CreateIncidentPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleNext = () => {
+    window.speechSynthesis.cancel()
+    setIsSpeaking(false)
+
     if (currentStep === 5) {
       handleSubmit()
       return
@@ -85,9 +88,11 @@ export default function CreateIncidentPage() {
       const nextStep = (currentStep + 1) as Step
       setCurrentStep(nextStep)
 
-      // Speak the prompt for the NEXT step, not the current one
+      // Speak the prompt for the NEXT step after a short delay
       if (autoSpeak && nextStep < 6) {
-        speakPrompt(VOICE_PROMPTS[nextStep - 1].question)
+        setTimeout(() => {
+          speakPrompt(VOICE_PROMPTS[nextStep - 1].question)
+        }, 300)
       }
     }
   }
@@ -137,15 +142,12 @@ export default function CreateIncidentPage() {
   }, [voicesLoaded])
 
   const speakPrompt = (text: string) => {
-    if (!autoSpeak) {
-      console.log("[v0] Auto-speak is disabled")
-      return
-    }
-
-    console.log("[v0] Attempting to speak:", text.substring(0, 50) + "...")
+    if (!autoSpeak) return
 
     window.speechSynthesis.cancel()
+    setIsSpeaking(false)
 
+    // Wait for cancellation to complete before starting new speech
     setTimeout(() => {
       const utterance = new SpeechSynthesisUtterance(text)
       utterance.rate = 0.9
@@ -157,29 +159,27 @@ export default function CreateIncidentPage() {
         const englishVoice = voices.find((v) => v.lang.startsWith("en"))
         if (englishVoice) {
           utterance.voice = englishVoice
-          console.log("[v0] Using voice:", englishVoice.name)
         }
       }
 
       utterance.onstart = () => {
-        console.log("[v0] Speech started")
         setIsSpeaking(true)
       }
       utterance.onend = () => {
-        console.log("[v0] Speech ended")
         setIsSpeaking(false)
       }
       utterance.onerror = (event) => {
-        console.error("[v0] Speech error:", event.error)
-        setIsSpeaking(false)
-        if (event.error === "not-allowed") {
-          toast.error("Please enable audio permissions in your browser")
+        if (event.error !== "canceled") {
+          console.error("[v0] Speech error:", event.error)
+          if (event.error === "not-allowed") {
+            toast.error("Please enable audio permissions in your browser")
+          }
         }
+        setIsSpeaking(false)
       }
 
-      console.log("[v0] Starting speech synthesis...")
       window.speechSynthesis.speak(utterance)
-    }, 100)
+    }, 200)
   }
 
   const stopSpeaking = () => {
