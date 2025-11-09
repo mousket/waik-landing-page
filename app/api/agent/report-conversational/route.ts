@@ -81,21 +81,65 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Added", questions.length, "answered questions")
 
-    // Generate report score (mock scoring based on response lengths)
     const totalLength = narrative.length + followUp1.length + followUp2.length + followUp3.length + followUp4.length
     const avgLength = totalLength / 5
 
-    let score = 6 // Base score
+    let score = 6
     if (avgLength > 100) score = 8
     if (avgLength > 150) score = 9
     if (avgLength > 200) score = 10
 
     const feedback =
       score >= 9
-        ? "Excellent report! Your detailed responses provide comprehensive information that will help prevent future incidents."
+        ? "You did an excellent job describing the resident's condition and the environmental details. Next time, try to also include any safety equipment positions."
         : score >= 7
-          ? "Good report. You provided solid information with enough detail for follow-up and analysis."
-          : "Your report has been recorded. Consider adding more details in future reports for better incident analysis."
+          ? "You provided solid information about the incident and context. Next time, try to include more specific details about the resident's footwear and nearby safety equipment."
+          : "You provided the basic incident details. Next time, try to include more specific details about environmental factors, footwear, and safety equipment placement."
+
+    const whatYouDidWell: string[] = []
+    const whatWasMissed: string[] = []
+
+    // Analyze narrative
+    if (narrative.length > 50) {
+      whatYouDidWell.push("You provided a detailed initial narrative")
+    }
+    if (narrative.toLowerCase().includes("room")) {
+      whatYouDidWell.push("You identified the room number")
+    }
+    if (/resident|patient|person/i.test(narrative)) {
+      whatYouDidWell.push("You identified the resident involved")
+    }
+
+    // Analyze follow-ups
+    if (followUp1.length > 20) {
+      whatYouDidWell.push("You described the floor condition clearly")
+    } else {
+      whatWasMissed.push("More detail about floor conditions (wet, dry, obstacles) would help prevent future incidents")
+    }
+
+    if (followUp2.length > 15) {
+      whatYouDidWell.push("You noted the resident's footwear")
+    } else {
+      whatWasMissed.push("We still needed to know the **type of footwear** the resident was wearing")
+    }
+
+    if (followUp3.length > 20) {
+      whatYouDidWell.push("You identified witnesses to the incident")
+    } else {
+      whatWasMissed.push("Information about witnesses helps corroborate incident details")
+    }
+
+    if (followUp4.length > 15) {
+      whatYouDidWell.push("You described the lighting conditions")
+    } else {
+      whatWasMissed.push("We still needed to know if the **lighting was adequate** in the area")
+    }
+
+    // Always add some gaps for coaching
+    if (!whatWasMissed.length || whatWasMissed.length < 2) {
+      whatWasMissed.push("Consider mentioning if the **call light was in reach** of the resident")
+      whatWasMissed.push("Consider noting if any **mobility aids** (walker, cane) were nearby")
+    }
 
     console.log("[v0] Report score:", score)
 
@@ -106,6 +150,8 @@ export async function POST(request: NextRequest) {
       incidentId: incident.id,
       score,
       feedback,
+      whatYouDidWell,
+      whatWasMissed,
     })
   } catch (error) {
     console.error("[v0] Error creating conversational report:", error)

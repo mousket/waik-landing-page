@@ -59,6 +59,11 @@ export default function ConversationalCreatePage() {
   const [conversationStarted, setConversationStarted] = useState(false)
   const [reportScore, setReportScore] = useState<number | null>(null)
   const [reportFeedback, setReportFeedback] = useState<string>("")
+  const [showDetailedReport, setShowDetailedReport] = useState(false)
+  const [reportDetails, setReportDetails] = useState<{
+    whatYouDidWell: string[]
+    whatWasMissed: string[]
+  } | null>(null)
   const [awaitingStart, setAwaitingStart] = useState(true)
 
   const recognitionRef = useRef<any>(null)
@@ -330,11 +335,19 @@ export default function ConversationalCreatePage() {
           const data = await response.json()
           setReportScore(data.score)
           setReportFeedback(data.feedback)
+          setReportDetails({
+            whatYouDidWell: data.whatYouDidWell || [],
+            whatWasMissed: data.whatWasMissed || [],
+          })
 
           setIsProcessing(false)
           setCurrentStep("report-card")
           setTimeout(() => {
-            addAIMessage(AI_MESSAGES.reportCard)
+            const scoreMessage = `Thank you. The report is complete and saved. Your initial narrative scored a ${data.score} out of 10.`
+            addAIMessage(scoreMessage)
+            setTimeout(() => {
+              addAIMessage(data.feedback)
+            }, 2000)
           }, 1000)
         } catch (error) {
           console.error("[v0] Error creating report:", error)
@@ -454,16 +467,68 @@ export default function ConversationalCreatePage() {
 
               {currentStep === "report-card" && reportScore !== null && (
                 <div className="flex justify-center">
-                  <Card className="max-w-md w-full p-6 bg-gradient-to-br from-green-500/10 to-blue-500/10 border-green-500/20">
+                  <Card className="max-w-md w-full p-6 bg-gradient-to-br from-green-500/10 to-blue-500/10 border-green-500/20 space-y-4">
                     <div className="text-center space-y-4">
                       <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-                      <h2 className="text-2xl font-bold">Report Quality Score</h2>
+                      <h2 className="text-2xl font-bold">Report Complete</h2>
                       <div className="text-6xl font-bold text-green-600">{reportScore}/10</div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{reportFeedback}</p>
-                      <Button onClick={handleFinish} className="w-full" size="lg">
-                        Finish & Return to Dashboard
-                      </Button>
                     </div>
+
+                    {!showDetailedReport ? (
+                      <div className="space-y-4">
+                        <Button
+                          onClick={() => setShowDetailedReport(true)}
+                          variant="outline"
+                          className="w-full"
+                          size="lg"
+                        >
+                          Show Detailed Report Card
+                        </Button>
+                        <Button onClick={handleFinish} className="w-full" size="lg">
+                          Finish & Return to Dashboard
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {reportDetails && (
+                          <>
+                            <div className="space-y-3">
+                              <h3 className="font-semibold text-green-600 flex items-center gap-2">
+                                <CheckCircle2 className="h-5 w-5" />
+                                What You Did Well
+                              </h3>
+                              <ul className="space-y-2">
+                                {reportDetails.whatYouDidWell.map((item, index) => (
+                                  <li key={index} className="flex gap-2 text-sm">
+                                    <span className="text-green-500 shrink-0">[+]</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            <div className="space-y-3">
+                              <h3 className="font-semibold text-orange-600 flex items-center gap-2">
+                                <span className="text-orange-500 text-lg">[!]</span>
+                                What Was Missed
+                              </h3>
+                              <ul className="space-y-2">
+                                {reportDetails.whatWasMissed.map((item, index) => (
+                                  <li key={index} className="flex gap-2 text-sm">
+                                    <span className="text-orange-500 shrink-0">[!]</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </>
+                        )}
+
+                        <Button onClick={handleFinish} className="w-full" size="lg">
+                          Finish & Return to Dashboard
+                        </Button>
+                      </div>
+                    )}
                   </Card>
                 </div>
               )}
