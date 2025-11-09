@@ -58,6 +58,7 @@ export default function CompanionCreatePage() {
   const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
   const isSpeakingRef = useRef(false)
   const isListeningRef = useRef(false)
+  const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const narrativeRef = useRef("")
   const followUp1Ref = useRef("")
@@ -114,6 +115,14 @@ export default function CompanionCreatePage() {
 
         if (finalTranscript) {
           setCurrentText((prev) => prev + " " + finalTranscript)
+
+          if (speechEndTimerRef.current) {
+            clearTimeout(speechEndTimerRef.current)
+          }
+          speechEndTimerRef.current = setTimeout(() => {
+            console.log("[v0] Auto-submitting after speech ended")
+            handleSubmit()
+          }, 2000)
         }
         setInterimTranscript(interimText)
 
@@ -145,6 +154,9 @@ export default function CompanionCreatePage() {
       }
       if (synthRef.current) {
         synthRef.current.cancel()
+      }
+      if (speechEndTimerRef.current) {
+        clearTimeout(speechEndTimerRef.current)
       }
     }
   }, [])
@@ -242,9 +254,17 @@ export default function CompanionCreatePage() {
   }
 
   const handleSubmit = async () => {
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current)
+      speechEndTimerRef.current = null
+    }
+
     stopListening()
     const userResponse = currentText.trim()
     if (!userResponse) return
+
+    console.log("[v0] 📝 User response:", userResponse)
+    console.log("[v0] 📍 Current step:", currentStep)
 
     setCurrentText("")
     setInterimTranscript("")
