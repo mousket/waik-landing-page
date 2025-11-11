@@ -117,6 +117,7 @@ export default function CreateIncidentPage() {
     residentState: "",
     environmentNotes: "",
   })
+  const isMobileDictationRef = useRef(false)
   const hasSpokenInitialPromptRef = useRef(false)
   const {
     speak: speakTTS,
@@ -159,6 +160,15 @@ export default function CreateIncidentPage() {
       stopTTS()
     }
   }, [stopTTS])
+
+useEffect(() => {
+  if (typeof navigator !== "undefined") {
+    const ua = navigator.userAgent || navigator.vendor || (window as any).opera || ""
+    isMobileDictationRef.current = /android|avantgo|blackberry|iemobile|ipad|iphone|ipod|kindle|midp|phone|pocket|psp|symbian|up\.browser|up\.link|windows ce|windows phone|xda|xiino/i.test(
+      ua,
+    )
+  }
+}, [])
 
   useEffect(() => {
     if (!speechSupported && autoSpeak) {
@@ -223,6 +233,28 @@ export default function CreateIncidentPage() {
 
     recognitionRef.current.onresult = (event: any) => {
       if (!currentPrompt.field) return
+
+      if (!isMobileDictationRef.current) {
+        let transcript = ""
+        const startIndex = typeof event.resultIndex === "number" ? event.resultIndex : 0
+        for (let i = startIndex; i < event.results.length; i++) {
+          const result = event.results[i]
+          const phrase = result?.[0]?.transcript ?? ""
+          if (!phrase) continue
+          transcript += phrase
+          if (result.isFinal) {
+            dictationFinalRef.current[currentPrompt.field] = phrase.trim()
+          }
+        }
+
+        const normalized = transcript.trim()
+        const lastResult = event.results?.[event.results.length - 1]
+        updateFieldValue(currentPrompt.field, () => normalized, { final: !!lastResult?.isFinal })
+        if (lastResult?.isFinal) {
+          dictationFinalRef.current[currentPrompt.field] = normalized
+        }
+        return
+      }
 
       let committedValue = dictationFinalRef.current[currentPrompt.field] ?? ""
       let interimDelta = ""
