@@ -1,10 +1,35 @@
 import type { Database, Incident, User } from "./types"
 import bcrypt from "bcrypt"
 
-// In-memory database (works in browser and server)
-const db: Database = {
-  users: [],
-  incidents: [],
+const STORAGE_KEY = "waik_demo_db"
+
+function getInitialDb(): Database {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        console.log("[DB] Loaded database from localStorage")
+        return JSON.parse(stored)
+      }
+    } catch (error) {
+      console.error("[DB] Failed to load from localStorage:", error)
+    }
+  }
+  return { users: [], incidents: [] }
+}
+
+// Initialize with localStorage data if available
+const db: Database = getInitialDb()
+
+function saveDb() {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db))
+      console.log("[DB] Saved to localStorage")
+    } catch (error) {
+      console.error("[DB] Failed to save to localStorage:", error)
+    }
+  }
 }
 
 // Initialize database with sample data
@@ -15,147 +40,157 @@ async function initializeDb() {
     console.log("[DB] Starting database initialization...")
 
     try {
-      // Pre-populate with sample users
-      db.users = [
-        {
-          id: "user-1",
-          username: "james.martinez",
-          // Password: staff123
-          password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
-          role: "staff",
-          name: "James Martinez",
-          createdAt: "2025-01-15T08:00:00Z",
-          email: "james.martine@waik.demo.care",
-        },
-        {
-          id: "user-2",
-          username: "waik-demo-staff",
-          password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
-          role: "staff",
-          name: "Sarah Johnson",
-          createdAt: "2025-01-15T08:00:00Z",
-          email: "sarah.johnson@demo.waik.care",
-        },
-        {
-          id: "user-3",
-          username: "emily.davis",
-          // Password: staff123
-          password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
-          role: "staff",
-          name: "Emily Davis",
-          email: "emily@waik-demo.com",
-          createdAt: "2025-01-15T08:00:00Z",
-        },
-        {
-          id: "user-5",
-          username: "scott.kallstrom",
-          // Password: admin123
-          password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
-          role: "admin",
-          name: "Scott Kallstrom",
-          email: "scott@waik.com",
-          createdAt: "2024-01-15T10:00:00Z",
-        },
-        {
-          id: "user-6",
-          username: "gerard.beaubrun",
-          // Password: admin123
-          password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
-          role: "admin",
-          name: "Gerard Beaubrun",
-          email: "gerard@waik.com",
-          createdAt: "2024-01-15T10:00:00Z",
-        },
-      ]
+      if (db.users.length === 0) {
+        // Pre-populate with sample users
+        db.users = [
+          {
+            id: "user-1",
+            username: "james.martinez",
+            // Password: staff123
+            password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
+            role: "staff",
+            name: "James Martinez",
+            createdAt: "2025-01-15T08:00:00Z",
+            email: "james.martine@waik.demo.care",
+          },
+          {
+            id: "user-2",
+            username: "waik-demo-staff",
+            password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
+            role: "staff",
+            name: "Sarah Johnson",
+            createdAt: "2025-01-15T08:00:00Z",
+            email: "sarah.johnson@demo.waik.care",
+          },
+          {
+            id: "user-3",
+            username: "emily.davis",
+            // Password: staff123
+            password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
+            role: "staff",
+            name: "Emily Davis",
+            email: "emily@waik-demo.com",
+            createdAt: "2025-01-15T08:00:00Z",
+          },
+          {
+            id: "user-5",
+            username: "scott.kallstrom",
+            // Password: admin123
+            password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
+            role: "admin",
+            name: "Scott Kallstrom",
+            email: "scott@waik.com",
+            createdAt: "2024-01-15T10:00:00Z",
+          },
+          {
+            id: "user-6",
+            username: "gerard.beaubrun",
+            // Password: admin123
+            password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
+            role: "admin",
+            name: "Gerard Beaubrun",
+            email: "gerard@waik.com",
+            createdAt: "2024-01-15T10:00:00Z",
+          },
+        ]
 
-      // Pre-populate with sample incidents
-      db.incidents = [
-        {
-          id: "inc-1",
-          title: "Resident Fall in Room 204",
-          description: "Resident experienced a fall while attempting to get out of bed.",
-          status: "open",
-          priority: "high",
-          sub_type: "fall-bed",
-          residentName: "Margaret Thompson",
-          residentAge: 78,
-          residentGender: "Female",
-          residentRoom: "204",
-          staffId: "user-2",
-          staffName: "Sarah Johnson",
-          createdAt: "2025-01-21T08:15:00Z",
-          updatedAt: "2025-01-21T08:15:00Z",
-          questions: [
-            {
-              id: "q-1",
-              question: "What time did the fall occur?",
-              askedBy: "WAiK Agent",
-              askedAt: "2025-01-21T08:20:00Z",
-              answer: {
-                text: "The fall occurred at approximately 8:15 AM during morning rounds.",
-                answeredBy: "Sarah Johnson",
-                answeredAt: "2025-01-21T09:00:00Z",
+        console.log("[DB] Users initialized:", db.users.length)
+      }
+
+      if (db.incidents.length === 0) {
+        // Pre-populate with sample incidents
+        db.incidents = [
+          {
+            id: "inc-1",
+            title: "Resident Fall in Room 204",
+            description: "Resident experienced a fall while attempting to get out of bed.",
+            status: "open",
+            priority: "high",
+            sub_type: "fall-bed",
+            residentName: "Margaret Thompson",
+            residentAge: 78,
+            residentGender: "Female",
+            residentRoom: "204",
+            staffId: "user-2",
+            staffName: "Sarah Johnson",
+            createdAt: "2025-01-21T08:15:00Z",
+            updatedAt: "2025-01-21T08:15:00Z",
+            questions: [
+              {
+                id: "q-1",
+                question: "What time did the fall occur?",
+                askedBy: "WAiK Agent",
+                askedAt: "2025-01-21T08:20:00Z",
+                answer: {
+                  text: "The fall occurred at approximately 8:15 AM during morning rounds.",
+                  answeredBy: "Sarah Johnson",
+                  answeredAt: "2025-01-21T09:00:00Z",
+                },
               },
-            },
-            {
-              id: "q-2",
-              question: "Were there any witnesses to the fall?",
-              askedBy: "Admin User",
-              askedAt: "2025-01-21T10:00:00Z",
-              assignedTo: ["user-2"],
-            },
-          ],
-        },
-        {
-          id: "inc-2",
-          title: "Medication Administration Delay",
-          description: "Morning medication was administered 30 minutes late due to staffing constraints.",
-          status: "in-progress",
-          priority: "medium",
-          sub_type: "medication-delay",
-          residentName: "Robert Williams",
-          residentAge: 82,
-          residentGender: "Male",
-          residentRoom: "312",
-          staffId: "user-2",
-          staffName: "Sarah Johnson",
-          createdAt: "2025-01-21T10:00:00Z",
-          updatedAt: "2025-01-21T10:30:00Z",
-          questions: [
-            {
-              id: "q-3",
-              question: "What was the reason for the staffing shortage?",
-              askedBy: "WAiK Agent",
-              askedAt: "2025-01-21T10:15:00Z",
-              answer: {
-                text: "Two staff members called in sick, and we were unable to find immediate coverage.",
-                answeredBy: "Sarah Johnson",
-                answeredAt: "2025-01-21T11:00:00Z",
+              {
+                id: "q-2",
+                question: "Were there any witnesses to the fall?",
+                askedBy: "Admin User",
+                askedAt: "2025-01-21T10:00:00Z",
+                assignedTo: ["user-2"],
               },
-            },
-          ],
-        },
-        {
-          id: "inc-3",
-          title: "Dietary Restriction Not Followed",
-          description: "Resident with lactose intolerance was served a meal containing dairy products.",
-          status: "resolved",
-          priority: "low",
-          sub_type: "dietary-restriction",
-          residentName: "Elizabeth Davis",
-          residentAge: 75,
-          residentGender: "Female",
-          residentRoom: "108",
-          staffId: "user-2",
-          staffName: "Sarah Johnson",
-          createdAt: "2025-01-22T12:00:00Z",
-          updatedAt: "2025-01-22T14:00:00Z",
-          questions: [],
-        },
-      ]
+            ],
+          },
+          {
+            id: "inc-2",
+            title: "Medication Administration Delay",
+            description: "Morning medication was administered 30 minutes late due to staffing constraints.",
+            status: "in-progress",
+            priority: "medium",
+            sub_type: "medication-delay",
+            residentName: "Robert Williams",
+            residentAge: 82,
+            residentGender: "Male",
+            residentRoom: "312",
+            staffId: "user-2",
+            staffName: "Sarah Johnson",
+            createdAt: "2025-01-21T10:00:00Z",
+            updatedAt: "2025-01-21T10:30:00Z",
+            questions: [
+              {
+                id: "q-3",
+                question: "What was the reason for the staffing shortage?",
+                askedBy: "WAiK Agent",
+                askedAt: "2025-01-21T10:15:00Z",
+                answer: {
+                  text: "Two staff members called in sick, and we were unable to find immediate coverage.",
+                  answeredBy: "Sarah Johnson",
+                  answeredAt: "2025-01-21T11:00:00Z",
+                },
+              },
+            ],
+          },
+          {
+            id: "inc-3",
+            title: "Dietary Restriction Not Followed",
+            description: "Resident with lactose intolerance was served a meal containing dairy products.",
+            status: "resolved",
+            priority: "low",
+            sub_type: "dietary-restriction",
+            residentName: "Elizabeth Davis",
+            residentAge: 75,
+            residentGender: "Female",
+            residentRoom: "108",
+            staffId: "user-2",
+            staffName: "Sarah Johnson",
+            createdAt: "2025-01-22T12:00:00Z",
+            updatedAt: "2025-01-22T14:00:00Z",
+            questions: [],
+          },
+        ]
+
+        console.log("[DB] Incidents initialized:", db.incidents.length)
+      }
+
+      saveDb()
 
       isInitialized = true
-      console.log("[DB] In-memory database initialized successfully")
+      console.log("[DB] Database initialized successfully")
       console.log("[DB] Users loaded:", db.users.length)
       console.log("[DB] Incidents loaded:", db.incidents.length)
     } catch (error) {
@@ -252,6 +287,8 @@ export async function updateIncident(id: string, updates: Partial<Incident>): Pr
     updatedAt: new Date().toISOString(),
   }
 
+  saveDb()
+
   return db.incidents[index]
 }
 
@@ -259,6 +296,8 @@ export async function addIncident(incident: Incident): Promise<Incident> {
   await initializeDb()
 
   db.incidents.push(incident)
+
+  saveDb()
 
   return incident
 }
@@ -275,6 +314,8 @@ export async function updateHumanReport(
   incident.humanReport = humanReport
   incident.updatedAt = new Date().toISOString()
 
+  saveDb()
+
   return incident
 }
 
@@ -286,6 +327,8 @@ export async function updateAIReport(incidentId: string, aiReport: Incident["aiR
 
   incident.aiReport = aiReport
   incident.updatedAt = new Date().toISOString()
+
+  saveDb()
 
   return incident
 }
@@ -334,6 +377,8 @@ export function createIncident(data: {
   }
 
   db.incidents.push(incident)
+
+  saveDb()
 
   console.log("[v0] [DB] ✅ Incident added to database")
   console.log("[v0] [DB] Total incidents in database:", db.incidents.length)
@@ -395,6 +440,8 @@ export function addQuestion(
   incident.questions.push(question)
   incident.updatedAt = now
 
+  saveDb()
+
   console.log("[v0] [DB] ✅ Question added:", {
     id: questionId,
     hasAnswer: !!data.answer,
@@ -412,6 +459,8 @@ export async function addQuestionToIncident(incidentId: string, question: Incide
 
   incident.questions.push(question)
   incident.updatedAt = new Date().toISOString()
+
+  saveDb()
 
   return true
 }
@@ -431,6 +480,8 @@ export async function answerQuestion(
 
   question.answer = answer
   incident.updatedAt = new Date().toISOString()
+
+  saveDb()
 
   return true
 }
@@ -452,6 +503,8 @@ export async function deleteQuestion(incidentId: string, questionId: string): Pr
 
   incident.questions.splice(questionIndex, 1)
   incident.updatedAt = new Date().toISOString()
+
+  saveDb()
 
   return true
 }
