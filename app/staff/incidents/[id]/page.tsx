@@ -138,6 +138,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const intelligenceRecognitionRef = useRef<any>(null)
 
+  const [showOriginalNarrative, setShowOriginalNarrative] = useState(false)
+  const [showInvestigativeHighlights, setShowInvestigativeHighlights] = useState(true)
+
   useEffect(() => {
     fetchIncident()
     fetchEmployeeList()
@@ -535,7 +538,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     : originalNarrative
       ? `<p>${originalNarrative.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br />")}</p>`
       : "<p>No narrative provided.</p>"
-  const showOriginalNarrative = Boolean(enhancedNarrativeHtml && originalNarrative)
   const residentStateHtml = residentStateRaw ? formatPlainTextAsHtml(residentStateRaw) : null
   const environmentNotesHtml = environmentNotesRaw ? formatPlainTextAsHtml(environmentNotesRaw) : null
 
@@ -685,53 +687,91 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
           <TabsContent value="overview" className="space-y-6 mt-6">
             <Card className="border-primary/20 bg-white shadow-lg">
               <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:items-center justify-between gap-4">
                   <div className="flex-1 space-y-4">
                     <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
                       {incident?.title}
                     </CardTitle>
+
                     <div className="space-y-3">
-                      {enhancedNarrativeHtml && (
-                        <Badge variant="secondary" className="w-fit uppercase tracking-wide text-[10px]">
-                          AI-enhanced summary
-                        </Badge>
-                      )}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {enhancedNarrativeHtml && (
+                            <Badge variant="secondary" className="w-fit uppercase tracking-wide text-[10px]">
+                              AI-enhanced summary
+                            </Badge>
+                          )}
+                        </div>
+                        {showOriginalNarrative && enhancedNarrativeHtml && originalNarrative && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowOriginalNarrative(!showOriginalNarrative)}
+                            className="text-xs"
+                          >
+                            {showOriginalNarrative ? "Hide" : "Show"} Original Voice Narrative
+                          </Button>
+                        )}
+                      </div>
+
                       <div
                         className="text-sm leading-relaxed text-muted-foreground incident-enhanced-html"
                         dangerouslySetInnerHTML={{ __html: narrativeHtml }}
                       />
+
+                      {showOriginalNarrative && (
+                        <div className="mt-4 rounded-lg border border-muted bg-muted/40 p-4 space-y-2">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Original voice narrative
+                          </p>
+                          <div
+                            className="text-sm leading-relaxed text-muted-foreground"
+                            dangerouslySetInnerHTML={{
+                              __html: formatPlainTextAsHtml(originalNarrative),
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
-                    {showOriginalNarrative && (
-                      <div className="mt-4 rounded-lg border border-muted bg-muted/40 p-4 space-y-2">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          Original voice narrative
-                        </p>
-                        <div
-                          className="text-sm leading-relaxed text-muted-foreground"
-                          dangerouslySetInnerHTML={{
-                            __html: formatPlainTextAsHtml(originalNarrative),
-                          }}
-                        />
-                      </div>
-                    )}
+
                     {(residentStateHtml || environmentNotesHtml) && (
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {residentStateHtml && (
-                          <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Resident state</p>
-                            <div
-                              className="text-sm leading-relaxed text-muted-foreground"
-                              dangerouslySetInnerHTML={{ __html: residentStateHtml }}
-                            />
-                          </div>
-                        )}
-                        {environmentNotesHtml && (
-                          <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Environment notes</p>
-                            <div
-                              className="text-sm leading-relaxed text-muted-foreground"
-                              dangerouslySetInnerHTML={{ __html: environmentNotesHtml }}
-                            />
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            Investigative Highlights
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowInvestigativeHighlights(!showInvestigativeHighlights)}
+                            className="text-xs"
+                          >
+                            {showInvestigativeHighlights ? "Hide" : "Show"}
+                          </Button>
+                        </div>
+
+                        {showInvestigativeHighlights && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {residentStateHtml && (
+                              <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Resident state</p>
+                                <div
+                                  className="text-sm leading-relaxed text-muted-foreground"
+                                  dangerouslySetInnerHTML={{ __html: residentStateHtml }}
+                                />
+                              </div>
+                            )}
+                            {environmentNotesHtml && (
+                              <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                  Environment notes
+                                </p>
+                                <div
+                                  className="text-sm leading-relaxed text-muted-foreground"
+                                  dangerouslySetInnerHTML={{ __html: environmentNotesHtml }}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1413,19 +1453,26 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </Card>
           </TabsContent>
 
-          {/* Update WAiK Agent tab to use markdown parser */}
           <TabsContent value="waik" className="space-y-6 mt-6">
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                WAiK Intelligence
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                WAiK summaries, insights, recommendations, and action items
-              </p>
-            </div>
-
             {incident?.aiReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md lg:col-span-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Brain className="h-5 w-5 text-purple-600" />
+                        <div className="absolute -top-1 -right-1 h-2 w-2 bg-purple-600 rounded-full animate-pulse" />
+                      </div>
+                      <CardTitle className="text-lg bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                        WAiK Intelligence
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-xs mt-1">
+                      WAiK summaries, insights, recommendations, and action items
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
                   <CardHeader>
                     <div className="flex items-center gap-2">

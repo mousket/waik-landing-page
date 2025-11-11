@@ -70,6 +70,10 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("overview")
 
+  const [showOriginalNarrative, setShowOriginalNarrative] = useState(false)
+  const [showInvestigativeHighlights, setShowInvestigativeHighlights] = useState(true)
+  const [showReportCard, setShowReportCard] = useState(true)
+
   const [isEditingIncident, setIsEditingIncident] = useState(false)
   const [editedTitle, setEditedTitle] = useState("")
   const [editedDescription, setEditedDescription] = useState("")
@@ -724,68 +728,95 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
               {!isEditingIncident && (
                 <CardContent className="pt-0">
                   <Separator className="mb-4" />
+
                   <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                         Incident Narrative
                       </h3>
-                      {incident.initialReport?.enhancedNarrative ? (
-                        <>
-                          <Badge variant="secondary" className="mb-2">
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            AI-Enhanced
-                          </Badge>
-                          <div
-                            className="text-sm leading-relaxed text-foreground incident-enhanced-html"
-                            dangerouslySetInnerHTML={{
-                              __html: markdownTohtml(incident.initialReport.enhancedNarrative),
-                            }}
-                          />
-                        </>
-                      ) : (
-                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-                          {incident.initialReport?.narrative || incident.description || "No narrative provided."}
-                        </p>
+                      {incident.initialReport?.enhancedNarrative && incident.initialReport?.narrative && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowOriginalNarrative(!showOriginalNarrative)}
+                          className="text-xs"
+                        >
+                          {showOriginalNarrative ? "Hide" : "Show"} Original Voice Narrative
+                        </Button>
                       )}
                     </div>
 
-                    {incident.initialReport?.narrative &&
+                    {incident.initialReport?.enhancedNarrative ? (
+                      <>
+                        <Badge variant="secondary" className="mb-2">
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          AI-Enhanced
+                        </Badge>
+                        <div
+                          className="text-sm leading-relaxed text-foreground incident-enhanced-html"
+                          dangerouslySetInnerHTML={{
+                            __html: markdownTohtml(incident.initialReport.enhancedNarrative),
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                        {incident.initialReport?.narrative || incident.description || "No narrative provided."}
+                      </p>
+                    )}
+
+                    {showOriginalNarrative &&
+                      incident.initialReport?.narrative &&
                       incident.initialReport?.enhancedNarrative &&
                       incident.initialReport.narrative !== incident.initialReport.enhancedNarrative && (
-                        <details className="mt-4">
-                          <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            View original voice transcript
-                          </summary>
-                          <div className="mt-2 p-3 bg-muted/40 rounded-md border border-muted">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                              Original Transcript
-                            </p>
-                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-                              {incident.initialReport.narrative}
-                            </p>
-                          </div>
-                        </details>
+                        <div className="mt-4 p-3 bg-muted/40 rounded-md border border-muted">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                            Original Transcript
+                          </p>
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
+                            {incident.initialReport.narrative}
+                          </p>
+                        </div>
                       )}
 
                     {(incident.initialReport?.residentState || incident.initialReport?.environmentNotes) && (
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {incident.initialReport.residentState && (
-                          <div className="p-3 bg-muted/40 rounded-md border border-muted">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Resident State</p>
-                            <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-                              {incident.initialReport.residentState}
-                            </p>
-                          </div>
-                        )}
-                        {incident.initialReport.environmentNotes && (
-                          <div className="p-3 bg-muted/40 rounded-md border border-muted">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                              Environment Notes
-                            </p>
-                            <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-                              {incident.initialReport.environmentNotes}
-                            </p>
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            Investigative Highlights
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowInvestigativeHighlights(!showInvestigativeHighlights)}
+                            className="text-xs"
+                          >
+                            {showInvestigativeHighlights ? "Hide" : "Show"}
+                          </Button>
+                        </div>
+
+                        {showInvestigativeHighlights && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {incident.initialReport.residentState && (
+                              <div className="p-3 bg-muted/40 rounded-md border border-muted">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                                  Resident State
+                                </p>
+                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                                  {incident.initialReport.residentState}
+                                </p>
+                              </div>
+                            )}
+                            {incident.initialReport.environmentNotes && (
+                              <div className="p-3 bg-muted/40 rounded-md border border-muted">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                                  Environment Notes
+                                </p>
+                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                                  {incident.initialReport.environmentNotes}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1039,22 +1070,22 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                               "MMM d, yyyy 'at' h:mm a",
                             )}
                           </p>
+                          {unansweredQuestions[currentPendingQuestionTab]?.assignedTo &&
+                            unansweredQuestions[currentPendingQuestionTab].assignedTo!.length > 0 && (
+                              <div className="flex items-center gap-2">
+                                <UserPlus className="h-3 w-3 text-muted-foreground" />
+                                <p className="text-xs text-muted-foreground">
+                                  Assigned to:{" "}
+                                  {unansweredQuestions[currentPendingQuestionTab]
+                                    .assignedTo!.map((empId) => {
+                                      const emp = staffList.find((s) => s.id === empId)
+                                      return emp?.name || empId
+                                    })
+                                    .join(", ")}
+                                </p>
+                              </div>
+                            )}
                         </div>
-                        {unansweredQuestions[currentPendingQuestionTab]?.assignedTo &&
-                          unansweredQuestions[currentPendingQuestionTab].assignedTo!.length > 0 && (
-                            <div className="flex items-center gap-2 mt-2">
-                              <UserPlus className="h-3 w-3 text-muted-foreground" />
-                              <p className="text-xs text-muted-foreground">
-                                Assigned to:{" "}
-                                {unansweredQuestions[currentPendingQuestionTab]
-                                  .assignedTo!.map((empId) => {
-                                    const emp = staffList.find((s) => s.id === empId)
-                                    return emp?.name || empId
-                                  })
-                                  .join(", ")}
-                              </p>
-                            </div>
-                          )}
                       </div>
                       <Button
                         variant="ghost"
@@ -1511,14 +1542,8 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
           </TabsContent>
 
           <TabsContent value="waik" className="space-y-6 mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                  WAiK AI Agent
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">AI-powered analysis and recommendations</p>
-              </div>
-              {role === "admin" && (
+            {role === "admin" && (
+              <div className="flex justify-end">
                 <Button
                   onClick={handleGenerateAIReport}
                   disabled={!canGenerateAIReport || isGeneratingAIReport || !!incident.aiReport}
@@ -1546,8 +1571,8 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                     )}
                   </span>
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
 
             {isGeneratingAIReport && (
               <Card className="border-purple-200 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 shadow-lg overflow-hidden">
@@ -1610,6 +1635,23 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
             {incident.aiReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md lg:col-span-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Brain className="h-5 w-5 text-purple-600" />
+                        <div className="absolute -top-1 -right-1 h-2 w-2 bg-purple-600 rounded-full animate-pulse" />
+                      </div>
+                      <CardTitle className="text-lg bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                        WAiK Intelligence
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-xs mt-1">
+                      WAiK summaries, insights, recommendations, and action items
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
                   <CardHeader>
                     <div className="flex items-center gap-2">
@@ -1685,16 +1727,28 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md lg:col-span-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Brain className="h-5 w-5 text-purple-400" />
+                        <div className="absolute -top-1 -right-1 h-2 w-2 bg-purple-400 rounded-full animate-pulse" />
+                      </div>
+                      <CardTitle className="text-lg bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                        WAiK Intelligence
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-xs mt-1">
+                      WAiK summaries, insights, recommendations, and action items
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">AI Summary</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Summary</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -1707,14 +1761,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
                 <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Brain className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">AI Insights</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Insights</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -1727,14 +1776,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Lightbulb className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">AI Recommendations</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Recommendations</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -1747,14 +1791,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Target className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">AI Actions</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Actions</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
