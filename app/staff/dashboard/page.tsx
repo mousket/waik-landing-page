@@ -2,24 +2,35 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useAuthStore } from "@/lib/auth-store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useAuthStore } from "@/lib/auth-store"
-import { AlertCircle, Clock, CheckCircle2, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AlertCircle, Clock, CheckCircle2, Plus, Search, Filter } from "lucide-react"
 import type { Incident } from "@/lib/types"
 
 export default function StaffDashboard() {
   const router = useRouter()
-  const { name, userId } = useAuthStore()
+  const { name, userId } = useAuthStore() // Use the imported useAuthStore
   const [incidents, setIncidents] = useState<Incident[]>([])
+  const [filteredIncidents, setFilteredIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [priorityFilter, setPriorityFilter] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<string>("date-desc")
 
   useEffect(() => {
     if (userId) {
       fetchIncidents()
     }
   }, [userId])
+
+  useEffect(() => {
+    filterAndSortIncidents()
+  }, [incidents, searchQuery, statusFilter, priorityFilter, sortBy])
 
   const fetchIncidents = async () => {
     if (!userId) return
@@ -34,6 +45,48 @@ export default function StaffDashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const filterAndSortIncidents = () => {
+    let filtered = [...incidents]
+
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (incident) =>
+          incident.residentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          incident.residentRoom.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    }
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((incident) => incident.status === statusFilter)
+    }
+
+    if (priorityFilter !== "all") {
+      filtered = filtered.filter((incident) => incident.priority === priorityFilter)
+    }
+
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        case "date-asc":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        case "priority":
+          const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 }
+          return (
+            priorityOrder[a.priority as keyof typeof priorityOrder] -
+            priorityOrder[b.priority as keyof typeof priorityOrder]
+          )
+        case "resident":
+          return a.residentName.localeCompare(b.residentName)
+        default:
+          return 0
+      }
+    })
+
+    setFilteredIncidents(filtered)
   }
 
   const openIncidents = incidents.filter((i) => i.status === "open")
@@ -61,10 +114,8 @@ export default function StaffDashboard() {
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div className="absolute inset-0 -z-10">
-        {/* Base gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
 
-        {/* Dot grid pattern */}
         <div
           className="absolute inset-0 opacity-20 sm:opacity-30"
           style={{
@@ -86,7 +137,6 @@ export default function StaffDashboard() {
           style={{ animationDuration: "12s", animationDelay: "4s" }}
         />
 
-        {/* Animated diagonal lines - hidden on mobile for performance */}
         <div className="absolute inset-0 overflow-hidden hidden sm:block">
           <div
             className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-pulse"
@@ -121,7 +171,7 @@ export default function StaffDashboard() {
           <Button
             size="lg"
             className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all w-full sm:w-auto"
-            onClick={() => router.push("/staff/report")}
+            onClick={() => router.push("/incidents/create")}
           >
             <Plus className="w-5 h-5 mr-2" />
             Create New Incident
@@ -171,15 +221,75 @@ export default function StaffDashboard() {
             <CardDescription className="text-sm">All incidents assigned to you</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="space-y-4 mb-6">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by resident name, incident type, or room..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="pending-review">Pending Review</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date-desc">Newest First</SelectItem>
+                    <SelectItem value="date-asc">Oldest First</SelectItem>
+                    <SelectItem value="priority">Priority</SelectItem>
+                    <SelectItem value="resident">Resident Name</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {loading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
               </div>
-            ) : incidents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No incidents assigned to you yet</div>
+            ) : filteredIncidents.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {searchQuery || statusFilter !== "all" || priorityFilter !== "all"
+                  ? "No incidents match your filters"
+                  : "No incidents assigned to you yet"}
+              </div>
             ) : (
               <div className="space-y-4">
-                {incidents.map((incident) => {
+                {filteredIncidents.map((incident) => {
                   const unansweredCount = incident.questions.filter((q) => !q.answer).length
                   return (
                     <div

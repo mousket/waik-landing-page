@@ -81,7 +81,7 @@ export default function AdminLayout({
               <Button
                 className="w-full justify-start bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
                 onClick={() => {
-                  router.push("/admin/incidents/new")
+                  router.push("/incidents/create")
                   setIsMobileMenuOpen(false)
                 }}
               >

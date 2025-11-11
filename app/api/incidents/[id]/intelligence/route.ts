@@ -10,7 +10,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params
     const body = await request.json()
-    const { question } = body
+    const { question, userId, useTools = true } = body  // ✅ Accept userId and useTools flag
 
     if (!question) {
       return NextResponse.json({ error: "Question is required" }, { status: 400 })
@@ -25,15 +25,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     // Get incident
-    const incident = getIncidentById(id)
+    const incident = await getIncidentById(id)
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
 
-    // Get answer using Intelligence agent with RAG
-    console.log("[API] Processing intelligence question for incident:", id)
     const qaAgent = getIntelligenceQA()
-    const answer = await qaAgent.answerQuestion(incident, question)
+    let answer: string
+
+    // Use AGENTIC mode (with tools) if userId provided
+    if (useTools && userId) {
+      console.log("[API] Using AGENTIC Intelligence (can send questions to staff)")
+      answer = await qaAgent.answerQuestionWithTools(incident, question, userId)
+    } else {
+      console.log("[API] Using standard Intelligence (RAG only)")
+      answer = await qaAgent.answerQuestion(incident, question)
+    }
 
     console.log("[API] Intelligence answer generated")
     return NextResponse.json({

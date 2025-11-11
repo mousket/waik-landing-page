@@ -4,7 +4,7 @@ import { getIncidentById, updateIncident } from "@/lib/db"
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const incident = getIncidentById(id)
+    const incident = await getIncidentById(id)  // ✅ Now async
 
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
