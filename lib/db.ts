@@ -1,6 +1,10 @@
+import bcrypt from "bcryptjs"
+import connectMongo from "@/backend/src/lib/mongodb"
+import IncidentModel from "@/backend/src/models/incident.model"
+import UserModel from "@/backend/src/models/user.model"
+import NotificationModel from "@/backend/src/models/notification.model"
 import type {
   Answer,
-  Database,
   Incident,
   IncidentInitialReport,
   IncidentInvestigationMetadata,
@@ -10,131 +14,247 @@ import type {
   User,
   UserRole,
 } from "./types"
-import { Low } from "lowdb"
-import { JSONFile } from "lowdb/node"
-import path from "path"
-import bcrypt from "bcryptjs"
 import { getQuestionEmbedding } from "./embeddings"
 import { isOpenAIConfigured } from "./openai"
 
-// Initialize lowdb with JSON file adapter
-const dbPath = path.join(process.cwd(), "data", "db.json")
-const adapter = new JSONFile<Database>(dbPath)
-const db = new Low<Database>(adapter, { users: [], incidents: [], notifications: [] })
-
-// Initialize database - must be called before using
 let isInitialized = false
 
-async function initializeDb() {
+async function ensureDatabase() {
+  await connectMongo()
   if (!isInitialized) {
-    await db.read()
-    
-    // If database is empty, initialize with empty arrays
-    db.data ||= { users: [], incidents: [], notifications: [] }
-    db.data.notifications ||= []
-    
     isInitialized = true
-    console.log("[DB] Database initialized from:", dbPath)
   }
 }
 
-// Auto-initialize on import (for Next.js API routes)
-initializeDb().catch((err) => console.error("[DB] Initialization error:", err))
-
-// ============================================================================
-// USER FUNCTIONS
-// ============================================================================
-
-export function getDb(): Database {
-  return db.data
+const toIsoString = (value?: Date | string | null): string | undefined => {
+  if (!value) return undefined
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
 }
+
+const serializeAnswer = (answer?: any): Answer | undefined => {
+  if (!answer) return undefined
+  return {
+    id: answer.id,
+    questionId: answer.questionId,
+    answerText: answer.answerText,
+    answeredBy: answer.answeredBy,
+    answeredAt: toIsoString(answer.answeredAt) ?? new Date().toISOString(),
+    method: answer.method,
+  }
+}
+
+const serializeQuestion = (question: any): Question => ({
+  id: question.id,
+  incidentId: question.incidentId,
+  questionText: question.questionText,
+  askedBy: question.askedBy,
+  askedByName: question.askedByName,
+  askedAt: toIsoString(question.askedAt) ?? new Date().toISOString(),
+  assignedTo: question.assignedTo?.length ? question.assignedTo : undefined,
+  answer: serializeAnswer(question.answer),
+  source: question.source,
+  generatedBy: question.generatedBy,
+  vectorizedAt: toIsoString(question.vectorizedAt),
+  metadata: question.metadata,
+})
+
+const serializeIncident = (incident: any): Incident => ({
+  id: incident.id,
+  title: incident.title,
+  description: incident.description,
+  status: incident.status,
+  priority: incident.priority,
+  staffId: incident.staffId,
+  staffName: incident.staffName,
+  residentName: incident.residentName,
+  residentRoom: incident.residentRoom,
+  createdAt: toIsoString(incident.createdAt) ?? new Date().toISOString(),
+  updatedAt: toIsoString(incident.updatedAt) ?? new Date().toISOString(),
+  summary: incident.summary ?? null,
+  questions: (incident.questions ?? []).map(serializeQuestion),
+  initialReport: incident.initialReport
+    ? {
+        capturedAt: toIsoString(incident.initialReport.capturedAt) ?? new Date().toISOString(),
+        narrative: incident.initialReport.narrative,
+        residentState: incident.initialReport.residentState,
+        environmentNotes: incident.initialReport.environmentNotes,
+        enhancedNarrative: incident.initialReport.enhancedNarrative,
+        recordedById: incident.initialReport.recordedById,
+        recordedByName: incident.initialReport.recordedByName,
+        recordedByRole: incident.initialReport.recordedByRole,
+      }
+    : undefined,
+  investigation: incident.investigation
+    ? {
+        ...incident.investigation,
+        startedAt: toIsoString(incident.investigation.startedAt),
+        completedAt: toIsoString(incident.investigation.completedAt),
+      }
+    : undefined,
+  humanReport: incident.humanReport
+    ? {
+        ...incident.humanReport,
+        createdAt: toIsoString(incident.humanReport.createdAt) ?? new Date().toISOString(),
+        lastEditedAt: toIsoString(incident.humanReport.lastEditedAt),
+      }
+    : undefined,
+  aiReport: incident.aiReport
+    ? {
+        ...incident.aiReport,
+        generatedAt: toIsoString(incident.aiReport.generatedAt) ?? new Date().toISOString(),
+      }
+    : undefined,
+})
+
+const serializeUser = (user: any): User => ({
+  id: user.id,
+  username: user.username,
+  password: user.password,
+  role: user.role,
+  name: user.name,
+  email: user.email,
+  createdAt: toIsoString(user.createdAt) ?? new Date().toISOString(),
+})
+
+const serializeNotification = (notification: any): IncidentNotification => ({
+  id: notification.id,
+  incidentId: notification.incidentId,
+  type: notification.type,
+  message: notification.message,
+  createdAt: toIsoString(notification.createdAt) ?? new Date().toISOString(),
+  readAt: toIsoString(notification.readAt),
+  targetUserId: notification.targetUserId,
+})
+
+const VOICE_SEED_QUESTIONS: Array<{ key: keyof IncidentInitialReport; prompt: string }> = [
+  { key: "narrative", prompt: "Describe what happened during the incident." },
+  { key: "residentState", prompt: "How is the resident doing right now?" },
+  { key: "environmentNotes", prompt: "Describe the room or environment conditions." },
+]
+
+const toDateOrUndefined = (value?: string | null): Date | undefined => {
+  if (!value) return undefined
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return parsed
+}
+
+const prepareHumanReport = (report?: Incident["humanReport"]) =>
+  report
+    ? {
+        ...report,
+        createdAt: toDateOrUndefined(report.createdAt) ?? new Date(),
+        lastEditedAt: toDateOrUndefined(report.lastEditedAt) ?? undefined,
+      }
+    : undefined
+
+const prepareAIReport = (report?: Incident["aiReport"]) =>
+  report
+    ? {
+        ...report,
+        generatedAt: toDateOrUndefined(report.generatedAt) ?? new Date(),
+      }
+    : undefined
+
+const prepareInvestigation = (investigation?: IncidentInvestigationMetadata) =>
+  investigation
+    ? {
+        ...investigation,
+        startedAt: toDateOrUndefined(investigation.startedAt) ?? undefined,
+        completedAt: toDateOrUndefined(investigation.completedAt) ?? undefined,
+      }
+    : undefined
 
 export async function getUsers(): Promise<User[]> {
-  await initializeDb()
-  await db.read()
-  return db.data.users
-}
-
-export async function getUserByCredentials(username: string, password: string): Promise<User | null> {
-  await initializeDb()
-  
-  const user = db.data.users.find((u) => u.username === username)
-  if (!user) return null
-
-  // Compare password with hashed password
-  const isValid = await bcrypt.compare(password, user.password)
-  if (!isValid) return null
-
-  return user
+  await ensureDatabase()
+  const users = await UserModel.find({}).lean().exec()
+  return users.map(serializeUser)
 }
 
 export async function getUserById(id: string): Promise<User | null> {
-  await initializeDb()
-  await db.read()
-  return db.data.users.find((u) => u.id === id) || null
+  await ensureDatabase()
+  const user = await UserModel.findOne({ id }).lean().exec()
+  return user ? serializeUser(user) : null
 }
 
-// ============================================================================
-// INCIDENT FUNCTIONS
-// ============================================================================
+export async function getUserByCredentials(username: string, password: string): Promise<User | null> {
+  await ensureDatabase()
+  const user = await UserModel.findOne({ username }).lean().exec()
+  if (!user) return null
+
+  const isValid = await bcrypt.compare(password, user.password)
+  if (!isValid) return null
+
+  return serializeUser(user)
+}
 
 export async function getIncidents(): Promise<Incident[]> {
-  await initializeDb()
-  // Always re-read from disk to get latest data
-  await db.read()
-  return db.data.incidents
+  await ensureDatabase()
+  const incidents = await IncidentModel.find({}).lean().exec()
+  return incidents.map(serializeIncident)
 }
 
 export async function getIncidentById(id: string): Promise<Incident | null> {
-  await initializeDb()
-  // Always re-read from disk to get latest data
-  await db.read()
-  console.log("[DB] Re-read database for incident:", id)
-  return db.data.incidents.find((i) => i.id === id) || null
+  await ensureDatabase()
+  const incident = await IncidentModel.findOne({ id }).lean().exec()
+  return incident ? serializeIncident(incident) : null
 }
 
 export async function getIncidentsByStaffId(staffId: string): Promise<Incident[]> {
-  await initializeDb()
-  await db.read()
-
-  return db.data.incidents.filter((incident) => {
-    const isReporter = incident.staffId === staffId
-    const isAssigned = incident.questions.some((q) => q.assignedTo?.includes(staffId))
-    const hasDirectedQuestion = incident.questions.some((q) => q.metadata?.assignedStaffIds?.includes(staffId))
-
-    return isReporter || isAssigned || hasDirectedQuestion
+  await ensureDatabase()
+  const incidents = await IncidentModel.find({
+    $or: [
+      { staffId },
+      { "questions.assignedTo": staffId },
+      { "questions.metadata.assignedStaffIds": staffId },
+    ],
   })
+    .lean()
+    .exec()
+
+  return incidents.map(serializeIncident)
 }
 
 export async function updateIncident(id: string, updates: Partial<Incident>): Promise<Incident | null> {
-  await initializeDb()
-  
-  const index = db.data.incidents.findIndex((i) => i.id === id)
-  if (index === -1) return null
+  await ensureDatabase()
 
-  db.data.incidents[index] = {
-    ...db.data.incidents[index],
+  const preparedUpdates: any = {
     ...updates,
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date(),
   }
 
-  await db.write()
-  return db.data.incidents[index]
-}
+  if (updates.humanReport) {
+    preparedUpdates.humanReport = prepareHumanReport(updates.humanReport)
+  }
 
-export async function addIncident(incident: Incident): Promise<Incident> {
-  await initializeDb()
-  await db.read()
-  
-  db.data.incidents.push(incident)
-  await db.write()
-  
-  return incident
-}
+  if (updates.aiReport) {
+    preparedUpdates.aiReport = prepareAIReport(updates.aiReport)
+  }
 
-// ============================================================================
-// QUESTION & ANSWER FUNCTIONS
-// ============================================================================
+  if (updates.investigation) {
+    preparedUpdates.investigation = prepareInvestigation(updates.investigation)
+  }
+
+  if (updates.initialReport) {
+    preparedUpdates.initialReport = {
+      ...updates.initialReport,
+      capturedAt: toDateOrUndefined(updates.initialReport.capturedAt) ?? new Date(),
+    }
+  }
+
+  if (updates.summary === null) {
+    preparedUpdates.summary = null
+  }
+
+  const incident = await IncidentModel.findOneAndUpdate({ id }, preparedUpdates, {
+    new: true,
+    lean: true,
+  })
+
+  return incident ? serializeIncident(incident) : null
+}
 
 export async function addQuestionToIncident(
   incidentId: string,
@@ -146,33 +266,46 @@ export async function addQuestionToIncident(
     metadata?: Question["metadata"]
     source?: Question["source"]
     generatedBy?: string
+    answer?: Answer
   },
 ): Promise<Question | null> {
-  await initializeDb()
+  await ensureDatabase()
 
-  const incident = db.data.incidents.find((i) => i.id === incidentId)
-  if (!incident) {
-    console.error(`[DB] Incident ${incidentId} not found when adding question`)
-    return null
-  }
+  const now = new Date()
+  const questionId = `q-${Date.now()}`
 
-  const timestamp = new Date().toISOString()
-  const question: Question = {
-    id: `q-${Date.now()}`,
+  const questionDoc = {
+    id: questionId,
     incidentId,
     questionText: input.questionText,
     askedBy: input.askedBy,
     askedByName: input.askedByName,
-    askedAt: timestamp,
+    askedAt: now,
     assignedTo: input.assignedTo,
     metadata: input.metadata,
     source: input.source ?? "manual",
     generatedBy: input.generatedBy,
+    answer: input.answer
+      ? {
+          ...input.answer,
+          answeredAt: toDateOrUndefined(input.answer.answeredAt) ?? now,
+        }
+      : undefined,
   }
 
-  incident.questions.push(question)
-  incident.updatedAt = timestamp
-  await db.write()
+  const incident = await IncidentModel.findOneAndUpdate(
+    { id: incidentId },
+    {
+      $push: { questions: questionDoc },
+      $set: { updatedAt: now },
+    },
+    { new: true, lean: true },
+  )
+
+  const question = incident?.questions?.find((q: any) => q.id === questionId)
+  if (!question) {
+    return null
+  }
 
   if (isOpenAIConfigured()) {
     getQuestionEmbedding(
@@ -180,19 +313,29 @@ export async function addQuestionToIncident(
       question.id,
       question.questionText,
       question.askedBy,
-      question.askedAt,
-      undefined,
-      question.metadata,
-    )
-      .then(() => {
-        question.vectorizedAt = new Date().toISOString()
-      })
-      .catch((error) => {
-        console.error("[DB] Failed to vectorize question", question.id, error)
-      })
+      toIsoString(question.askedAt) ?? now.toISOString(),
+      question.answer
+        ? {
+            id: question.answer.id,
+            text: question.answer.answerText,
+            answeredBy: question.answer.answeredBy,
+            answeredAt: toIsoString(question.answer.answeredAt) ?? now.toISOString(),
+          }
+        : undefined,
+      {
+        assignedTo: question.assignedTo,
+        reporterId: incident?.staffId,
+        reporterName: incident?.staffName,
+        reporterRole: incident?.investigation?.reporterRole,
+        source: question.source,
+        generatedBy: question.generatedBy,
+      },
+    ).catch((error) => {
+      console.error("[DB] Failed to vectorize question", question.id, error)
+    })
   }
 
-  return question
+  return serializeQuestion(question)
 }
 
 export async function answerQuestion(
@@ -200,115 +343,82 @@ export async function answerQuestion(
   questionId: string,
   answer: Answer,
 ): Promise<Question | null> {
-  await initializeDb()
-  await db.read()
+  await ensureDatabase()
 
-  const incident = db.data.incidents.find((i) => i.id === incidentId)
-  if (!incident) {
-    console.log("[DB] Incident not found:", incidentId)
-    return null
-  }
+  const answeredAt = toDateOrUndefined(answer.answeredAt) ?? new Date()
 
-  const question = incident.questions.find((q) => q.id === questionId)
+  const incident = await IncidentModel.findOneAndUpdate(
+    { id: incidentId, "questions.id": questionId },
+    {
+      $set: {
+        "questions.$.answer": {
+          ...answer,
+          answeredAt,
+        },
+        "questions.$.vectorizedAt": answeredAt,
+        updatedAt: new Date(),
+      },
+    },
+    { new: true, lean: true },
+  )
+
+  const question = incident?.questions?.find((q: any) => q.id === questionId)
   if (!question) {
-    console.log("[DB] Question not found:", questionId, "in incident:", incidentId)
     return null
   }
-
-  question.answer = answer
-  incident.updatedAt = new Date().toISOString()
-  
-  await db.write()
 
   if (isOpenAIConfigured()) {
-    const reporterRole = db.data.users.find((u) => u.id === incident.staffId)?.role || "staff"
     getQuestionEmbedding(
       incidentId,
       questionId,
       question.questionText,
       question.askedBy,
-      question.askedAt,
+      toIsoString(question.askedAt) ?? answeredAt.toISOString(),
       {
-        id: answer.id,
-        text: answer.answerText,
-        answeredBy: answer.answeredBy,
-        answeredAt: answer.answeredAt,
+        id: question.answer.id,
+        text: question.answer.answerText,
+        answeredBy: question.answer.answeredBy,
+        answeredAt: toIsoString(question.answer.answeredAt) ?? answeredAt.toISOString(),
       },
       {
         assignedTo: question.assignedTo,
-        reporterId: incident.staffId,
-        reporterName: incident.staffName,
-        reporterRole,
+        reporterId: incident?.staffId,
+        reporterName: incident?.staffName,
+        reporterRole: incident?.investigation?.reporterRole,
         source: question.source,
         generatedBy: question.generatedBy,
       },
-    )
-      .then(() => {
-        console.log("[DB] Vectorized answered question", questionId)
-      })
-      .catch((error) => {
-        console.error("[DB] Auto-vectorization failed (non-critical):", error)
-      })
+    ).catch((error) => {
+      console.error("[DB] Auto-vectorization failed (non-critical):", error)
+    })
   }
 
-  console.log("[DB] Answered question:", questionId, "in incident:", incidentId)
-  return question
+  return serializeQuestion(question)
 }
 
 export async function deleteQuestion(incidentId: string, questionId: string): Promise<boolean> {
-  await initializeDb()
+  await ensureDatabase()
 
-  const incident = await getIncidentById(incidentId)  // ✅ Now async
+  const incident = await IncidentModel.findOne({ id: incidentId }).lean().exec()
   if (!incident) {
-    console.log("[DB] Incident not found:", incidentId)
     return false
   }
 
-  const questionIndex = incident.questions.findIndex((q) => q.id === questionId)
-  if (questionIndex === -1) {
-    console.log("[DB] Question not found:", questionId)
+  const question = incident.questions?.find((q: any) => q.id === questionId)
+  if (!question || question.answer) {
     return false
   }
 
-  // Only allow deleting unanswered questions
-  if (incident.questions[questionIndex].answer) {
-    console.log("[DB] Cannot delete answered question:", questionId)
-    return false
-  }
+  const result = await IncidentModel.updateOne(
+    { id: incidentId },
+    {
+      $pull: { questions: { id: questionId } },
+      $set: { updatedAt: new Date() },
+    },
+  )
 
-  incident.questions.splice(questionIndex, 1)
-  incident.updatedAt = new Date().toISOString()
-  
-  await db.write()
-  console.log("[DB] Deleted question:", questionId, "from incident:", incidentId)
-  return true
+  return result.modifiedCount > 0
 }
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Force a read from disk (useful for debugging)
- */
-export async function refreshDb(): Promise<void> {
-  await db.read()
-  console.log("[DB] Database refreshed from disk")
-}
-
-/**
- * Get database file path
- */
-export function getDbPath(): string {
-  return dbPath
-}
-
-/**
- * Create a new incident with questions and answers (e.g. from voice report)
- */
-// ============================================================================
-// INCIDENT CREATION & INVESTIGATION HELPERS
-// ============================================================================
 
 interface CreateIncidentFromReportInput {
   title?: string
@@ -324,25 +434,14 @@ interface CreateIncidentFromReportInput {
   enhancedNarrative?: string
 }
 
-const VOICE_SEED_QUESTIONS: Array<{ key: keyof IncidentInitialReport; prompt: string }> = [
-  { key: "narrative", prompt: "Describe what happened during the incident." },
-  { key: "residentState", prompt: "How is the resident doing right now?" },
-  { key: "environmentNotes", prompt: "Describe the room or environment conditions." },
-]
-
-/**
- * Create an incident from the voice-guided reporter agent payload.
- * Seeds the Q&A tab with answered questions so admins immediately see context.
- */
 export async function createIncidentFromReport(input: CreateIncidentFromReportInput): Promise<Incident> {
-  await initializeDb()
-  await db.read()
+  await ensureDatabase()
 
-  const now = new Date().toISOString()
+  const now = new Date()
   const incidentId = `inc-${Date.now()}`
 
   const initialReport: IncidentInitialReport = {
-    capturedAt: now,
+    capturedAt: now.toISOString(),
     narrative: input.narrative,
     residentState: input.residentState,
     environmentNotes: input.environmentNotes,
@@ -358,40 +457,40 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
     reporterRole: input.reportedByRole,
   }
 
-  const seedQuestions: Question[] = VOICE_SEED_QUESTIONS.flatMap((seed, index) => {
-    const value = initialReport[seed.key]
+  const seedQuestions = VOICE_SEED_QUESTIONS.flatMap((seed, index) => {
+    const value = (initialReport as any)[seed.key]
     if (!value) return []
 
     const questionId = `q-${Date.now()}-${index}`
     const answerId = `a-${Date.now()}-${index}`
 
-    const question: Question = {
-      id: questionId,
-      incidentId,
-      questionText: seed.prompt,
-      askedBy: input.reportedById,
-      askedByName: input.reportedByName,
-      askedAt: now,
-      source: "voice-report",
-      generatedBy: "reporter-agent",
-      metadata: {
-        ...baseQuestionProps,
-        createdVia: "voice",
+    return [
+      {
+        id: questionId,
+        incidentId,
+        questionText: seed.prompt,
+        askedBy: input.reportedById,
+        askedByName: input.reportedByName,
+        askedAt: now,
+        source: "voice-report" as Question["source"],
+        generatedBy: "reporter-agent",
+        metadata: {
+          ...baseQuestionProps,
+          createdVia: "voice" as const,
+        },
+        answer: {
+          id: answerId,
+          questionId,
+          answerText: value,
+          answeredBy: input.reportedById,
+          answeredAt: now,
+          method: "voice" as const,
+        },
       },
-      answer: {
-        id: answerId,
-        questionId,
-        answerText: value,
-        answeredBy: input.reportedById,
-        answeredAt: now,
-        method: "voice",
-      },
-    }
-
-    return [question]
+    ]
   })
 
-  const incident: Incident = {
+  const incidentDoc = await IncidentModel.create({
     id: incidentId,
     title: input.title || `${input.residentName} Incident`,
     description: input.narrative || "Incident reported via voice agent.",
@@ -404,20 +503,22 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
     createdAt: now,
     updatedAt: now,
     questions: seedQuestions,
-    initialReport,
+    initialReport: {
+      ...initialReport,
+      capturedAt: now,
+    },
     investigation: {
       status: "not-started",
     },
-  }
+  })
 
-  db.data.incidents.push(incident)
-  await db.write()
+  const incident = serializeIncident(incidentDoc.toJSON())
 
   if (isOpenAIConfigured()) {
     Promise.all(
-      seedQuestions.map((question) =>
+      incident.questions.map((question) =>
         getQuestionEmbedding(
-          incidentId,
+          incident.id,
           question.id,
           question.questionText,
           question.askedBy,
@@ -432,24 +533,19 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
             : undefined,
           {
             assignedTo: question.assignedTo,
-            reporterId: input.reportedById,
-            reporterName: input.reportedByName,
+            reporterId: incident.staffId,
+            reporterName: incident.staffName,
             reporterRole: input.reportedByRole,
             source: question.source,
             generatedBy: question.generatedBy,
           },
-        )
-          .then(() => {
-            question.vectorizedAt = new Date().toISOString()
-          })
-          .catch((error) => {
-            console.error("[DB] Failed to vectorize seed question", question.id, error)
-          }),
+        ).catch((error) => {
+          console.error("[DB] Failed to vectorize seed question", question.id, error)
+        }),
       ),
     ).catch((error) => console.error("[DB] Seed vectorization batch failed", error))
   }
 
-  console.log("[DB] Created incident from report:", incident.id)
   return incident
 }
 
@@ -461,28 +557,23 @@ interface QueueInvestigationQuestionsInput {
   askedByName?: string
 }
 
-/**
- * Queue investigator follow-up questions and vectorize them for downstream RAG.
- */
 export async function queueInvestigationQuestions(
   input: QueueInvestigationQuestionsInput,
 ): Promise<Question[]> {
-  await initializeDb()
-  await db.read()
+  await ensureDatabase()
 
-  const incident = db.data.incidents.find((i) => i.id === input.incidentId)
+  const incident = await IncidentModel.findOne({ id: input.incidentId }).lean().exec()
   if (!incident) {
     throw new Error(`Incident ${input.incidentId} not found`)
   }
 
-  const reporterRole = db.data.users.find((user) => user.id === incident.staffId)?.role || "staff"
-  const timestamp = new Date().toISOString()
+  const reporterRole = incident.investigation?.reporterRole ?? (await getUserById(incident.staffId))?.role ?? "staff"
+  const timestamp = new Date()
   const generatedBy = input.generatedBy || "investigation-agent"
   const askedBy = input.askedById || "investigation-agent"
 
-  const newQuestions: Question[] = input.questions.map((item, index) => {
+  const newQuestions = input.questions.map((item, index) => {
     const questionId = `q-${Date.now()}-${index}`
-
     return {
       id: questionId,
       incidentId: incident.id,
@@ -491,25 +582,32 @@ export async function queueInvestigationQuestions(
       askedByName: input.askedByName,
       askedAt: timestamp,
       assignedTo: item.assignedTo,
-      source: "ai-generated",
+      source: "ai-generated" as const,
       generatedBy,
       metadata: {
         reporterId: incident.staffId,
         reporterName: incident.staffName,
         reporterRole,
         assignedStaffIds: item.assignedTo,
-        createdVia: "system",
+        createdVia: "system" as const,
       },
     }
   })
 
-  incident.questions.push(...newQuestions)
-  incident.updatedAt = timestamp
-  incident.investigation = incident.investigation || { status: "in-progress" }
-  incident.investigation.status = "in-progress"
-  incident.investigation.startedAt ||= timestamp
-
-  await db.write()
+  await IncidentModel.updateOne(
+    { id: input.incidentId },
+    {
+      $push: { questions: { $each: newQuestions } },
+      $set: {
+        updatedAt: timestamp,
+        investigation: {
+          ...(incident.investigation ?? {}),
+          status: "in-progress",
+          startedAt: incident.investigation?.startedAt ?? timestamp,
+        },
+      },
+    },
+  )
 
   if (isOpenAIConfigured()) {
     Promise.all(
@@ -519,7 +617,7 @@ export async function queueInvestigationQuestions(
           question.id,
           question.questionText,
           question.askedBy,
-          question.askedAt,
+          timestamp.toISOString(),
           undefined,
           {
             assignedTo: question.assignedTo,
@@ -538,88 +636,65 @@ export async function queueInvestigationQuestions(
     ).catch((error) => console.error("[DB] Queue vectorization batch failed", error))
   }
 
-  return newQuestions
+  return newQuestions.map(serializeQuestion)
 }
 
-/**
- * Mark an investigation as completed and persist optional metadata.
- */
 export async function markInvestigationComplete(
   incidentId: string,
   updates: Partial<Omit<IncidentInvestigationMetadata, "status">> = {},
 ): Promise<Incident | null> {
-  await initializeDb()
-  await db.read()
+  await ensureDatabase()
 
-  const incident = db.data.incidents.find((i) => i.id === incidentId)
-  if (!incident) {
-    return null
-  }
+  const incident = await IncidentModel.findOneAndUpdate(
+    { id: incidentId },
+    {
+      $set: {
+        investigation: {
+          ...(updates ?? {}),
+          status: "completed" as InvestigationStatus,
+          completedAt: toDateOrUndefined(updates.completedAt) ?? new Date(),
+        },
+        updatedAt: new Date(),
+      },
+    },
+    { new: true, lean: true },
+  )
 
-  incident.investigation = {
-    ...incident.investigation,
-    ...updates,
-    status: "completed" as InvestigationStatus,
-    completedAt: updates.completedAt || new Date().toISOString(),
-  }
-
-  incident.updatedAt = new Date().toISOString()
-  await db.write()
-  return incident
+  return incident ? serializeIncident(incident) : null
 }
-
-// ============================================================================
-// NOTIFICATION HELPERS (scaffolding for future prompts)
-// ============================================================================
 
 type CreateNotificationInput = Omit<IncidentNotification, "id" | "createdAt" | "readAt"> & { id?: string }
 
 export async function createNotification(input: CreateNotificationInput): Promise<IncidentNotification> {
-  await initializeDb()
-  await db.read()
+  await ensureDatabase()
 
-  const notification: IncidentNotification = {
+  const notification = await NotificationModel.create({
     id: input.id || `notif-${Date.now()}`,
     incidentId: input.incidentId,
     type: input.type,
     message: input.message,
-    createdAt: new Date().toISOString(),
+    createdAt: new Date(),
     targetUserId: input.targetUserId,
-    readAt: undefined,
-  }
+  })
 
-  db.data.notifications.push(notification)
-  await db.write()
-  return notification
+  return serializeNotification(notification.toJSON())
 }
 
 export async function getNotificationsForUser(userId: string): Promise<IncidentNotification[]> {
-  await initializeDb()
-  await db.read()
-  return db.data.notifications.filter((notif) => notif.targetUserId === userId)
+  await ensureDatabase()
+  const notifications = await NotificationModel.find({ targetUserId: userId }).lean().exec()
+  return notifications.map(serializeNotification)
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
-  await initializeDb()
-  await db.read()
-
-  const notification = db.data.notifications.find((notif) => notif.id === notificationId)
-  if (notification) {
-    notification.readAt = new Date().toISOString()
-    await db.write()
-  }
+  await ensureDatabase()
+  await NotificationModel.updateOne({ id: notificationId }, { $set: { readAt: new Date() } })
 }
 
-/**
- * Hash a password for storage
- */
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10)
 }
 
-/**
- * Check if database is initialized
- */
 export function isDatabaseInitialized(): boolean {
   return isInitialized
 }
