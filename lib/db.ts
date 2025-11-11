@@ -13,7 +13,7 @@ import type {
 import { Low } from "lowdb"
 import { JSONFile } from "lowdb/node"
 import path from "path"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import { getQuestionEmbedding } from "./embeddings"
 import { isOpenAIConfigured } from "./openai"
 
