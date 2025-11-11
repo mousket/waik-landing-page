@@ -296,12 +296,12 @@ export async function generateGapQuestions(
       : ""
   const lastAnswerHint = options.lastAnswer
     ? `The nurse just said: "${options.lastAnswer}". Build directly on this insight.`
-    : "Acknowledge the previous answer before asking the next question."
+    : ""
 
-  const systemPrompt = `You are an expert clinical investigator running a live, empathetic interview with a nurse.
-- Keep a warm, conversational tone that builds rapport.
-- Begin each question with a short acknowledgement of what the nurse just shared.
-- Bundle multiple related missing data points into a single follow-up question.
+const systemPrompt = `You are an expert clinical investigator running a focused interview with a nurse.
+- Keep a warm, professional tone while staying concise.
+- Go straight to the essential question without prefacing statements.
+- Bundle multiple related missing data points into a single follow-up question when it makes sense.
 - Ask for specifics (measurements, timelines, observations) where useful.
 - ${responderName}
 - ${subtypeContext}
@@ -321,7 +321,7 @@ ${missingList}
 
 Category distribution: ${categorySummary}
 
-Return ${desiredQuestionCount} open-ended questions, each on its own line. Lead with a short acknowledgement or transition (e.g. "Thank you. Next...").`
+Return ${desiredQuestionCount} open-ended questions, each on its own line. Each line must contain only the question itself with no acknowledgements or extra commentary.`
 
   const response = await generateChatCompletion(
     [

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/lib/auth-store"
 import { Button } from "@/components/ui/button"
@@ -58,6 +58,43 @@ const VOICE_PROMPTS: VoicePrompt[] = [
   },
 ]
 
+type DictationField = Exclude<VoicePrompt["field"], null>
+
+const mergeTranscript = (base: string, addition: string) => {
+  const normalizedBase = base ?? ""
+  const normalizedAddition = (addition ?? "").replace(/\s+/g, " ").trim()
+
+  if (!normalizedAddition) {
+    return normalizedBase
+  }
+
+  if (!normalizedBase) {
+    return normalizedAddition
+  }
+
+  const needsSpace =
+    !normalizedBase.endsWith(" ") &&
+    !normalizedAddition.startsWith(" ") &&
+    !",.!?:;".includes(normalizedAddition[0] ?? "")
+
+  const combined = `${normalizedBase}${needsSpace ? " " : ""}${normalizedAddition}`
+
+  return combined.replace(/\s{2,}/g, " ").trimStart()
+}
+
+const extractTranscriptDelta = (full: string, baseline: string) => {
+  const source = full ?? ""
+  const reference = baseline ?? ""
+  let index = 0
+  const max = Math.min(source.length, reference.length)
+
+  while (index < max && source[index] === reference[index]) {
+    index += 1
+  }
+
+  return source.slice(index)
+}
+
 export default function CreateIncidentPage() {
   const router = useRouter()
   const { userId, role, name } = useAuthStore()
@@ -73,6 +110,13 @@ export default function CreateIncidentPage() {
   const [canAddMore, setCanAddMore] = useState(false)
   const recognitionRef = useRef<any>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const dictationFinalRef = useRef<Record<DictationField, string>>({
+    residentName: "",
+    roomNumber: "",
+    narrative: "",
+    residentState: "",
+    environmentNotes: "",
+  })
   const hasSpokenInitialPromptRef = useRef(false)
   const {
     speak: speakTTS,
@@ -158,6 +202,10 @@ export default function CreateIncidentPage() {
 
     const currentPrompt = VOICE_PROMPTS[currentStep - 1]
 
+    if (currentPrompt.field) {
+      dictationFinalRef.current[currentPrompt.field] = getCurrentValue()
+    }
+
     if (
       currentPrompt.field === "narrative" ||
       currentPrompt.field === "residentState" ||
@@ -174,22 +222,42 @@ export default function CreateIncidentPage() {
     setCanAddMore(false)
 
     recognitionRef.current.onresult = (event: any) => {
-      let transcript = ""
+      if (!currentPrompt.field) return
 
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript
+      let committedValue = dictationFinalRef.current[currentPrompt.field] ?? ""
+      let interimDelta = ""
+
+      const startIndex = typeof event.resultIndex === "number" ? event.resultIndex : 0
+
+      for (let i = startIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        const phrase = result?.[0]?.transcript ?? ""
+        if (!phrase) continue
+
+        if (result.isFinal) {
+          const normalizedCommitted = committedValue.trim()
+          const normalizedPhrase = phrase.trim()
+
+          if (normalizedCommitted && !normalizedPhrase.startsWith(normalizedCommitted)) {
+            committedValue = normalizedPhrase
+          } else {
+            const delta = extractTranscriptDelta(phrase, committedValue)
+            committedValue = mergeTranscript(committedValue, delta)
+          }
+
+          interimDelta = ""
+        } else {
+          interimDelta = extractTranscriptDelta(phrase, committedValue)
+        }
       }
 
-      if (currentPrompt.field === "residentName") {
-        setResidentName(transcript)
-      } else if (currentPrompt.field === "roomNumber") {
-        setRoomNumber(transcript)
-      } else if (currentPrompt.field === "narrative") {
-        setNarrative(transcript)
-      } else if (currentPrompt.field === "residentState") {
-        setResidentState(transcript)
-      } else if (currentPrompt.field === "environmentNotes") {
-        setEnvironmentNotes(transcript)
+      dictationFinalRef.current[currentPrompt.field] = committedValue
+
+      if (interimDelta) {
+        const preview = mergeTranscript(committedValue, interimDelta)
+        updateFieldValue(currentPrompt.field, () => preview, { final: false })
+      } else {
+        updateFieldValue(currentPrompt.field, () => committedValue, { final: true })
       }
     }
 
@@ -390,13 +458,48 @@ export default function CreateIncidentPage() {
     return ""
   }
 
+  const updateFieldValue = (
+    field: DictationField,
+    updater: (prev: string) => string,
+    options: { final?: boolean } = {},
+  ) => {
+    const { final = true } = options
+
+    const applySetter = (setter: Dispatch<SetStateAction<string>>) => {
+      setter((prev) => {
+        const nextValue = updater(prev)
+        if (final) {
+          dictationFinalRef.current[field] = nextValue
+        }
+        return nextValue
+      })
+    }
+
+    switch (field) {
+      case "residentName":
+        applySetter(setResidentName)
+        break
+      case "roomNumber":
+        applySetter(setRoomNumber)
+        break
+      case "narrative":
+        applySetter(setNarrative)
+        break
+      case "residentState":
+        applySetter(setResidentState)
+        break
+      case "environmentNotes":
+        applySetter(setEnvironmentNotes)
+        break
+      default:
+        break
+    }
+  }
+
   const setCurrentValue = (value: string) => {
     const currentPrompt = VOICE_PROMPTS[currentStep - 1]
-    if (currentPrompt.field === "residentName") setResidentName(value)
-    else if (currentPrompt.field === "roomNumber") setRoomNumber(value)
-    else if (currentPrompt.field === "narrative") setNarrative(value)
-    else if (currentPrompt.field === "residentState") setResidentState(value)
-    else if (currentPrompt.field === "environmentNotes") setEnvironmentNotes(value)
+    if (!currentPrompt.field) return
+    updateFieldValue(currentPrompt.field, () => value, { final: true })
   }
 
   const currentPrompt = VOICE_PROMPTS[currentStep - 1]
