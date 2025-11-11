@@ -20,13 +20,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       method,
     }
 
-    const success = await answerQuestion(id, questionId, answer)
+    const updatedQuestion = await answerQuestion(id, questionId, answer)
 
-    if (!success) {
+    if (!updatedQuestion) {
       return NextResponse.json({ error: "Incident or question not found" }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, answer })
+    return NextResponse.json({ success: true, answer: updatedQuestion.answer })
   } catch (error) {
     console.error("[v0] Error saving answer:", error)
     return NextResponse.json({ error: "Failed to save answer" }, { status: 500 })
