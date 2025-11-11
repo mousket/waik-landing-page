@@ -3,6 +3,8 @@ import bcrypt from "bcrypt"
 
 const STORAGE_KEY = "waik_demo_db"
 
+let isInitialized = false
+
 function getInitialDb(): Database {
   // Try to load from localStorage (client-side only)
   if (typeof window !== "undefined") {
@@ -201,8 +203,7 @@ function initializeDb() {
   }
 }
 
-// Auto-initialize on import
-initializeDb().catch((err) => console.error("[DB] Initialization error:", err))
+initializeDb()
 
 // ============================================================================
 // USER FUNCTIONS
@@ -534,5 +535,3 @@ export async function hashPassword(password: string): Promise<string> {
 export function isDatabaseInitialized(): boolean {
   return isInitialized
 }
-
-let isInitialized = false
