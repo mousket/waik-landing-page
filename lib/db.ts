@@ -4,6 +4,7 @@ import bcrypt from "bcrypt"
 const STORAGE_KEY = "waik_demo_db"
 
 function getInitialDb(): Database {
+  // Try to load from localStorage (client-side only)
   if (typeof window !== "undefined") {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -15,13 +16,14 @@ function getInitialDb(): Database {
       console.error("[DB] Failed to load from localStorage:", error)
     }
   }
+
   return { users: [], incidents: [] }
 }
 
-// Initialize with localStorage data if available
 const db: Database = getInitialDb()
 
 function saveDb() {
+  // Save to localStorage (browser only)
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db))
@@ -30,12 +32,11 @@ function saveDb() {
       console.error("[DB] Failed to save to localStorage:", error)
     }
   }
+  // The in-memory db object persists automatically on the server
+  console.log("[DB] In-memory database updated (incidents:", db.incidents.length, ")")
 }
 
-// Initialize database with sample data
-let isInitialized = false
-
-async function initializeDb() {
+function initializeDb() {
   if (!isInitialized) {
     console.log("[DB] Starting database initialization...")
 
@@ -533,3 +534,5 @@ export async function hashPassword(password: string): Promise<string> {
 export function isDatabaseInitialized(): boolean {
   return isInitialized
 }
+
+let isInitialized = false
