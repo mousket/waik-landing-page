@@ -101,6 +101,12 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   const answeredQuestions = incident?.questions?.filter((q) => q.answer) ?? []
   const unansweredQuestions = incident?.questions?.filter((q) => !q.answer) ?? []
+  const MAX_PENDING_QUESTIONS = 10
+  const visiblePendingQuestions = useMemo(
+    () => unansweredQuestions.slice(0, MAX_PENDING_QUESTIONS),
+    [unansweredQuestions],
+  )
+  const hiddenPendingCount = Math.max(0, unansweredQuestions.length - visiblePendingQuestions.length)
 
   const canGenerateAIReport = answeredQuestions.length >= 5
 
@@ -133,13 +139,13 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     )
   }, [staffList, newQuestionSearchQuery])
 
-  const currentPendingQuestion = unansweredQuestions[currentPendingQuestionTab] ?? null
+  const currentPendingQuestion = visiblePendingQuestions[currentPendingQuestionTab] ?? null
   const currentAnsweredQuestion = answeredQuestions[currentAnsweredQuestionTab] ?? null
 
-  useEffect(() => {
-    fetchIncident()
-    fetchStaffList()
-  }, [params.id])
+useEffect(() => {
+  fetchIncident()
+  fetchStaffList()
+}, [params.id])
 
   const fetchIncident = async () => {
     try {
@@ -498,13 +504,13 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     scrollToBottom()
   }, [intelligenceMessages, isIntelligenceLoading])
 
-  useEffect(() => {
-    if (unansweredQuestions.length === 0) {
-      setCurrentPendingQuestionTab(0)
-      return
-    }
-    setCurrentPendingQuestionTab((prev) => Math.min(prev, unansweredQuestions.length - 1))
-  }, [unansweredQuestions.length])
+useEffect(() => {
+  if (visiblePendingQuestions.length === 0) {
+    setCurrentPendingQuestionTab(0)
+    return
+  }
+  setCurrentPendingQuestionTab((prev) => Math.min(prev, visiblePendingQuestions.length - 1))
+}, [visiblePendingQuestions.length])
 
   useEffect(() => {
     if (answeredQuestions.length === 0) {
@@ -899,8 +905,8 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex gap-2 flex-wrap">
-                    {unansweredQuestions.map((question, idx) => (
+                    <div className="flex gap-2 flex-wrap">
+                    {visiblePendingQuestions.map((question, idx) => (
                       <button
                         key={question.id}
                         onClick={() => setCurrentPendingQuestionTab(idx)}
@@ -915,6 +921,11 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                       </button>
                     ))}
                   </div>
+                    {hiddenPendingCount > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {hiddenPendingCount} additional question{hiddenPendingCount === 1 ? "" : "s"} will appear once the current batch is answered.
+                      </p>
+                    )}
 
                   <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5 space-y-3">
                     <div className="flex items-start gap-3">

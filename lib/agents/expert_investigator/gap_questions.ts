@@ -177,6 +177,41 @@ const SUBTYPE_FIELD_DESCRIPTORS: Record<FallSubtypeStandards["sub_type_id"], Rec
   },
 }
 
+const OUTDOOR_LOCATION_KEYWORDS = [
+  "outside",
+  "outdoor",
+  "parking",
+  "parking lot",
+  "garden",
+  "courtyard",
+  "patio",
+  "sidewalk",
+  "driveway",
+  "lawn",
+  "yard",
+  "gazebo",
+  "porch",
+  "balcony",
+  "street",
+  "walkway",
+  "trail",
+  "foh patio",
+]
+
+const ROOM_SPECIFIC_QUESTION_PATTERN = /(call[- ]?light|lighting|room light|bedside lamp|overhead light)/i
+
+function adjustQuestionsForContext(questions: string[], state: AgentState): string[] {
+  const location = state.global_standards.location_of_fall?.toLowerCase() ?? ""
+  const isOutdoor = OUTDOOR_LOCATION_KEYWORDS.some((keyword) => location.includes(keyword))
+
+  if (!isOutdoor) {
+    return questions
+  }
+
+  const filtered = questions.filter((question) => !ROOM_SPECIFIC_QUESTION_PATTERN.test(question))
+  return filtered.length > 0 ? filtered : questions
+}
+
 function isStringMissing(value: unknown): boolean {
   if (value === null || value === undefined) return true
   if (typeof value === "string") return value.trim().length === 0
@@ -277,6 +312,14 @@ export async function generateGapQuestions(
     .map((field, index) => `${index + 1}. ${field.label} – ${field.context}`)
     .join("\n")
 
+  const locationContext = state.global_standards.location_of_fall
+    ? `The fall occurred at: ${state.global_standards.location_of_fall}. Avoid irrelevant room-specific questions (e.g., call light placement) if this location suggests an outdoor setting.`
+    : "Use the documented fall location when crafting prompts so you skip irrelevant room-specific questions if the incident happened elsewhere (like outdoors or in common areas)."
+
+  const timeContext = state.global_standards.time_of_fall
+    ? `Recorded time of incident: ${state.global_standards.time_of_fall}. Avoid asking about lighting if the existing details already cover daylight conditions.`
+    : ""
+
   const categories = missing.reduce<Record<string, number>>((acc, field) => {
     acc[field.category] = (acc[field.category] ?? 0) + 1
     return acc
@@ -305,6 +348,8 @@ const systemPrompt = `You are an expert clinical investigator running a focused 
 - Ask for specifics (measurements, timelines, observations) where useful.
 - ${responderName}
 - ${subtypeContext}
+- ${locationContext}
+- ${timeContext}
 - ${continuityHint}
 - ${lastAnswerHint}
 - Vary your sentence structure so every question feels distinct.`
@@ -346,8 +391,10 @@ Return ${desiredQuestionCount} open-ended questions, each on its own line. Each 
       ? questions
       : buildFallbackQuestions(missing, Math.min(desiredQuestionCount, maxQuestions))
 
+  const contextAwareQuestions = adjustQuestionsForContext(finalQuestions, state)
+
   return {
-    questions: finalQuestions,
+    questions: contextAwareQuestions,
     missingFields: missing,
   }
 }

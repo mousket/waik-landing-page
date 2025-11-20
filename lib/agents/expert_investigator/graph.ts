@@ -93,13 +93,38 @@ async function upsertQuestionsForIncident(
   const pending: PendingQuestion[] = []
   const excludeSet = new Set((options.excludeTexts ?? []).map((text) => text.trim().toLowerCase()))
 
-  for (const text of questionTexts) {
-    if (excludeSet.has(text.trim().toLowerCase())) {
+  const existingIncident = await getIncidentById(incidentId)
+  const existingQuestions = existingIncident?.questions ?? []
+  const normalizedExisting = new Map<string, (typeof existingQuestions)[number]>()
+
+  for (const existing of existingQuestions) {
+    normalizedExisting.set(existing.questionText.trim().toLowerCase(), existing)
+  }
+
+  for (const rawText of questionTexts) {
+    const normalizedText = rawText.trim().toLowerCase()
+    if (!normalizedText || excludeSet.has(normalizedText)) {
+      continue
+    }
+
+    const existing = normalizedExisting.get(normalizedText)
+    if (existing) {
+      if (existing.answer) {
+        continue
+      }
+
+      pending.push({
+        id: existing.id,
+        text: existing.questionText,
+        askedBy: existing.askedBy,
+        assignedTo: existing.assignedTo,
+        askedAt: existing.askedAt,
+      })
       continue
     }
 
     const question = await addQuestionToIncident(incidentId, {
-      questionText: text,
+      questionText: rawText,
       askedBy: investigatorId,
       askedByName: investigatorName,
       assignedTo: assignedStaffIds,
@@ -112,6 +137,7 @@ async function upsertQuestionsForIncident(
     })
 
     if (question) {
+      normalizedExisting.set(normalizedText, question)
       pending.push({
         id: question.id,
         text: question.questionText,

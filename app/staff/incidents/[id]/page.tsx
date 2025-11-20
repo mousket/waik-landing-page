@@ -251,10 +251,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const handleSaveProgress = async () => {
     if (!incident || !userId) return
 
-    const currentQuestion = unansweredQuestions[currentTextQuestionIndex]
-    const answerText = answers[currentQuestion?.id]
+    const currentQuestion = visibleUnansweredQuestions[currentTextQuestionIndex]
+    const answerText = currentQuestion ? answers[currentQuestion.id] : undefined
 
-    if (!answerText || answerText.trim() === "") {
+    if (!currentQuestion || !answerText || answerText.trim() === "") {
       toast.error("Please provide an answer before saving")
       return
     }
@@ -284,12 +284,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
         return newAnswers
       })
 
-      const remainingQuestions = incident.questions.filter((q) => !q.answer && q.id !== currentQuestion.id)
-      if (remainingQuestions.length > 0) {
-        setCurrentTextQuestionIndex(0)
-      } else {
-        toast.success("All questions answered! Great job!")
-      }
+      setCurrentTextQuestionIndex(0)
     } catch (error) {
       console.error("[v0] Error saving progress:", error)
       toast.error("Failed to save your answer")
@@ -363,7 +358,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const handleSaveCurrentAnswer = async () => {
     if (!currentTranscript.trim() || !incident || !userId) return
 
-    const currentQuestion = unansweredQuestions[currentQuestionIndex]
+    const currentQuestion = visibleUnansweredQuestions[currentQuestionIndex]
+    if (!currentQuestion) {
+      toast.error("No question selected")
+      return
+    }
 
     setSaving(true)
     try {
@@ -392,18 +391,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       setCurrentTranscript("")
       setIsEditingTranscript(false)
 
-      const remainingQuestions = incident.questions.filter((q) => !q.answer && q.id !== currentQuestion.id)
-
-      if (remainingQuestions.length > 0) {
-        // Move to next question
-        setTimeout(() => {
-          speakQuestion(remainingQuestions[0].questionText)
-        }, 500)
-      } else {
-        // All questions answered
-        toast.success("All questions answered! Great job!")
-        setQaMode("text")
-      }
+      setCurrentQuestionIndex(0)
     } catch (error) {
       console.error("[v0] Error saving answer:", error)
       toast.error("Failed to save your answer")
@@ -415,7 +403,8 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   // They are replaced by handleSaveCurrentAnswer
 
   const handleStartVoiceMode = () => {
-    if (!incident || incident.questions.filter((q) => !q.answer).length === 0) {
+    const pendingBatch = visibleUnansweredQuestions
+    if (!incident || pendingBatch.length === 0) {
       toast.error("No questions to answer")
       return
     }
@@ -428,7 +417,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     setCurrentQuestionIndex(0)
     setVoiceAnswers({})
     setTimeout(() => {
-      speakQuestion(incident.questions.filter((q) => !q.answer)[0].questionText || "")
+      speakQuestion(pendingBatch[0]?.questionText || "")
     }, 500)
   }
 
@@ -588,7 +577,27 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   }, [incident?.id])
 
   const unansweredQuestions = incident?.questions.filter((q) => !q.answer) || []
+  const MAX_PENDING_QUESTIONS = 10
+  const visibleUnansweredQuestions = useMemo(
+    () => unansweredQuestions.slice(0, MAX_PENDING_QUESTIONS),
+    [unansweredQuestions],
+  )
+  const hiddenPendingCount = Math.max(0, unansweredQuestions.length - visibleUnansweredQuestions.length)
   const answeredQuestions = incident?.questions.filter((q) => q.answer) || []
+
+  const activeTextQuestion = visibleUnansweredQuestions[currentTextQuestionIndex] ?? null
+  const activeVoiceQuestion = visibleUnansweredQuestions[currentQuestionIndex] ?? null
+
+  useEffect(() => {
+    if (visibleUnansweredQuestions.length === 0) {
+      setCurrentTextQuestionIndex(0)
+      setCurrentQuestionIndex(0)
+      return
+    }
+
+    setCurrentTextQuestionIndex((prev) => Math.min(prev, visibleUnansweredQuestions.length - 1))
+    setCurrentQuestionIndex((prev) => Math.min(prev, visibleUnansweredQuestions.length - 1))
+  }, [visibleUnansweredQuestions.length])
 
   const filteredEmployees = staffList.filter((emp) =>
     emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()),
@@ -1154,7 +1163,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   {qaMode === "text" ? (
                     <>
                       <div className="flex gap-2 flex-wrap">
-                        {unansweredQuestions.map((q, idx) => (
+                        {visibleUnansweredQuestions.map((q, idx) => (
                           <button
                             key={q.id}
                             onClick={() => setCurrentTextQuestionIndex(idx)}
@@ -1169,21 +1178,26 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </button>
                         ))}
                       </div>
+                      {hiddenPendingCount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {hiddenPendingCount} additional question{hiddenPendingCount === 1 ? "" : "s"} will unlock once the current batch is answered.
+                        </p>
+                      )}
 
                       <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
                         <div className="flex items-start gap-3">
                           <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
                           <div className="flex-1">
                             <p className="font-medium text-lg leading-relaxed">
-                              {unansweredQuestions[currentTextQuestionIndex]?.questionText}
+                            {activeTextQuestion?.questionText}
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                               <p className="text-xs text-muted-foreground">
-                                Asked by <span className="font-medium">{unansweredQuestions[currentTextQuestionIndex]?.askedBy}</span>
+                                Asked by <span className="font-medium">{activeTextQuestion?.askedBy}</span>
                               </p>
                               <span className="text-xs text-muted-foreground">•</span>
                               <p className="text-xs text-muted-foreground">
-                                {formatDate(unansweredQuestions[currentTextQuestionIndex]?.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                                {formatDate(activeTextQuestion?.askedAt, "MMM d, yyyy 'at' h:mm a")}
                               </p>
                             </div>
                           </div>
@@ -1195,11 +1209,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         <Textarea
                           id="answer-input"
                           placeholder="Type your answer here..."
-                          value={answers[unansweredQuestions[currentTextQuestionIndex]?.id] || ""}
+                          value={(activeTextQuestion && answers[activeTextQuestion.id]) || ""}
                           onChange={(e) =>
                             setAnswers({
                               ...answers,
-                              [unansweredQuestions[currentTextQuestionIndex]?.id]: e.target.value,
+                              ...(activeTextQuestion ? { [activeTextQuestion.id]: e.target.value } : {}),
                             })
                           }
                           rows={5}
@@ -1232,11 +1246,17 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </Button>
                         <Button
                           onClick={() =>
-                            setCurrentTextQuestionIndex(
-                              Math.min(unansweredQuestions.length - 1, currentTextQuestionIndex + 1),
+                            setCurrentTextQuestionIndex((prev) =>
+                              Math.min(
+                                Math.max(visibleUnansweredQuestions.length - 1, 0),
+                                prev + 1,
+                              ),
                             )
                           }
-                          disabled={currentTextQuestionIndex === unansweredQuestions.length - 1}
+                          disabled={
+                            visibleUnansweredQuestions.length === 0 ||
+                            currentTextQuestionIndex === visibleUnansweredQuestions.length - 1
+                          }
                           variant="outline"
                           className="flex-1"
                         >
@@ -1248,7 +1268,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   ) : (
                     <>
                       <div className="flex gap-2 flex-wrap">
-                        {unansweredQuestions.map((q, idx) => (
+                        {visibleUnansweredQuestions.map((q, idx) => (
                           <button
                             key={q.id}
                             onClick={() => {
@@ -1268,21 +1288,26 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </button>
                         ))}
                       </div>
+                      {hiddenPendingCount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {hiddenPendingCount} additional question{hiddenPendingCount === 1 ? "" : "s"} will unlock once the current batch is answered.
+                        </p>
+                      )}
 
                       <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
                         <div className="flex items-start gap-3">
                           <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
                           <div className="flex-1">
                             <p className="font-medium text-lg leading-relaxed">
-                              {unansweredQuestions[currentQuestionIndex]?.questionText}
+                              {activeVoiceQuestion?.questionText}
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                               <p className="text-xs text-muted-foreground">
-                                Asked by <span className="font-medium">{unansweredQuestions[currentQuestionIndex]?.askedBy}</span>
+                                Asked by <span className="font-medium">{activeVoiceQuestion?.askedBy}</span>
                               </p>
                               <span className="text-xs text-muted-foreground">•</span>
                               <p className="text-xs text-muted-foreground">
-                                {formatDate(unansweredQuestions[currentQuestionIndex]?.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                                {formatDate(activeVoiceQuestion?.askedAt, "MMM d, yyyy 'at' h:mm a")}
                               </p>
                             </div>
                           </div>
@@ -1302,7 +1327,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
                         <div>
                           <p className="text-lg font-semibold mb-2">
-                            Question {currentQuestionIndex + 1} of {unansweredQuestions.length}
+                        Question {currentQuestionIndex + 1} of {visibleUnansweredQuestions.length}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {isSpeaking
@@ -1342,7 +1367,12 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                                   onClick={() => {
                                     setCurrentTranscript("")
                                     setIsEditingTranscript(false)
-                                    setTimeout(() => speakQuestion(unansweredQuestions[currentQuestionIndex].questionText), 300)
+                                    setTimeout(() => {
+                                      const next = visibleUnansweredQuestions[currentQuestionIndex]
+                                      if (next) {
+                                        speakQuestion(next.questionText)
+                                      }
+                                    }, 300)
                                   }}
                                   variant="outline"
                                 >
