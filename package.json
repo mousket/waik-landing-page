@@ -1,12 +1,13 @@
 {
-  "name": "my-v0-project",
+  "name": "waik-landing-page",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "next build",
+    "build:static": "node scripts/build-static-homepage.js",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
     "migrate": "ts-node --compiler-options '{\"module\":\"commonjs\"}' backend/scripts/migrate-lowdb-to-mongo.ts"
   },
   "dependencies": {
