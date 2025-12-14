@@ -6,7 +6,7 @@ import { AuthGuard } from "@/components/auth-guard"
 import { useAuthStore } from "@/lib/auth-store"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { LogOut, Home, Menu, X, Bell, Plus } from "lucide-react"
+import { LogOut, Home, Menu, X, Bell, Plus, MessageSquare, Volume2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import {
@@ -34,7 +34,6 @@ export default function StaffLayout({
   useEffect(() => {
     if (userId) {
       fetchNotifications()
-      // Poll for notifications every 30 seconds
       const interval = setInterval(fetchNotifications, 30000)
       return () => clearInterval(interval)
     }
@@ -62,6 +61,7 @@ export default function StaffLayout({
   return (
     <AuthGuard allowedRoles={["staff"]}>
       <div className="min-h-screen bg-background">
+        {/* Mobile Header */}
         <div className="fixed top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur-lg border-b border-border/50 z-50 lg:hidden">
           <div className="flex items-center justify-between h-full px-4">
             <Button
@@ -119,6 +119,7 @@ export default function StaffLayout({
           </div>
         </div>
 
+        {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
             className="fixed inset-0 bg-black/60 z-30 lg:hidden backdrop-blur-sm"
@@ -126,6 +127,7 @@ export default function StaffLayout({
           />
         )}
 
+        {/* Sidebar */}
         <aside
           className={`fixed left-0 top-0 h-full w-72 border-r bg-gradient-to-b from-sidebar to-sidebar/95 shadow-2xl z-40 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -155,14 +157,34 @@ export default function StaffLayout({
                 Dashboard
               </Button>
               <Button
-                className="w-full justify-start bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
+                className="w-full justify-start bg-gradient-to-r from-primary via-primary to-accent hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
                 onClick={() => {
-                  router.push("/staff/report")
+                  router.push("/incidents/create")
                   setIsMobileMenuOpen(false)
                 }}
               >
                 <Plus className="mr-3 h-5 w-5" />
                 New Incident
+              </Button>
+              <Button
+                className="w-full justify-start bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
+                onClick={() => {
+                  router.push("/incidents/conversational/create")
+                  setIsMobileMenuOpen(false)
+                }}
+              >
+                <MessageSquare className="mr-3 h-5 w-5" />
+                Conversational Reporting
+              </Button>
+              <Button
+                className="w-full justify-start bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
+                onClick={() => {
+                  router.push("/incidents/companion/create")
+                  setIsMobileMenuOpen(false)
+                }}
+              >
+                <Volume2 className="mr-3 h-5 w-5" />
+                AI Companion
               </Button>
             </nav>
 
