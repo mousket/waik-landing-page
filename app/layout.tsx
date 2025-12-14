@@ -11,7 +11,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-sans",
+  variable: "--font-body",
   display: "swap",
 })
 
@@ -34,8 +34,7 @@ const getSiteUrl = () => {
   }
 
   // 2. Vercel preview/production deployments (automatic)
-  const vercelUrlEnv = process.env.NEXT_PUBLIC_VERCEL_URL
-  if (process.env.VERCEL_URL && vercelUrlEnv && vercelUrlEnv.trim() !== "") {
+  if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim() !== "") {
     const vercelUrl = `https://${process.env.VERCEL_URL}`
     if (isValidUrl(vercelUrl)) {
       return vercelUrl
@@ -49,13 +48,13 @@ const getSiteUrl = () => {
 const siteUrl = getSiteUrl()
 
 export const metadata: Metadata = {
-  title: "WAiK - Voice-First Documentation and Reporting for Healthcare Incidents",
+  title: "WAiK - Voice-First AI for Healthcare Documentation",
   description:
     "Stay Audit ready and Turn critical incident documentation and reports into a 5-minute conversation. Give your nurses and staff back hundreds of hours and slash compliance risk.",
   generator: "v0.app",
   metadataBase: new URL(siteUrl),
   openGraph: {
-    title: "WAiK - Voice-First Documentation and Reporting for Healthcare Incidents",
+    title: "WAiK - Voice-First AI for Healthcare Documentation",
     description:
       "Stay Audit ready and Turn critical incident documentation and reports into a 5-minute conversation. Give your nurses and staff back hundreds of hours and slash compliance risk.",
     url: siteUrl,
@@ -65,7 +64,7 @@ export const metadata: Metadata = {
         url: "/waik-logo.png",
         width: 1200,
         height: 630,
-        alt: "WAiK - Voice-First Documentation and Reporting for Healthcare Incidents",
+        alt: "WAiK - Voice-First AI for Healthcare Documentation",
       },
     ],
     locale: "en_US",
@@ -73,7 +72,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "WAiK - Voice-First Documentation and Reporting for Healthcare Incidents",
+    title: "WAiK - Voice-First AI for Healthcare Documentation",
     description:
       "Stay Audit ready and Turn critical incident documentation and reports into a 5-minute conversation. Give your nurses and staff back hundreds of hours and slash compliance risk.",
     images: ["/waik-logo.png"],

@@ -25,36 +25,16 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      console.log("[v0] Attempting login via proxy: /api/proxy/auth/login")
-      console.log("[v0] Username:", username)
-
-      const response = await fetch("/api/proxy/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       })
 
-      console.log("[v0] Response received, status:", response.status)
-
       const data = await response.json()
-      console.log("[v0] Response data:", data)
 
       if (!response.ok) {
-        if (data.details) {
-          console.error("[v0] Backend error details:", data.details)
-          toast.error(`Login failed: ${data.error}. Backend issue: ${data.details.substring(0, 100)}`)
-        } else {
-          toast.error(data.error || data.message || "Login failed")
-        }
-        setIsLoading(false)
-        return
-      }
-
-      if (!data.userId || !data.role) {
-        console.error("[v0] Invalid response structure:", data)
-        toast.error("Invalid login response from server")
+        toast.error(data.error || "Login failed")
         setIsLoading(false)
         return
       }
@@ -69,7 +49,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("[v0] Login error:", error)
-      toast.error(`Login error: ${error instanceof Error ? error.message : "Unknown error"}`)
+      toast.error("An error occurred during login")
       setIsLoading(false)
     }
   }

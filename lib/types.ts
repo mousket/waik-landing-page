@@ -21,62 +21,11 @@ export interface Answer {
 
 export interface Question {
   id: string
-  incidentId?: string
+  incidentId: string
   questionText: string
   askedBy: string
-  askedByName?: string
   askedAt: string
-  assignedTo?: string[]
   answer?: Answer
-  source?: "voice-report" | "ai-generated" | "manual"
-  generatedBy?: string
-  vectorizedAt?: string
-  metadata?: {
-    reporterId?: string
-    reporterName?: string
-    reporterRole?: UserRole
-    assignedStaffIds?: string[]
-    createdVia?: "voice" | "text" | "system"
-  }
-}
-
-export interface IncidentInitialReport {
-  capturedAt: string
-  narrative: string
-  residentState?: string
-  environmentNotes?: string
-  enhancedNarrative?: string
-  recordedById: string
-  recordedByName: string
-  recordedByRole: UserRole
-}
-
-export type InvestigationStatus = "not-started" | "in-progress" | "completed"
-
-import type { GoldStandardFallReport, FallSubtypeStandards } from "./gold_standards"
-
-export interface IncidentInvestigationMetadata {
-  status: InvestigationStatus
-  subtype?: string
-  startedAt?: string
-  completedAt?: string
-  investigatorId?: string
-  investigatorName?: string
-  goldStandard?: GoldStandardFallReport | null
-  subTypeData?: FallSubtypeStandards | null
-  score?: number | null
-  completenessScore?: number | null
-  feedback?: string | null
-}
-
-export interface IncidentNotification {
-  id: string
-  incidentId: string
-  type: "incident-created" | "investigation-started" | "follow-up-required" | "investigation-completed"
-  message: string
-  createdAt: string
-  readAt?: string
-  targetUserId: string
 }
 
 export interface HumanReport {
@@ -115,8 +64,6 @@ export interface Incident {
   createdAt: string
   updatedAt: string
   questions: Question[]
-  initialReport?: IncidentInitialReport
-  investigation?: IncidentInvestigationMetadata
   summary?: string | null
   humanReport?: HumanReport
   aiReport?: AIReport
@@ -125,5 +72,4 @@ export interface Incident {
 export interface Database {
   users: User[]
   incidents: Incident[]
-  notifications: IncidentNotification[]
 }

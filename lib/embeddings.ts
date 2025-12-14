@@ -2,43 +2,14 @@ import { Low } from "lowdb"
 import { JSONFile } from "lowdb/node"
 import path from "path"
 import { generateEmbedding, cosineSimilarity } from "./openai"
-import type { Incident, UserRole } from "./types"
+import type { Incident } from "./types"
 
-// Embedding cache structure with full metadata for traceability
-interface QuestionEmbeddingMetadata {
-  embedding: number[]
-  questionText: string
-  askedBy: string  // Admin who asked
-  askedAt: string
-  source?: string
-  generatedBy?: string
-  assignedTo?: string[]
-  reporterId?: string
-  reporterName?: string
-  reporterRole?: UserRole
-  answerId?: string  // Link to answer
-  answerText?: string
-  answeredBy?: string  // Staff who answered
-  answeredAt?: string
-  hasAnswer: boolean
-  vectorizedAt: string
-}
-
-interface IncidentEmbeddingMetadata {
-  residentName: string
-  residentRoom: string
-  staffId: string  // Assigned staff
-  staffName: string
-  title: string
-  vectorizedAt: string
-}
-
+// Embedding cache structure
 interface EmbeddingCache {
   [incidentId: string]: {
     incidentEmbedding: number[]
-    incidentMetadata: IncidentEmbeddingMetadata
     questionEmbeddings: {
-      [questionId: string]: QuestionEmbeddingMetadata
+      [questionId: string]: number[]
     }
     lastUpdated: string
   }
@@ -63,7 +34,7 @@ async function initializeEmbeddings() {
 initializeEmbeddings().catch((err) => console.error("[Embeddings] Init error:", err))
 
 /**
- * Get or generate incident embedding with full metadata
+ * Get or generate incident embedding
  */
 export async function getIncidentEmbedding(incident: Incident): Promise<number[]> {
   await initializeEmbeddings()
@@ -81,31 +52,15 @@ export async function getIncidentEmbedding(incident: Incident): Promise<number[]
   const text = createIncidentText(incident)
   const embedding = await generateEmbedding(text)
 
-  // Cache it with FULL METADATA for traceability
+  // Cache it
   if (!embeddingsDb.data[incident.id]) {
     embeddingsDb.data[incident.id] = {
       incidentEmbedding: embedding,
-      incidentMetadata: {
-        residentName: incident.residentName,
-        residentRoom: incident.residentRoom,
-        staffId: incident.staffId,
-        staffName: incident.staffName,
-        title: incident.title,
-        vectorizedAt: new Date().toISOString(),
-      },
       questionEmbeddings: {},
       lastUpdated: new Date().toISOString(),
     }
   } else {
     embeddingsDb.data[incident.id].incidentEmbedding = embedding
-    embeddingsDb.data[incident.id].incidentMetadata = {
-      residentName: incident.residentName,
-      residentRoom: incident.residentRoom,
-      staffId: incident.staffId,
-      staffName: incident.staffName,
-      title: incident.title,
-      vectorizedAt: new Date().toISOString(),
-    }
     embeddingsDb.data[incident.id].lastUpdated = new Date().toISOString()
   }
 
@@ -114,32 +69,13 @@ export async function getIncidentEmbedding(incident: Incident): Promise<number[]
 }
 
 /**
- * Get or generate question embedding with FULL METADATA for traceability
- * This ensures we can trace back from embedding to:
- * - Question text and who asked it
- * - Answer text and who answered it
- * - Link to incident (via incidentId)
+ * Get or generate question embedding
  */
 export async function getQuestionEmbedding(
   incidentId: string,
   questionId: string,
   questionText: string,
-  askedBy: string,
-  askedAt: string,
-  answer?: {
-    id: string
-    text: string
-    answeredBy: string
-    answeredAt: string
-  },
-  context?: {
-    assignedTo?: string[]
-    reporterId?: string
-    reporterName?: string
-    reporterRole?: UserRole
-    source?: string
-    generatedBy?: string
-  },
+  answer?: string,
 ): Promise<number[]> {
   await initializeEmbeddings()
 
@@ -147,107 +83,52 @@ export async function getQuestionEmbedding(
   
   if (cache) {
     console.log("[Embeddings] Using cached question embedding:", questionId)
-    return cache.embedding
+    return cache
   }
 
   // Generate new embedding
   console.log("[Embeddings] Generating new question embedding:", questionId)
-  const text = answer ? `Question: ${questionText}\nAnswer: ${answer.text}` : `Question: ${questionText}`
+  const text = answer ? `Question: ${questionText}\nAnswer: ${answer}` : `Question: ${questionText}`
   const embedding = await generateEmbedding(text)
 
-  // Cache it with FULL METADATA for complete traceability
-  const metadata: QuestionEmbeddingMetadata = {
-    embedding,
-    questionText,
-    askedBy,  // ✅ Link to admin who asked
-    askedAt,
-    source: context?.source,
-    generatedBy: context?.generatedBy,
-    assignedTo: context?.assignedTo,
-    reporterId: context?.reporterId,
-    reporterName: context?.reporterName,
-    reporterRole: context?.reporterRole,
-    answerId: answer?.id,  // ✅ Link to specific answer
-    answerText: answer?.text,
-    answeredBy: answer?.answeredBy,  // ✅ Link to staff who answered
-    answeredAt: answer?.answeredAt,
-    hasAnswer: !!answer,
-    vectorizedAt: new Date().toISOString(),
-  }
-
-  // Ensure incident entry exists
+  // Cache it
   if (!embeddingsDb.data[incidentId]) {
     embeddingsDb.data[incidentId] = {
       incidentEmbedding: [],
-      incidentMetadata: {
-        residentName: "",
-        residentRoom: "",
-        staffId: "",
-        staffName: "",
-        title: "",
-        vectorizedAt: new Date().toISOString(),
-      },
-      questionEmbeddings: {},
+      questionEmbeddings: { [questionId]: embedding },
       lastUpdated: new Date().toISOString(),
     }
+  } else {
+    embeddingsDb.data[incidentId].questionEmbeddings ||= {}
+    embeddingsDb.data[incidentId].questionEmbeddings[questionId] = embedding
   }
-
-  // Store metadata
-  embeddingsDb.data[incidentId].questionEmbeddings ||= {}
-  embeddingsDb.data[incidentId].questionEmbeddings[questionId] = metadata
-  embeddingsDb.data[incidentId].lastUpdated = new Date().toISOString()
 
   await embeddingsDb.write()
   return embedding
 }
 
 /**
- * Search questions semantically using RAG with full metadata
+ * Search questions semantically using RAG
  */
 export async function searchSimilarQuestions(
   incident: Incident,
   query: string,
   topK: number = 3,
-): Promise<
-  Array<{
-    questionId: string
-    questionText: string
-    answer?: string
-    similarity: number
-    askedBy: string
-    answeredBy?: string
-  }>
-> {
+): Promise<Array<{ questionId: string; questionText: string; answer?: string; similarity: number }>> {
   await initializeEmbeddings()
 
   // Generate query embedding
   const queryEmbedding = await generateEmbedding(query)
 
-  // Get all question embeddings with metadata
-  const results: Array<{
-    questionId: string
-    questionText: string
-    answer?: string
-    similarity: number
-    askedBy: string
-    answeredBy?: string
-  }> = []
+  // Get all question embeddings
+  const results: Array<{ questionId: string; questionText: string; answer?: string; similarity: number }> = []
 
   for (const question of incident.questions) {
     const questionEmbedding = await getQuestionEmbedding(
       incident.id,
       question.id,
       question.questionText,
-      question.askedBy,
-      question.askedAt,
-      question.answer
-        ? {
-            id: question.answer.id,
-            text: question.answer.answerText,
-            answeredBy: question.answer.answeredBy,
-            answeredAt: question.answer.answeredAt,
-          }
-        : undefined,
+      question.answer?.answerText,
     )
 
     const similarity = cosineSimilarity(queryEmbedding, questionEmbedding)
@@ -257,8 +138,6 @@ export async function searchSimilarQuestions(
       questionText: question.questionText,
       answer: question.answer?.answerText,
       similarity,
-      askedBy: question.askedBy,
-      answeredBy: question.answer?.answeredBy,
     })
   }
 

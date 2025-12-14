@@ -11,7 +11,6 @@ import type { Incident } from "@/lib/types"
 import { format } from "date-fns"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { apiUrl } from "@/lib/api-config"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -34,7 +33,7 @@ export default function AdminDashboard() {
 
   const fetchIncidents = async () => {
     try {
-      const response = await fetch(apiUrl("/api/incidents"))
+      const response = await fetch("/api/incidents")
       if (response.ok) {
         const data = await response.json()
         setIncidents(data)

@@ -9,8 +9,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Staff ID is required" }, { status: 400 })
     }
 
-    const incidents = await getIncidentsByStaffId(staffId)  
-    console.log("[API] Fetched", incidents.length, "incidents for staff:", staffId)
+    const incidents = getIncidentsByStaffId(staffId)
     return NextResponse.json({ incidents })
   } catch (error) {
     console.error("[v0] Error fetching staff incidents:", error)

@@ -16,7 +16,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     // Get incident
-    const incident = await getIncidentById(id)  // ✅ Now async
+    const incident = getIncidentById(id)
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
@@ -61,7 +61,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const incident = await getIncidentById(id)  // ✅ Now async
+    const incident = getIncidentById(id)
 
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
@@ -84,7 +84,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const incident = await getIncidentById(id)  // ✅ Now async
+    const incident = getIncidentById(id)
 
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
