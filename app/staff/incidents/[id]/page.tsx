@@ -105,7 +105,7 @@ const formatDate = (dateString: string | undefined, formatString: string): strin
 
 export default function StaffIncidentDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const { userId } = useAuthStore()
+  const { userId, role } = useAuthStore()
   const [incident, setIncident] = useState<Incident | null>(null)
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -807,6 +807,232 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                 </div>
               </CardHeader>
             </Card>
+
+            <Card className="border-primary/20 bg-white shadow-lg">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                <div>
+                  <CardTitle className="text-lg text-primary">Investigative Highlights</CardTitle>
+                  <CardDescription>
+                    Notes captured during follow-up along with resident state and environment observations
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-0 text-xs text-primary hover:text-primary"
+                  onClick={() => setShowInvestigativeHighlights((prev) => !prev)}
+                >
+                  {showInvestigativeHighlights ? "Hide" : "Show"}
+                </Button>
+              </CardHeader>
+              {showInvestigativeHighlights && (
+                <CardContent className="space-y-4">
+                  {(residentStateHtml || environmentNotesHtml) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {residentStateHtml && (
+                        <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Resident state</p>
+                          <div
+                            className="text-sm leading-relaxed text-muted-foreground"
+                            dangerouslySetInnerHTML={{ __html: residentStateHtml ?? "" }}
+                          />
+                        </div>
+                      )}
+                      {environmentNotesHtml && (
+                        <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Environment notes</p>
+                          <div
+                            className="text-sm leading-relaxed text-muted-foreground"
+                            dangerouslySetInnerHTML={{ __html: environmentNotesHtml ?? "" }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {answeredQuestions.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Answer highlights</p>
+                      <ul className="space-y-2 text-sm text-muted-foreground">
+                        {answeredQuestions.slice(0, 3).map((q) => (
+                          <li key={`qa-highlight-${q.id}`} className="border border-muted/40 rounded-lg p-3 bg-muted/20">
+                            <p className="font-medium">{q.questionText}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {q.answer?.answerText ?? "No answer captured."}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                      {answeredQuestions.length > 3 ? (
+                        <p className="text-xs text-muted-foreground">
+                          There are {answeredQuestions.length - 3} additional answered questions in the Q&A tab.
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+
+            <Card className="border-primary/20 bg-white shadow-lg">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                <div className="space-y-3">
+                  <CardTitle className="text-lg sm:text-xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                    Report Card
+                  </CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground">
+                    Generated from the narrative and follow-up answers captured for this incident
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-0 text-xs text-primary hover:text-primary"
+                  onClick={handleToggleReportCard}
+                >
+                  {showReportCard ? "Hide" : "Show"}
+                </Button>
+              </CardHeader>
+              {showReportCard && (
+                <CardContent className="space-y-5">
+                  {reportCardLoading ? (
+                    <div className="flex items-center justify-center py-8 text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        <span>Scoring narrative…</span>
+                      </div>
+                    </div>
+                  ) : reportCard ? (
+                    <div className="space-y-5">
+                      <div className="text-center space-y-2">
+                        <div className="text-5xl font-bold text-primary">{formatScore(reportCard.score)}/10</div>
+                        <p className="text-sm text-muted-foreground">Overall quality score</p>
+                        <p className="text-xs text-muted-foreground">
+                          Completeness {formatScore(reportCard.completenessScore)}/10
+                        </p>
+                      </div>
+
+                      {quickCritique ? (
+                        <div className="rounded-md bg-muted p-4 text-sm leading-relaxed text-muted-foreground">
+                          <p>
+                            <span className="font-semibold text-emerald-700">What went well:</span> {quickCritique.strengthsSnippet}
+                          </p>
+                          <p>
+                            <span className="font-semibold text-amber-700">Needs attention:</span> {quickCritique.gapsSnippet}
+                          </p>
+                          {quickCritique.adviceSnippet ? (
+                            <p>
+                              <span className="font-semibold text-sky-700">Advice:</span> {quickCritique.adviceSnippet}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <div className="space-y-3">
+                        <Button
+                          variant="outline"
+                          className="w-full border border-primary/30 text-primary hover:bg-primary/10"
+                          onClick={() => setShowDetailedReport((prev) => !prev)}
+                        >
+                          {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
+                        </Button>
+
+                        {showDetailedReport ? (
+                          <div className="space-y-4">
+                            <div className="overflow-hidden rounded-2xl border border-primary/20 bg-primary/5">
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-primary"
+                                onClick={() => toggleDetailSection("strengths")}
+                              >
+                                <span>What You Did Well</span>
+                                <ChevronDown
+                                  className={`h-4 w-4 transition-transform ${expandedSections.strengths ? "rotate-180" : ""}`}
+                                />
+                              </button>
+                              {expandedSections.strengths ? (
+                                <div className="border-t border-primary/20 px-4 py-3 text-sm text-muted-foreground">
+                                  {reportCard.strengths.length > 0 ? (
+                                    <ul className="space-y-2">
+                                      {reportCard.strengths.map((item, index) => (
+                                        <li key={`strength-${index}`} className="flex gap-2">
+                                          <span className="text-emerald-500 shrink-0">[+]</span>
+                                          <span>{item}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p>No specific strengths identified yet.</p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="overflow-hidden rounded-2xl border border-amber-200/40 bg-amber-50">
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-amber-700"
+                                onClick={() => toggleDetailSection("gaps")}
+                              >
+                                <span>What Needs Work</span>
+                                <ChevronDown
+                                  className={`h-4 w-4 transition-transform ${expandedSections.gaps ? "rotate-180" : ""}`}
+                                />
+                              </button>
+                              {expandedSections.gaps ? (
+                                <div className="border-t border-amber-200/40 px-4 py-3 text-sm text-slate-700">
+                                  {reportCard.gaps.length > 0 ? (
+                                    <ul className="space-y-2">
+                                      {reportCard.gaps.map((item, index) => (
+                                        <li key={`gap-${index}`} className="flex gap-2">
+                                          <span className="text-amber-500 shrink-0">[!]</span>
+                                          <span>{item}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p>No major gaps flagged—keep this level of detail.</p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="overflow-hidden rounded-2xl border border-sky-200/40 bg-sky-50">
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-sky-700"
+                                onClick={() => toggleDetailSection("narrative")}
+                              >
+                                <span>See Original Narrative</span>
+                                <ChevronDown
+                                  className={`h-4 w-4 transition-transform ${expandedSections.narrative ? "rotate-180" : ""}`}
+                                />
+                              </button>
+                              {expandedSections.narrative ? (
+                                <div className="border-t border-sky-200/40 px-4 py-3 text-sm text-slate-700 whitespace-pre-line">
+                                  {aggregatedNarrativeHtml ? (
+                                    <div dangerouslySetInnerHTML={{ __html: aggregatedNarrativeHtml }} />
+                                  ) : (
+                                    <p>No narrative captured for this incident.</p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : reportCardError ? (
+                    <div className="text-sm text-destructive">{reportCardError}</div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No narrative captured yet.</div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+
+            {/* Q&A content is now located in the dedicated Q&A tab below */}
+
           </TabsContent>
 
           <TabsContent value="qa" className="space-y-6 mt-6">

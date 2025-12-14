@@ -86,6 +86,8 @@ export interface Incident {
   createdAt: string
   updatedAt: string
   questions: Question[]
+  initialReport?: IncidentInitialReport
+  investigation?: IncidentInvestigationMetadata
   summary?: string | null
   initialReport?: InitialReport
   humanReport?: HumanReport
@@ -95,4 +97,5 @@ export interface Incident {
 export interface Database {
   users: User[]
   incidents: Incident[]
+  notifications: IncidentNotification[]
 }

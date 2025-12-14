@@ -58,14 +58,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const { id } = params
     const body = await request.json()
-    const { question } = body
+    const { question, userId, useTools = true } = body  // ✅ Accept userId and useTools flag
 
     if (!question) {
       return NextResponse.json({ error: "Question is required" }, { status: 400 })
     }
 
     // Get incident
-    const incident = getIncidentById(id)
+    const incident = await getIncidentById(id)
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }

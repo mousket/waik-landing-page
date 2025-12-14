@@ -10,7 +10,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { id } = await params
 
     // Get incident
-    const incident = getIncidentById(id)
+    const incident = await getIncidentById(id)  // ✅ Now async
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
@@ -66,7 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const incident = getIncidentById(id)
+    const incident = await getIncidentById(id)  // ✅ Now async
 
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })

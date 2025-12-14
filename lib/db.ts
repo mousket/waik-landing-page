@@ -286,7 +286,7 @@ export async function updateIncident(id: string, updates: Partial<Incident>): Pr
   db.incidents[index] = {
     ...db.incidents[index],
     ...updates,
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date(),
   }
 
   saveDb()
@@ -335,9 +335,28 @@ export async function updateAIReport(incidentId: string, aiReport: Incident["aiR
   return incident
 }
 
-// ============================================================================
-// QUESTION & ANSWER FUNCTIONS
-// ============================================================================
+  if (updates.investigation) {
+    preparedUpdates.investigation = prepareInvestigation(updates.investigation)
+  }
+
+  if (updates.initialReport) {
+    preparedUpdates.initialReport = {
+      ...updates.initialReport,
+      capturedAt: toDateOrUndefined(updates.initialReport.capturedAt) ?? new Date(),
+    }
+  }
+
+  if (updates.summary === null) {
+    preparedUpdates.summary = null
+  }
+
+  const incident = await IncidentModel.findOneAndUpdate({ id }, preparedUpdates, {
+    new: true,
+    lean: true,
+  })
+
+  return incident ? serializeIncident(incident) : null
+}
 
 export function createIncident(data: {
   title: string
@@ -477,8 +496,7 @@ export async function answerQuestion(
   const incident = getIncidentById(incidentId)
   if (!incident) return false
 
-  const question = incident.questions.find((q) => q.id === questionId)
-  if (!question) return false
+  const answeredAt = toDateOrUndefined(answer.answeredAt) ?? new Date()
 
   question.answer = answer
   incident.updatedAt = new Date().toISOString()
@@ -511,9 +529,8 @@ export async function deleteQuestion(incidentId: string, questionId: string): Pr
   return true
 }
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+export async function deleteQuestion(incidentId: string, questionId: string): Promise<boolean> {
+  await ensureDatabase()
 
 /**
  * Force a refresh (no-op for in-memory database)
@@ -522,16 +539,10 @@ export async function refreshDb(): Promise<void> {
   console.log("[DB] In-memory database (no refresh needed)")
 }
 
-/**
- * Hash a password for storage
- */
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10)
 }
 
-/**
- * Check if database is initialized
- */
 export function isDatabaseInitialized(): boolean {
   return isInitialized
 }

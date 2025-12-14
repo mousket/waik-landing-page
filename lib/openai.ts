@@ -25,7 +25,8 @@ export function isOpenAIConfigured(): boolean {
  */
 export async function generateChatCompletion(
   messages: OpenAI.Chat.ChatCompletionMessageParam[],
-  options?: Partial<typeof AI_CONFIG>,
+  options?: Partial<typeof AI_CONFIG> &
+    Pick<OpenAI.Chat.Completions.ChatCompletionCreateParams, "tools" | "tool_choice" | "response_format">,
 ) {
   if (!isOpenAIConfigured()) {
     throw new Error("OpenAI API key not configured")
@@ -36,6 +37,9 @@ export async function generateChatCompletion(
     messages,
     temperature: options?.temperature ?? AI_CONFIG.temperature,
     max_tokens: options?.maxTokens || AI_CONFIG.maxTokens,
+    tools: options?.tools,
+    tool_choice: options?.tool_choice,
+    response_format: options?.response_format,
   })
 
   return response
