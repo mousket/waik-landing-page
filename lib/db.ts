@@ -1,339 +1,237 @@
-import type { Database, Incident, User } from "./types"
-import bcrypt from "bcrypt"
-
-const STORAGE_KEY = "waik_demo_db"
+import bcrypt from "bcryptjs"
+import connectMongo from "@/backend/src/lib/mongodb"
+import IncidentModel from "@/backend/src/models/incident.model"
+import UserModel from "@/backend/src/models/user.model"
+import NotificationModel from "@/backend/src/models/notification.model"
+import type {
+  Answer,
+  Incident,
+  IncidentInitialReport,
+  IncidentInvestigationMetadata,
+  IncidentNotification,
+  InvestigationStatus,
+  Question,
+  User,
+  UserRole,
+} from "./types"
+import { getQuestionEmbedding } from "./embeddings"
+import { isOpenAIConfigured } from "./openai"
 
 let isInitialized = false
 
-function getInitialDb(): Database {
-  // Try to load from localStorage (client-side only)
-  if (typeof window !== "undefined") {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        console.log("[DB] Loaded database from localStorage")
-        return JSON.parse(stored)
-      }
-    } catch (error) {
-      console.error("[DB] Failed to load from localStorage:", error)
-    }
-  }
-
-  return { users: [], incidents: [] }
-}
-
-const db: Database = getInitialDb()
-
-function saveDb() {
-  // Save to localStorage (browser only)
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db))
-      console.log("[DB] Saved to localStorage")
-    } catch (error) {
-      console.error("[DB] Failed to save to localStorage:", error)
-    }
-  }
-  // The in-memory db object persists automatically on the server
-  console.log("[DB] In-memory database updated (incidents:", db.incidents.length, ")")
-}
-
-function initializeDb() {
+async function ensureDatabase() {
+  await connectMongo()
   if (!isInitialized) {
-    console.log("[DB] Starting database initialization...")
-
-    try {
-      if (db.users.length === 0) {
-        // Pre-populate with sample users
-        db.users = [
-          {
-            id: "user-1",
-            username: "james.martinez",
-            // Password: staff123
-            password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
-            role: "staff",
-            name: "James Martinez",
-            createdAt: "2025-01-15T08:00:00Z",
-            email: "james.martine@waik.demo.care",
-          },
-          {
-            id: "user-2",
-            username: "waik-demo-staff",
-            password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
-            role: "staff",
-            name: "Sarah Johnson",
-            createdAt: "2025-01-15T08:00:00Z",
-            email: "sarah.johnson@demo.waik.care",
-          },
-          {
-            id: "user-3",
-            username: "emily.davis",
-            // Password: staff123
-            password: "$2b$10$pwS0a7m5q8tZmjF3/age9O9vxeV0MBHKNsQIOOT1OxVKaYFH1YtoO",
-            role: "staff",
-            name: "Emily Davis",
-            email: "emily@waik-demo.com",
-            createdAt: "2025-01-15T08:00:00Z",
-          },
-          {
-            id: "user-5",
-            username: "scott.kallstrom",
-            // Password: admin123
-            password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
-            role: "admin",
-            name: "Scott Kallstrom",
-            email: "scott@waik.com",
-            createdAt: "2024-01-15T10:00:00Z",
-          },
-          {
-            id: "user-6",
-            username: "gerard.beaubrun",
-            // Password: admin123
-            password: "$2b$10$SY/3V1MS28E6CuxGHkVe8e.j68IDAGKv5GupVaXaGsJAUTmj/e32S",
-            role: "admin",
-            name: "Gerard Beaubrun",
-            email: "gerard@waik.com",
-            createdAt: "2024-01-15T10:00:00Z",
-          },
-        ]
-
-        console.log("[DB] Users initialized:", db.users.length)
-      }
-
-      if (db.incidents.length === 0) {
-        // Pre-populate with sample incidents
-        db.incidents = [
-          {
-            id: "inc-1",
-            title: "Resident Fall in Room 204",
-            description: "Resident experienced a fall while attempting to get out of bed.",
-            status: "open",
-            priority: "high",
-            sub_type: "fall-bed",
-            residentName: "Margaret Thompson",
-            residentAge: 78,
-            residentGender: "Female",
-            residentRoom: "204",
-            staffId: "user-2",
-            staffName: "Sarah Johnson",
-            createdAt: "2025-01-21T08:15:00Z",
-            updatedAt: "2025-01-21T08:15:00Z",
-            questions: [
-              {
-                id: "q-1",
-                question: "What time did the fall occur?",
-                askedBy: "WAiK Agent",
-                askedAt: "2025-01-21T08:20:00Z",
-                answer: {
-                  text: "The fall occurred at approximately 8:15 AM during morning rounds.",
-                  answeredBy: "Sarah Johnson",
-                  answeredAt: "2025-01-21T09:00:00Z",
-                },
-              },
-              {
-                id: "q-2",
-                question: "Were there any witnesses to the fall?",
-                askedBy: "Admin User",
-                askedAt: "2025-01-21T10:00:00Z",
-                assignedTo: ["user-2"],
-              },
-            ],
-          },
-          {
-            id: "inc-2",
-            title: "Medication Administration Delay",
-            description: "Morning medication was administered 30 minutes late due to staffing constraints.",
-            status: "in-progress",
-            priority: "medium",
-            sub_type: "medication-delay",
-            residentName: "Robert Williams",
-            residentAge: 82,
-            residentGender: "Male",
-            residentRoom: "312",
-            staffId: "user-2",
-            staffName: "Sarah Johnson",
-            createdAt: "2025-01-21T10:00:00Z",
-            updatedAt: "2025-01-21T10:30:00Z",
-            questions: [
-              {
-                id: "q-3",
-                question: "What was the reason for the staffing shortage?",
-                askedBy: "WAiK Agent",
-                askedAt: "2025-01-21T10:15:00Z",
-                answer: {
-                  text: "Two staff members called in sick, and we were unable to find immediate coverage.",
-                  answeredBy: "Sarah Johnson",
-                  answeredAt: "2025-01-21T11:00:00Z",
-                },
-              },
-            ],
-          },
-          {
-            id: "inc-3",
-            title: "Dietary Restriction Not Followed",
-            description: "Resident with lactose intolerance was served a meal containing dairy products.",
-            status: "resolved",
-            priority: "low",
-            sub_type: "dietary-restriction",
-            residentName: "Elizabeth Davis",
-            residentAge: 75,
-            residentGender: "Female",
-            residentRoom: "108",
-            staffId: "user-2",
-            staffName: "Sarah Johnson",
-            createdAt: "2025-01-22T12:00:00Z",
-            updatedAt: "2025-01-22T14:00:00Z",
-            questions: [],
-          },
-        ]
-
-        console.log("[DB] Incidents initialized:", db.incidents.length)
-      }
-
-      saveDb()
-
-      isInitialized = true
-      console.log("[DB] Database initialized successfully")
-      console.log("[DB] Users loaded:", db.users.length)
-      console.log("[DB] Incidents loaded:", db.incidents.length)
-    } catch (error) {
-      console.error("[DB] Initialization failed:", error)
-      throw error
-    }
+    isInitialized = true
   }
 }
 
-initializeDb()
-
-// ============================================================================
-// USER FUNCTIONS
-// ============================================================================
-
-export function getDb(): Database {
-  return db
+const toIsoString = (value?: Date | string | null): string | undefined => {
+  if (!value) return undefined
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
 }
 
-export function getUsers(): User[] {
-  return db.users
+const serializeAnswer = (answer?: any): Answer | undefined => {
+  if (!answer) return undefined
+  return {
+    id: answer.id,
+    questionId: answer.questionId,
+    answerText: answer.answerText,
+    answeredBy: answer.answeredBy,
+    answeredAt: toIsoString(answer.answeredAt) ?? new Date().toISOString(),
+    method: answer.method,
+  }
+}
+
+const serializeQuestion = (question: any): Question => ({
+  id: question.id,
+  incidentId: question.incidentId,
+  questionText: question.questionText,
+  askedBy: question.askedBy,
+  askedByName: question.askedByName,
+  askedAt: toIsoString(question.askedAt) ?? new Date().toISOString(),
+  assignedTo: question.assignedTo?.length ? question.assignedTo : undefined,
+  answer: serializeAnswer(question.answer),
+  source: question.source,
+  generatedBy: question.generatedBy,
+  vectorizedAt: toIsoString(question.vectorizedAt),
+  metadata: question.metadata,
+})
+
+const serializeIncident = (incident: any): Incident => ({
+  id: incident.id,
+  title: incident.title,
+  description: incident.description,
+  status: incident.status,
+  priority: incident.priority,
+  staffId: incident.staffId,
+  staffName: incident.staffName,
+  residentName: incident.residentName,
+  residentRoom: incident.residentRoom,
+  createdAt: toIsoString(incident.createdAt) ?? new Date().toISOString(),
+  updatedAt: toIsoString(incident.updatedAt) ?? new Date().toISOString(),
+  summary: incident.summary ?? null,
+  questions: (incident.questions ?? []).map(serializeQuestion),
+  initialReport: incident.initialReport
+    ? {
+        capturedAt: toIsoString(incident.initialReport.capturedAt) ?? new Date().toISOString(),
+        narrative: incident.initialReport.narrative,
+        residentState: incident.initialReport.residentState,
+        environmentNotes: incident.initialReport.environmentNotes,
+        enhancedNarrative: incident.initialReport.enhancedNarrative,
+        recordedById: incident.initialReport.recordedById,
+        recordedByName: incident.initialReport.recordedByName,
+        recordedByRole: incident.initialReport.recordedByRole,
+      }
+    : undefined,
+  investigation: incident.investigation
+    ? {
+        ...incident.investigation,
+        startedAt: toIsoString(incident.investigation.startedAt),
+        completedAt: toIsoString(incident.investigation.completedAt),
+      }
+    : undefined,
+  humanReport: incident.humanReport
+    ? {
+        ...incident.humanReport,
+        createdAt: toIsoString(incident.humanReport.createdAt) ?? new Date().toISOString(),
+        lastEditedAt: toIsoString(incident.humanReport.lastEditedAt),
+      }
+    : undefined,
+  aiReport: incident.aiReport
+    ? {
+        ...incident.aiReport,
+        generatedAt: toIsoString(incident.aiReport.generatedAt) ?? new Date().toISOString(),
+      }
+    : undefined,
+})
+
+const serializeUser = (user: any): User => ({
+  id: user.id,
+  username: user.username,
+  password: user.password,
+  role: user.role,
+  name: user.name,
+  email: user.email,
+  createdAt: toIsoString(user.createdAt) ?? new Date().toISOString(),
+})
+
+const serializeNotification = (notification: any): IncidentNotification => ({
+  id: notification.id,
+  incidentId: notification.incidentId,
+  type: notification.type,
+  message: notification.message,
+  createdAt: toIsoString(notification.createdAt) ?? new Date().toISOString(),
+  readAt: toIsoString(notification.readAt),
+  targetUserId: notification.targetUserId,
+})
+
+const VOICE_SEED_QUESTIONS: Array<{ key: keyof IncidentInitialReport; prompt: string }> = [
+  { key: "narrative", prompt: "Describe what happened during the incident." },
+  { key: "residentState", prompt: "How is the resident doing right now?" },
+  { key: "environmentNotes", prompt: "Describe the room or environment conditions." },
+]
+
+const toDateOrUndefined = (value?: string | null): Date | undefined => {
+  if (!value) return undefined
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return parsed
+}
+
+const prepareHumanReport = (report?: Incident["humanReport"]) =>
+  report
+    ? {
+        ...report,
+        createdAt: toDateOrUndefined(report.createdAt) ?? new Date(),
+        lastEditedAt: toDateOrUndefined(report.lastEditedAt) ?? undefined,
+      }
+    : undefined
+
+const prepareAIReport = (report?: Incident["aiReport"]) =>
+  report
+    ? {
+        ...report,
+        generatedAt: toDateOrUndefined(report.generatedAt) ?? new Date(),
+      }
+    : undefined
+
+const prepareInvestigation = (investigation?: IncidentInvestigationMetadata) =>
+  investigation
+    ? {
+        ...investigation,
+        startedAt: toDateOrUndefined(investigation.startedAt) ?? undefined,
+        completedAt: toDateOrUndefined(investigation.completedAt) ?? undefined,
+      }
+    : undefined
+
+export async function getUsers(): Promise<User[]> {
+  await ensureDatabase()
+  const users = await UserModel.find({}).lean().exec()
+  return users.map(serializeUser)
+}
+
+export async function getUserById(id: string): Promise<User | null> {
+  await ensureDatabase()
+  const user = await UserModel.findOne({ id }).lean().exec()
+  return user ? serializeUser(user) : null
 }
 
 export async function getUserByCredentials(username: string, password: string): Promise<User | null> {
-  await initializeDb()
+  await ensureDatabase()
+  const user = await UserModel.findOne({ username }).lean().exec()
+  if (!user) return null
 
-  console.log("[v0] Login attempt for username:", username)
-  console.log("[v0] Total users in database:", db.users.length)
+  const isValid = await bcrypt.compare(password, user.password)
+  if (!isValid) return null
 
-  const user = db.users.find((u) => u.username === username)
-  if (!user) {
-    console.log("[v0] User not found:", username)
-    return null
-  }
-
-  console.log("[v0] User found:", user.username, "- Verifying password...")
-
-  try {
-    // Compare password with hashed password
-    const isValid = await bcrypt.compare(password, user.password)
-    console.log("[v0] Password valid:", isValid)
-
-    if (!isValid) return null
-
-    return user
-  } catch (error) {
-    console.error("[v0] Password comparison error:", error)
-    console.log("[v0] Falling back to plain text comparison")
-    if (password === user.password) {
-      return user
-    }
-    return null
-  }
+  return serializeUser(user)
 }
 
-export function getUserById(id: string): User | null {
-  return db.users.find((u) => u.id === id) || null
+export async function getIncidents(): Promise<Incident[]> {
+  await ensureDatabase()
+  const incidents = await IncidentModel.find({}).lean().exec()
+  return incidents.map(serializeIncident)
 }
 
-// ============================================================================
-// INCIDENT FUNCTIONS
-// ============================================================================
-
-export function getIncidents(): Incident[] {
-  return db.incidents
+export async function getIncidentById(id: string): Promise<Incident | null> {
+  await ensureDatabase()
+  const incident = await IncidentModel.findOne({ id }).lean().exec()
+  return incident ? serializeIncident(incident) : null
 }
 
-export function getIncidentById(id: string): Incident | null {
-  return db.incidents.find((i) => i.id === id) || null
-}
-
-export function getIncidentsByStaffId(staffId: string): Incident[] {
-  return db.incidents.filter((incident) => {
-    // Include if staff created the incident
-    if (incident.staffId === staffId) return true
-
-    // Include if staff has any questions assigned to them
-    const hasAssignedQuestions = incident.questions.some((question) => question.assignedTo?.includes(staffId))
-
-    return hasAssignedQuestions
+export async function getIncidentsByStaffId(staffId: string): Promise<Incident[]> {
+  await ensureDatabase()
+  const incidents = await IncidentModel.find({
+    $or: [
+      { staffId },
+      { "questions.assignedTo": staffId },
+      { "questions.metadata.assignedStaffIds": staffId },
+    ],
   })
+    .lean()
+    .exec()
+
+  return incidents.map(serializeIncident)
 }
 
 export async function updateIncident(id: string, updates: Partial<Incident>): Promise<Incident | null> {
-  await initializeDb()
+  await ensureDatabase()
 
-  const index = db.incidents.findIndex((i) => i.id === id)
-  if (index === -1) return null
-
-  db.incidents[index] = {
-    ...db.incidents[index],
+  const preparedUpdates: any = {
     ...updates,
     updatedAt: new Date(),
   }
 
-  saveDb()
+  if (updates.humanReport) {
+    preparedUpdates.humanReport = prepareHumanReport(updates.humanReport)
+  }
 
-  return db.incidents[index]
-}
-
-export async function addIncident(incident: Incident): Promise<Incident> {
-  await initializeDb()
-
-  db.incidents.push(incident)
-
-  saveDb()
-
-  return incident
-}
-
-export async function updateHumanReport(
-  incidentId: string,
-  humanReport: Incident["humanReport"],
-): Promise<Incident | null> {
-  await initializeDb()
-
-  const incident = getIncidentById(incidentId)
-  if (!incident) return null
-
-  incident.humanReport = humanReport
-  incident.updatedAt = new Date().toISOString()
-
-  saveDb()
-
-  return incident
-}
-
-export async function updateAIReport(incidentId: string, aiReport: Incident["aiReport"]): Promise<Incident | null> {
-  await initializeDb()
-
-  const incident = getIncidentById(incidentId)
-  if (!incident) return null
-
-  incident.aiReport = aiReport
-  incident.updatedAt = new Date().toISOString()
-
-  saveDb()
-
-  return incident
-}
+  if (updates.aiReport) {
+    preparedUpdates.aiReport = prepareAIReport(updates.aiReport)
+  }
 
   if (updates.investigation) {
     preparedUpdates.investigation = prepareInvestigation(updates.investigation)
@@ -358,185 +256,439 @@ export async function updateAIReport(incidentId: string, aiReport: Incident["aiR
   return incident ? serializeIncident(incident) : null
 }
 
-export function createIncident(data: {
-  title: string
-  description: string
-  residentName: string
-  roomNumber: string
-  status: Incident["status"]
-  priority: Incident["priority"]
-  reportedBy: string
-  reportedByName: string
-  initialReport?: Incident["initialReport"]
-}): Incident {
-  console.log("[v0] [DB] createIncident called with:", {
-    title: data.title,
-    residentName: data.residentName,
-    roomNumber: data.roomNumber,
-    reportedBy: data.reportedBy,
-    reportedByName: data.reportedByName,
-    hasInitialReport: !!data.initialReport,
-  })
-
-  const id = `inc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  const now = new Date().toISOString()
-
-  const incident: Incident = {
-    id,
-    title: data.title,
-    description: data.description,
-    status: data.status,
-    priority: data.priority,
-    residentName: data.residentName,
-    residentRoom: data.roomNumber,
-    staffId: data.reportedBy,
-    staffName: data.reportedByName,
-    createdAt: now,
-    updatedAt: now,
-    questions: [],
-    initialReport: data.initialReport,
-  }
-
-  db.incidents.push(incident)
-
-  saveDb()
-
-  console.log("[v0] [DB] ✅ Incident added to database")
-  console.log("[v0] [DB] Total incidents in database:", db.incidents.length)
-  console.log("[v0] [DB] Latest incident:", {
-    id: incident.id,
-    title: incident.title,
-    staffName: incident.staffName,
-    hasInitialReport: !!incident.initialReport,
-  })
-
-  return incident
-}
-
-export function addQuestion(
+export async function addQuestionToIncident(
   incidentId: string,
-  data: {
-    question: string
+  input: {
+    questionText: string
     askedBy: string
-    askedByName: string
+    askedByName?: string
     assignedTo?: string[]
-    source?: "ai-generated" | "manual"
+    metadata?: Question["metadata"]
+    source?: Question["source"]
     generatedBy?: string
-    answer?: {
-      text: string
-      answeredBy: string
-      answeredAt?: string
-      method?: "text" | "voice"
-    }
+    answer?: Answer
   },
-): boolean {
-  const incident = getIncidentById(incidentId)
-  if (!incident) {
-    console.log("[v0] [DB] ❌ addQuestion failed - incident not found:", incidentId)
-    return false
-  }
+): Promise<Question | null> {
+  await ensureDatabase()
 
-  const questionId = `q-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  const now = new Date().toISOString()
+  const now = new Date()
+  const questionId = `q-${Date.now()}`
 
-  const question: Incident["questions"][0] = {
+  const questionDoc = {
     id: questionId,
-    question: data.question,
-    askedBy: data.askedBy,
-    askedByName: data.askedByName,
+    incidentId,
+    questionText: input.questionText,
+    askedBy: input.askedBy,
+    askedByName: input.askedByName,
     askedAt: now,
-    assignedTo: data.assignedTo || [],
-    source: data.source,
-    generatedBy: data.generatedBy,
-    answer: data.answer
+    assignedTo: input.assignedTo,
+    metadata: input.metadata,
+    source: input.source ?? "manual",
+    generatedBy: input.generatedBy,
+    answer: input.answer
       ? {
-          text: data.answer.text,
-          answeredBy: data.answer.answeredBy,
-          answeredAt: data.answer.answeredAt || now,
-          method: data.answer.method || "voice",
+          ...input.answer,
+          answeredAt: toDateOrUndefined(input.answer.answeredAt) ?? now,
         }
       : undefined,
   }
 
-  incident.questions.push(question)
-  incident.updatedAt = now
+  const incident = await IncidentModel.findOneAndUpdate(
+    { id: incidentId },
+    {
+      $push: { questions: questionDoc },
+      $set: { updatedAt: now },
+    },
+    { new: true, lean: true },
+  )
 
-  saveDb()
+  const question = incident?.questions?.find((q: any) => q.id === questionId)
+  if (!question) {
+    return null
+  }
 
-  console.log("[v0] [DB] ✅ Question added:", {
-    id: questionId,
-    hasAnswer: !!data.answer,
-    question: data.question.substring(0, 50) + "...",
-  })
+  if (isOpenAIConfigured()) {
+    getQuestionEmbedding(
+      incidentId,
+      question.id,
+      question.questionText,
+      question.askedBy,
+      toIsoString(question.askedAt) ?? now.toISOString(),
+      question.answer
+        ? {
+            id: question.answer.id,
+            text: question.answer.answerText,
+            answeredBy: question.answer.answeredBy,
+            answeredAt: toIsoString(question.answer.answeredAt) ?? now.toISOString(),
+          }
+        : undefined,
+      {
+        assignedTo: question.assignedTo,
+        reporterId: incident?.staffId,
+        reporterName: incident?.staffName,
+        reporterRole: incident?.questions?.[0]?.metadata?.reporterRole,
+        source: question.source,
+        generatedBy: question.generatedBy,
+      },
+    ).catch((error) => {
+      console.error("[DB] Failed to vectorize question", question.id, error)
+    })
+  }
 
-  return true
-}
-
-export async function addQuestionToIncident(incidentId: string, question: Incident["questions"][0]): Promise<boolean> {
-  await initializeDb()
-
-  const incident = getIncidentById(incidentId)
-  if (!incident) return false
-
-  incident.questions.push(question)
-  incident.updatedAt = new Date().toISOString()
-
-  saveDb()
-
-  return true
+  return serializeQuestion(question)
 }
 
 export async function answerQuestion(
   incidentId: string,
   questionId: string,
-  answer: Incident["questions"][0]["answer"],
-): Promise<boolean> {
-  await initializeDb()
-
-  const incident = getIncidentById(incidentId)
-  if (!incident) return false
+  answer: Answer,
+): Promise<Question | null> {
+  await ensureDatabase()
 
   const answeredAt = toDateOrUndefined(answer.answeredAt) ?? new Date()
 
-  question.answer = answer
-  incident.updatedAt = new Date().toISOString()
+  const incident = await IncidentModel.findOneAndUpdate(
+    { id: incidentId, "questions.id": questionId },
+    {
+      $set: {
+        "questions.$.answer": {
+          ...answer,
+          answeredAt,
+        },
+        "questions.$.vectorizedAt": answeredAt,
+        updatedAt: new Date(),
+      },
+    },
+    { new: true, lean: true },
+  )
 
-  saveDb()
-
-  return true
-}
-
-export async function deleteQuestion(incidentId: string, questionId: string): Promise<boolean> {
-  await initializeDb()
-
-  const incident = getIncidentById(incidentId)
-  if (!incident) return false
-
-  const questionIndex = incident.questions.findIndex((q) => q.id === questionId)
-  if (questionIndex === -1) return false
-
-  // Only allow deleting unanswered questions
-  if (incident.questions[questionIndex].answer) {
-    console.log("[DB] Cannot delete answered question")
-    return false
+  const question = incident?.questions?.find((q: any) => q.id === questionId)
+  if (!question) {
+    return null
   }
 
-  incident.questions.splice(questionIndex, 1)
-  incident.updatedAt = new Date().toISOString()
+  if (isOpenAIConfigured()) {
+    getQuestionEmbedding(
+      incidentId,
+      questionId,
+      question.questionText,
+      question.askedBy,
+      toIsoString(question.askedAt) ?? answeredAt.toISOString(),
+      {
+        id: question.answer.id,
+        text: question.answer.answerText,
+        answeredBy: question.answer.answeredBy,
+        answeredAt: toIsoString(question.answer.answeredAt) ?? answeredAt.toISOString(),
+      },
+      {
+        assignedTo: question.assignedTo,
+        reporterId: incident?.staffId,
+        reporterName: incident?.staffName,
+        reporterRole: incident?.questions?.[0]?.metadata?.reporterRole,
+        source: question.source,
+        generatedBy: question.generatedBy,
+      },
+    ).catch((error) => {
+      console.error("[DB] Auto-vectorization failed (non-critical):", error)
+    })
+  }
 
-  saveDb()
-
-  return true
+  return serializeQuestion(question)
 }
 
 export async function deleteQuestion(incidentId: string, questionId: string): Promise<boolean> {
   await ensureDatabase()
 
-/**
- * Force a refresh (no-op for in-memory database)
- */
-export async function refreshDb(): Promise<void> {
-  console.log("[DB] In-memory database (no refresh needed)")
+  const incident = await IncidentModel.findOne({ id: incidentId }).lean().exec()
+  if (!incident) {
+    return false
+  }
+
+  const question = incident.questions?.find((q: any) => q.id === questionId)
+  if (!question || question.answer) {
+    return false
+  }
+
+  const result = await IncidentModel.updateOne(
+    { id: incidentId },
+    {
+      $pull: { questions: { id: questionId } },
+      $set: { updatedAt: new Date() },
+    },
+  )
+
+  return result.modifiedCount > 0
+}
+
+interface CreateIncidentFromReportInput {
+  title?: string
+  narrative: string
+  residentName: string
+  residentRoom: string
+  residentState?: string
+  environmentNotes?: string
+  reportedById: string
+  reportedByName: string
+  reportedByRole: UserRole
+  priority?: "low" | "medium" | "high" | "urgent"
+  enhancedNarrative?: string
+}
+
+export async function createIncidentFromReport(input: CreateIncidentFromReportInput): Promise<Incident> {
+  await ensureDatabase()
+
+  const now = new Date()
+  const incidentId = `inc-${Date.now()}`
+
+  const initialReport: IncidentInitialReport = {
+    capturedAt: now.toISOString(),
+    narrative: input.narrative,
+    residentState: input.residentState,
+    environmentNotes: input.environmentNotes,
+    enhancedNarrative: input.enhancedNarrative,
+    recordedById: input.reportedById,
+    recordedByName: input.reportedByName,
+    recordedByRole: input.reportedByRole,
+  }
+
+  const baseQuestionProps = {
+    reporterId: input.reportedById,
+    reporterName: input.reportedByName,
+    reporterRole: input.reportedByRole,
+  }
+
+  const seedQuestions = VOICE_SEED_QUESTIONS.flatMap((seed, index) => {
+    const value = (initialReport as any)[seed.key]
+    if (!value) return []
+
+    const questionId = `q-${Date.now()}-${index}`
+    const answerId = `a-${Date.now()}-${index}`
+
+    return [
+      {
+        id: questionId,
+        incidentId,
+        questionText: seed.prompt,
+        askedBy: input.reportedById,
+        askedByName: input.reportedByName,
+        askedAt: now,
+        source: "voice-report" as Question["source"],
+        generatedBy: "reporter-agent",
+        metadata: {
+          ...baseQuestionProps,
+          createdVia: "voice" as const,
+        },
+        answer: {
+          id: answerId,
+          questionId,
+          answerText: value,
+          answeredBy: input.reportedById,
+          answeredAt: now,
+          method: "voice" as const,
+        },
+      },
+    ]
+  })
+
+  const incidentDoc = await IncidentModel.create({
+    id: incidentId,
+    title: input.title || `${input.residentName} Incident`,
+    description: input.narrative || "Incident reported via voice agent.",
+    status: "open",
+    priority: input.priority || "medium",
+    staffId: input.reportedById,
+    staffName: input.reportedByName,
+    residentName: input.residentName,
+    residentRoom: input.residentRoom,
+    createdAt: now,
+    updatedAt: now,
+    questions: seedQuestions,
+    initialReport: {
+      ...initialReport,
+      capturedAt: now,
+    },
+    investigation: {
+      status: "not-started",
+    },
+  })
+
+  const incident = serializeIncident(incidentDoc.toJSON())
+
+  if (isOpenAIConfigured()) {
+    Promise.all(
+      incident.questions.map((question) =>
+        getQuestionEmbedding(
+          incident.id,
+          question.id,
+          question.questionText,
+          question.askedBy,
+          question.askedAt,
+          question.answer
+            ? {
+                id: question.answer.id,
+                text: question.answer.answerText,
+                answeredBy: question.answer.answeredBy,
+                answeredAt: question.answer.answeredAt,
+              }
+            : undefined,
+          {
+            assignedTo: question.assignedTo,
+            reporterId: incident.staffId,
+            reporterName: incident.staffName,
+            reporterRole: input.reportedByRole,
+            source: question.source,
+            generatedBy: question.generatedBy,
+          },
+        ).catch((error) => {
+          console.error("[DB] Failed to vectorize seed question", question.id, error)
+        }),
+      ),
+    ).catch((error) => console.error("[DB] Seed vectorization batch failed", error))
+  }
+
+  return incident
+}
+
+interface QueueInvestigationQuestionsInput {
+  incidentId: string
+  questions: Array<{ questionText: string; assignedTo?: string[] }>
+  generatedBy?: string
+  askedById?: string
+  askedByName?: string
+}
+
+export async function queueInvestigationQuestions(
+  input: QueueInvestigationQuestionsInput,
+): Promise<Question[]> {
+  await ensureDatabase()
+
+  const incident = await IncidentModel.findOne({ id: input.incidentId }).lean().exec()
+  if (!incident) {
+    throw new Error(`Incident ${input.incidentId} not found`)
+  }
+
+  const reporterRole = incident.investigation?.reporterRole ?? (await getUserById(incident.staffId))?.role ?? "staff"
+  const timestamp = new Date()
+  const generatedBy = input.generatedBy || "investigation-agent"
+  const askedBy = input.askedById || "investigation-agent"
+
+  const newQuestions = input.questions.map((item, index) => {
+    const questionId = `q-${Date.now()}-${index}`
+    return {
+      id: questionId,
+      incidentId: incident.id,
+      questionText: item.questionText,
+      askedBy,
+      askedByName: input.askedByName,
+      askedAt: timestamp,
+      assignedTo: item.assignedTo,
+      source: "ai-generated" as const,
+      generatedBy,
+      metadata: {
+        reporterId: incident.staffId,
+        reporterName: incident.staffName,
+        reporterRole,
+        assignedStaffIds: item.assignedTo,
+        createdVia: "system" as const,
+      },
+    }
+  })
+
+  await IncidentModel.updateOne(
+    { id: input.incidentId },
+    {
+      $push: { questions: { $each: newQuestions } },
+      $set: {
+        updatedAt: timestamp,
+        investigation: {
+          ...(incident.investigation ?? {}),
+          status: "in-progress",
+          startedAt: incident.investigation?.startedAt ?? timestamp,
+        },
+      },
+    },
+  )
+
+  if (isOpenAIConfigured()) {
+    Promise.all(
+      newQuestions.map((question) =>
+        getQuestionEmbedding(
+          incident.id,
+          question.id,
+          question.questionText,
+          question.askedBy,
+          timestamp.toISOString(),
+          undefined,
+          {
+            assignedTo: question.assignedTo,
+            reporterId: incident.staffId,
+            reporterName: incident.staffName,
+            reporterRole,
+            source: question.source,
+            generatedBy: question.generatedBy,
+          },
+        )
+          .then(() => {
+            question.vectorizedAt = new Date().toISOString()
+          })
+          .catch((error) => console.error("[DB] Failed to vectorize queued question", question.id, error)),
+      ),
+    ).catch((error) => console.error("[DB] Queue vectorization batch failed", error))
+  }
+
+  return newQuestions.map(serializeQuestion)
+}
+
+export async function markInvestigationComplete(
+  incidentId: string,
+  updates: Partial<Omit<IncidentInvestigationMetadata, "status">> = {},
+): Promise<Incident | null> {
+  await ensureDatabase()
+
+  const incident = await IncidentModel.findOneAndUpdate(
+    { id: incidentId },
+    {
+      $set: {
+        investigation: {
+          ...(updates ?? {}),
+          status: "completed" as InvestigationStatus,
+          completedAt: toDateOrUndefined(updates.completedAt) ?? new Date(),
+        },
+        updatedAt: new Date(),
+      },
+    },
+    { new: true, lean: true },
+  )
+
+  return incident ? serializeIncident(incident) : null
+}
+
+type CreateNotificationInput = Omit<IncidentNotification, "id" | "createdAt" | "readAt"> & { id?: string }
+
+export async function createNotification(input: CreateNotificationInput): Promise<IncidentNotification> {
+  await ensureDatabase()
+
+  const notification = await NotificationModel.create({
+    id: input.id || `notif-${Date.now()}`,
+    incidentId: input.incidentId,
+    type: input.type,
+    message: input.message,
+    createdAt: new Date(),
+    targetUserId: input.targetUserId,
+  })
+
+  return serializeNotification(notification.toJSON())
+}
+
+export async function getNotificationsForUser(userId: string): Promise<IncidentNotification[]> {
+  await ensureDatabase()
+  const notifications = await NotificationModel.find({ targetUserId: userId }).lean().exec()
+  return notifications.map(serializeNotification)
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  await ensureDatabase()
+  await NotificationModel.updateOne({ id: notificationId }, { $set: { readAt: new Date() } })
 }
 
 export async function hashPassword(password: string): Promise<string> {

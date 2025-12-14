@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/lib/auth-store"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Mic, MicOff, ArrowRight, Loader2, CheckCircle2, Volume2, VolumeX, Plus } from "lucide-react"
 import { toast } from "sonner"
+import { useSpeechSynthesis } from "@/lib/hooks/useSpeechSynthesis"
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 
@@ -57,13 +58,49 @@ const VOICE_PROMPTS: VoicePrompt[] = [
   },
 ]
 
+type DictationField = Exclude<VoicePrompt["field"], null>
+
+const mergeTranscript = (base: string, addition: string) => {
+  const normalizedBase = base ?? ""
+  const normalizedAddition = (addition ?? "").replace(/\s+/g, " ").trim()
+
+  if (!normalizedAddition) {
+    return normalizedBase
+  }
+
+  if (!normalizedBase) {
+    return normalizedAddition
+  }
+
+  const needsSpace =
+    !normalizedBase.endsWith(" ") &&
+    !normalizedAddition.startsWith(" ") &&
+    !",.!?:;".includes(normalizedAddition[0] ?? "")
+
+  const combined = `${normalizedBase}${needsSpace ? " " : ""}${normalizedAddition}`
+
+  return combined.replace(/\s{2,}/g, " ").trimStart()
+}
+
+const extractTranscriptDelta = (full: string, baseline: string) => {
+  const source = full ?? ""
+  const reference = baseline ?? ""
+  let index = 0
+  const max = Math.min(source.length, reference.length)
+
+  while (index < max && source[index] === reference[index]) {
+    index += 1
+  }
+
+  return source.slice(index)
+}
+
 export default function CreateIncidentPage() {
   const router = useRouter()
   const { userId, role, name } = useAuthStore()
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const [autoSpeak, setAutoSpeak] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [residentName, setResidentName] = useState("")
   const [roomNumber, setRoomNumber] = useState("")
@@ -71,14 +108,27 @@ export default function CreateIncidentPage() {
   const [residentState, setResidentState] = useState("")
   const [environmentNotes, setEnvironmentNotes] = useState("")
   const [canAddMore, setCanAddMore] = useState(false)
-  const [voicesLoaded, setVoicesLoaded] = useState(false)
   const recognitionRef = useRef<any>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const dictationFinalRef = useRef<Record<DictationField, string>>({
+    residentName: "",
+    roomNumber: "",
+    narrative: "",
+    residentState: "",
+    environmentNotes: "",
+  })
+  const isMobileDictationRef = useRef(false)
+  const hasSpokenInitialPromptRef = useRef(false)
+  const {
+    speak: speakTTS,
+    stopSpeaking: stopTTS,
+    autoSpeak,
+    setAutoSpeak,
+    speechSupported,
+    voicesLoaded,
+  } = useSpeechSynthesis("en")
 
   const handleNext = () => {
-    window.speechSynthesis.cancel()
-    setIsSpeaking(false)
-
     if (currentStep === 5) {
       handleSubmit()
       return
@@ -88,34 +138,16 @@ export default function CreateIncidentPage() {
       const nextStep = (currentStep + 1) as Step
       setCurrentStep(nextStep)
 
-      // Speak the prompt for the NEXT step after a short delay
+      // Speak the prompt for the NEXT step, not the current one
       if (autoSpeak && nextStep < 6) {
-        setTimeout(() => {
-          speakPrompt(VOICE_PROMPTS[nextStep - 1].question)
-        }, 300)
+        speakPrompt(VOICE_PROMPTS[nextStep - 1].question)
       }
     }
   }
 
   useEffect(() => {
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices()
-      console.log("[v0] Speech synthesis voices loaded:", voices.length)
-      if (voices.length > 0) {
-        setVoicesLoaded(true)
-        return true
-      }
-      return false
-    }
-
-    if (!loadVoices()) {
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.onvoiceschanged = loadVoices
-      }
-    }
-
     // Initialize speech recognition
-    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+    if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
       recognitionRef.current = new SpeechRecognition()
       recognitionRef.current.continuous = false
@@ -124,70 +156,51 @@ export default function CreateIncidentPage() {
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
-      }
-      window.speechSynthesis.cancel()
+      recognitionRef.current?.stop()
+      stopTTS()
     }
-  }, [])
+  }, [stopTTS])
+
+useEffect(() => {
+  if (typeof navigator !== "undefined") {
+    const ua = navigator.userAgent || navigator.vendor || (window as any).opera || ""
+    isMobileDictationRef.current = /android|avantgo|blackberry|iemobile|ipad|iphone|ipod|kindle|midp|phone|pocket|psp|symbian|up\.browser|up\.link|windows ce|windows phone|xda|xiino/i.test(
+      ua,
+    )
+  }
+}, [])
 
   useEffect(() => {
-    if (voicesLoaded && autoSpeak && currentStep === 1) {
-      const timer = setTimeout(() => {
-        speakPrompt(VOICE_PROMPTS[0].question)
-      }, 800)
-      return () => clearTimeout(timer)
+    if (!speechSupported && autoSpeak) {
+      setAutoSpeak(false)
+      toast.warning("Speech synthesis is not available in this browser. Prompts will be displayed as text only.")
     }
-  }, [voicesLoaded, autoSpeak, currentStep])
+  }, [speechSupported, autoSpeak])
+
+  useEffect(() => {
+    if (voicesLoaded && autoSpeak && !hasSpokenInitialPromptRef.current) {
+      speakPrompt(VOICE_PROMPTS[0].question)
+      hasSpokenInitialPromptRef.current = true
+    }
+  }, [voicesLoaded, autoSpeak])
 
   const speakPrompt = (text: string) => {
-    if (!autoSpeak || !voicesLoaded) {
-      console.log("[v0] Cannot speak - autoSpeak disabled or voices not loaded")
-      return
+    if (!autoSpeak) return
+    if (!speechSupported) return
+
+    const success = speakTTS(text, {
+      rate: 0.9,
+      onstart: () => setIsSpeaking(true),
+      onend: () => setIsSpeaking(false),
+    })
+
+    if (!success) {
+      toast.error("Unable to play the prompt audio.")
     }
-
-    window.speechSynthesis.cancel()
-    setIsSpeaking(false)
-
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 0.9
-      utterance.pitch = 1
-      utterance.volume = 1
-
-      const voices = window.speechSynthesis.getVoices()
-      if (voices.length > 0) {
-        const englishVoice = voices.find((v) => v.lang.startsWith("en"))
-        if (englishVoice) {
-          utterance.voice = englishVoice
-          console.log("[v0] Selected voice:", englishVoice.name)
-        }
-      } else {
-        console.log("[v0] Warning: No voices available")
-      }
-
-      utterance.onstart = () => {
-        setIsSpeaking(true)
-      }
-      utterance.onend = () => {
-        setIsSpeaking(false)
-      }
-      utterance.onerror = (event) => {
-        if (event.error !== "canceled") {
-          console.error("[v0] Speech error:", event.error)
-          if (event.error === "not-allowed") {
-            toast.error("Please enable audio permissions in your browser")
-          }
-        }
-        setIsSpeaking(false)
-      }
-
-      window.speechSynthesis.speak(utterance)
-    }, 200)
   }
 
   const stopSpeaking = () => {
-    window.speechSynthesis.cancel()
+    stopTTS()
     setIsSpeaking(false)
   }
 
@@ -198,6 +211,10 @@ export default function CreateIncidentPage() {
     }
 
     const currentPrompt = VOICE_PROMPTS[currentStep - 1]
+
+    if (currentPrompt.field) {
+      dictationFinalRef.current[currentPrompt.field] = getCurrentValue()
+    }
 
     if (
       currentPrompt.field === "narrative" ||
@@ -215,22 +232,64 @@ export default function CreateIncidentPage() {
     setCanAddMore(false)
 
     recognitionRef.current.onresult = (event: any) => {
-      let transcript = ""
+      if (!currentPrompt.field) return
 
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript
+      if (!isMobileDictationRef.current) {
+        let transcript = ""
+        const startIndex = typeof event.resultIndex === "number" ? event.resultIndex : 0
+        for (let i = startIndex; i < event.results.length; i++) {
+          const result = event.results[i]
+          const phrase = result?.[0]?.transcript ?? ""
+          if (!phrase) continue
+          transcript += phrase
+          if (result.isFinal) {
+            dictationFinalRef.current[currentPrompt.field] = phrase.trim()
+          }
+        }
+
+        const normalized = transcript.trim()
+        const lastResult = event.results?.[event.results.length - 1]
+        updateFieldValue(currentPrompt.field, () => normalized, { final: !!lastResult?.isFinal })
+        if (lastResult?.isFinal) {
+          dictationFinalRef.current[currentPrompt.field] = normalized
+        }
+        return
       }
 
-      if (currentPrompt.field === "residentName") {
-        setResidentName(transcript)
-      } else if (currentPrompt.field === "roomNumber") {
-        setRoomNumber(transcript)
-      } else if (currentPrompt.field === "narrative") {
-        setNarrative(transcript)
-      } else if (currentPrompt.field === "residentState") {
-        setResidentState(transcript)
-      } else if (currentPrompt.field === "environmentNotes") {
-        setEnvironmentNotes(transcript)
+      let committedValue = dictationFinalRef.current[currentPrompt.field] ?? ""
+      let interimDelta = ""
+
+      const startIndex = typeof event.resultIndex === "number" ? event.resultIndex : 0
+
+      for (let i = startIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        const phrase = result?.[0]?.transcript ?? ""
+        if (!phrase) continue
+
+        if (result.isFinal) {
+          const normalizedCommitted = committedValue.trim()
+          const normalizedPhrase = phrase.trim()
+
+          if (normalizedCommitted && !normalizedPhrase.startsWith(normalizedCommitted)) {
+            committedValue = normalizedPhrase
+          } else {
+            const delta = extractTranscriptDelta(phrase, committedValue)
+            committedValue = mergeTranscript(committedValue, delta)
+          }
+
+          interimDelta = ""
+        } else {
+          interimDelta = extractTranscriptDelta(phrase, committedValue)
+        }
+      }
+
+      dictationFinalRef.current[currentPrompt.field] = committedValue
+
+      if (interimDelta) {
+        const preview = mergeTranscript(committedValue, interimDelta)
+        updateFieldValue(currentPrompt.field, () => preview, { final: false })
+      } else {
+        updateFieldValue(currentPrompt.field, () => committedValue, { final: true })
       }
     }
 
@@ -285,6 +344,7 @@ export default function CreateIncidentPage() {
     setIsProcessing(true)
     setCurrentStep(6)
 
+    // Speak the final prompt
     if (autoSpeak) {
       speakPrompt(VOICE_PROMPTS[5].question)
     }
@@ -309,27 +369,109 @@ export default function CreateIncidentPage() {
         }),
       })
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         throw new Error("Failed to create incident")
       }
 
-      const data = await response.json()
-      console.log("[v0] Incident created successfully:", data)
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+      let createdIncidentId: string | null = null
+      let redirectScheduled = false
+      const warningMessages = new Set<string>()
 
-      setIsProcessing(false)
+      const scheduleRedirectOnce = (incidentId: string) => {
+        createdIncidentId = incidentId
+        if (redirectScheduled) return
+        redirectScheduled = true
 
-      toast.success("Incident reported successfully!")
+        setIsProcessing(false)
+        toast.success("Incident reported successfully!")
 
-      setTimeout(() => {
-        console.log("[v0] Redirecting to dashboard for role:", role)
-        if (role === "admin") {
-          console.log("[v0] Redirecting to /admin/dashboard")
-          router.push("/admin/dashboard")
-        } else {
-          console.log("[v0] Redirecting to /staff/dashboard")
-          router.push("/staff/dashboard")
+        setTimeout(() => {
+          console.log("[v0] Redirecting to dashboard for role:", role)
+          if (role === "admin") {
+            router.push("/admin/dashboard")
+          } else {
+            router.push("/staff/dashboard")
+          }
+        }, 2000)
+      }
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        let newlineIndex
+        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim()
+          buffer = buffer.slice(newlineIndex + 1)
+          if (!line) continue
+
+          try {
+            const event = JSON.parse(line)
+            console.log("[v0] Reporter agent event:", event)
+
+            if (event.type === "error") {
+              if (event.node === "report_agent") {
+                throw new Error(event.error || "Reporter agent error")
+              } else {
+                console.warn(`[v0] Reporter agent warning from ${event.node}: ${event.error}`)
+                const warningMessage = event.error || `Reporter agent warning from ${event.node}`
+                if (!warningMessages.has(warningMessage)) {
+                  toast.warning(warningMessage)
+                  warningMessages.add(warningMessage)
+                }
+                continue
+              }
+            }
+
+            if (event.type === "incident_created") {
+              scheduleRedirectOnce(event.incidentId)
+              continue
+            }
+
+            if (event.type === "complete") {
+              if (event.incidentId) {
+                scheduleRedirectOnce(event.incidentId)
+              }
+              continue
+            }
+          } catch (parseError) {
+            console.error("[v0] Failed to parse reporter agent event", parseError)
+          }
         }
-      }, 2000)
+      }
+
+      if (!createdIncidentId && buffer.trim().length > 0) {
+        try {
+          const event = JSON.parse(buffer)
+          if (event.type === "incident_created" || event.type === "complete") {
+            scheduleRedirectOnce(event.incidentId)
+          } else if (event.type === "error") {
+            if (event.node === "report_agent") {
+              throw new Error(event.error || "Reporter agent error")
+            } else {
+              console.warn(`[v0] Reporter agent warning from ${event.node}: ${event.error}`)
+              const warningMessage = event.error || `Reporter agent warning from ${event.node}`
+              if (!warningMessages.has(warningMessage)) {
+                toast.warning(warningMessage)
+                warningMessages.add(warningMessage)
+              }
+            }
+          }
+        } catch (parseError) {
+          console.error("[v0] Failed to parse trailing reporter agent event", parseError)
+        }
+      }
+
+      if (!createdIncidentId) {
+        throw new Error("Reporter agent did not return an incident ID")
+      }
+
+      console.log("[v0] Incident created successfully:", createdIncidentId)
+
     } catch (error) {
       console.error("[v0] Error creating incident:", error)
       toast.error("Failed to create incident. Please try again.")
@@ -348,13 +490,48 @@ export default function CreateIncidentPage() {
     return ""
   }
 
+  const updateFieldValue = (
+    field: DictationField,
+    updater: (prev: string) => string,
+    options: { final?: boolean } = {},
+  ) => {
+    const { final = true } = options
+
+    const applySetter = (setter: Dispatch<SetStateAction<string>>) => {
+      setter((prev) => {
+        const nextValue = updater(prev)
+        if (final) {
+          dictationFinalRef.current[field] = nextValue
+        }
+        return nextValue
+      })
+    }
+
+    switch (field) {
+      case "residentName":
+        applySetter(setResidentName)
+        break
+      case "roomNumber":
+        applySetter(setRoomNumber)
+        break
+      case "narrative":
+        applySetter(setNarrative)
+        break
+      case "residentState":
+        applySetter(setResidentState)
+        break
+      case "environmentNotes":
+        applySetter(setEnvironmentNotes)
+        break
+      default:
+        break
+    }
+  }
+
   const setCurrentValue = (value: string) => {
     const currentPrompt = VOICE_PROMPTS[currentStep - 1]
-    if (currentPrompt.field === "residentName") setResidentName(value)
-    else if (currentPrompt.field === "roomNumber") setRoomNumber(value)
-    else if (currentPrompt.field === "narrative") setNarrative(value)
-    else if (currentPrompt.field === "residentState") setResidentState(value)
-    else if (currentPrompt.field === "environmentNotes") setEnvironmentNotes(value)
+    if (!currentPrompt.field) return
+    updateFieldValue(currentPrompt.field, () => value, { final: true })
   }
 
   const currentPrompt = VOICE_PROMPTS[currentStep - 1]

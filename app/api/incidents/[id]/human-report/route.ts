@@ -100,3 +100,4 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ error: "Failed to delete human report" }, { status: 500 })
   }
 }
+

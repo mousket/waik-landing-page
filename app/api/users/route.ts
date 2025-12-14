@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
     console.log("[v0] Users API called with role filter:", role)
 
-    const users = getUsers()
+    const users = await getUsers()  // ✅ Now async
     console.log("[v0] Total users found:", users.length)
 
     // Filter by role if specified

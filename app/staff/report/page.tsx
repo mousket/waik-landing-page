@@ -187,298 +187,85 @@ export default function StaffReportPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [awaitingAnswer, setAwaitingAnswer] = useState(false)
   const [isListening, setIsListening] = useState(false)
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
-  const [transcript, setTranscript] = useState("")
-  const [answers, setAnswers] = useState<string[]>([])
-  const [isComplete, setIsComplete] = useState(false)
-  const [isExiting, setIsExiting] = useState(false)
-  const [browserSupport, setBrowserSupport] = useState(true)
-  const [voicesLoaded, setVoicesLoaded] = useState(false)
-  const [conversationStarted, setConversationStarted] = useState(false)
+  const [pendingListen, setPendingListen] = useState(false)
+  const [showDetailedReport, setShowDetailedReport] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({
+    strengths: true,
+    gaps: true,
+    narrative: false,
+  })
+  const [initialNarrative, setInitialNarrative] = useState("")
 
-  const recognitionRef = useRef<any>(null)
-  const synthRef = useRef<SpeechSynthesis | null>(null)
-  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const preAnswersRef = useRef<Record<string, string>>({})
+  const askedQuestionIdsRef = useRef<Set<string>>(new Set())
+  const introHasRunRef = useRef(false)
+  const firstName = useMemo(() => (name ? name.split(" ")[0] : "there"), [name])
 
   const { speak, stopSpeaking, isSpeaking, autoSpeak, setAutoSpeak, speechSupported, voicesLoaded } =
     useSpeechSynthesis()
 
-      const loadVoices = () => {
-        const voices = window.speechSynthesis.getVoices()
-        console.log("[v0] Speech synthesis voices loaded:", voices.length)
-        console.log("[v0] Available voices:", voices.map((v) => `${v.name} (${v.lang})`).join(", "))
-
-        if (voices.length > 0) {
-          // Try to find Samantha first
-          const samanthaVoice = voices.find((v) => v.name.includes("Samantha"))
-          // Then try default English voice
-          const defaultEnglishVoice = voices.find((v) => v.lang.startsWith("en") && v.default)
-          // Then any English voice
-          const anyEnglishVoice = voices.find((v) => v.lang.startsWith("en"))
-
-          selectedVoiceRef.current = samanthaVoice || defaultEnglishVoice || anyEnglishVoice || voices[0]
-
-          console.log("[v0] Selected voice:", selectedVoiceRef.current?.name, "Lang:", selectedVoiceRef.current?.lang)
-          setVoicesLoaded(true)
-          return true
-        }
-        return false
-      }
-
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel()
-        synthRef.current = window.speechSynthesis
-      }
-
-      // Try immediate load
-      if (!loadVoices()) {
-        // Wait for voices to load
-        window.speechSynthesis.onvoiceschanged = () => {
-          console.log("[v0] Voices changed event fired")
-          loadVoices()
-        }
-
-        setTimeout(() => {
-          const testUtterance = new SpeechSynthesisUtterance(" ")
-          window.speechSynthesis.speak(testUtterance)
-          window.speechSynthesis.cancel()
-
-          // Try loading again after forcing
-          setTimeout(() => {
-            if (!voicesLoaded) {
-              loadVoices()
-            }
-          }, 100)
-        }, 100)
-      }
-
-      // Initialize Speech Recognition
-      recognitionRef.current = new SpeechRecognition()
-      recognitionRef.current.continuous = false
-      recognitionRef.current.interimResults = false
-      recognitionRef.current.lang = "en-US"
-
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript
-        console.log("[v0] Speech recognized:", transcript)
-        setTranscript(transcript)
-        handleUserResponse(transcript)
-      }
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.log("[v0] Speech recognition error:", event.error)
-        setIsListening(false)
-      }
-
-      recognitionRef.current.onend = () => {
-        console.log("[v0] Speech recognition ended")
-        setIsListening(false)
-      }
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
-      }
-      if (synthRef.current) {
-        synthRef.current.cancel()
-      }
-    }
+  const toggleSection = useCallback((section: keyof typeof expandedSections) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
   }, [])
 
+  const quickCritique = useMemo(() => {
+    if (!reportCard) return null
+    return buildQuickCritique(reportCard)
+  }, [reportCard])
+
+  const formatQuestionForConversation = useCallback(
+    (questionText: string) => {
+      const trimmed = questionText.trim()
+      const askedCount = askedQuestionIdsRef.current.size
+      const friendlyName = firstName || "there"
+      const prefix = askedCount === 0 ? `First question, ${friendlyName}:` : `Next question, ${friendlyName}:`
+      return `${prefix} ${trimmed}`
+    },
+    [firstName],
+  )
+
+  const handleFinish = useCallback(() => {
+    const destination = role === "admin" ? "/admin/dashboard" : "/staff/dashboard"
+    router.push(destination)
+  }, [role, router])
+
+function buildSubtypeCoachingMessage(
+  subtypeLabel: string | undefined,
+  nurseName: string,
+  residentName: string,
+): string | null {
+  if (!subtypeLabel) return null
+  const residentDisplay = residentName === "Unknown Resident" ? "the resident" : residentName
+  const nurseDisplay = nurseName || "there"
+
+  const templates: Record<string, string> = {
+    "bed-related fall":
+      `${nurseDisplay}, it sounds like ${residentDisplay} experienced a bed-related fall. Could you share the bed height, rail position, and what they were doing just before they slipped?`,
+    "wheelchair fall":
+      `${nurseDisplay}, I’m reading this as a wheelchair fall for ${residentDisplay}. Tell me more about the chair setup—brakes, cushions, footrests—and how they lost balance.`,
+    "slip or trip":
+      `${nurseDisplay}, this looks like a slip or trip for ${residentDisplay}. Please walk me through the floor condition, footwear, and anything on the ground that contributed.`,
+    "lift or transfer incident":
+      `${nurseDisplay}, I see ${residentDisplay} may have fallen during a lift or transfer. I’ll need more detail about the equipment and hand-off—how did they lose support from staff?`,
+  }
+
+  return templates[subtypeLabel] ?? null
+}
+
   useEffect(() => {
-    if (voicesLoaded && !conversationStarted && currentQuestionIndex === 0 && !isPaused) {
-      console.log("[v0] Voices ready, auto-starting conversation in 1.5 seconds")
-      setConversationStarted(true)
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
-      setTimeout(() => {
-        console.log("[v0] Starting initial question")
-        speakQuestion(0)
-      }, 1500)
-    }
-  }, [voicesLoaded, conversationStarted, currentQuestionIndex, isPaused])
+  const prePrompts = useMemo(() => buildPrePrompts(firstName), [firstName])
 
-  const speakQuestion = (questionIndex: number) => {
-    if (!synthRef.current) {
-      console.log("[v0] ❌ Cannot speak - synthRef not initialized")
-      return
-    }
-
-    if (isPaused) {
-      console.log("[v0] ❌ Cannot speak - paused")
-      return
-    }
-
-    if (!voicesLoaded) {
-      console.log("[v0] ❌ Cannot speak - voices not loaded")
-      return
-    }
-
-    const question = conversationScript[questionIndex]
-    console.log("[v0] 🎤 Preparing to speak question", questionIndex, ":", question.question.substring(0, 50) + "...")
-
-    // Cancel any ongoing speech
-    if (synthRef.current.speaking) {
-      console.log("[v0] ⚠️ Already speaking, canceling...")
-      synthRef.current.cancel()
-      // Wait a bit after canceling
-      setTimeout(() => speakQuestion(questionIndex), 200)
-      return
-    }
-
-    const utterance = new SpeechSynthesisUtterance(question.question)
-
-    // Set voice
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current
-      console.log("[v0] 🔊 Using voice:", selectedVoiceRef.current.name)
-    } else {
-      console.log("[v0] ⚠️ No voice selected, using default")
-    }
-
-    // Set speech parameters
-    utterance.rate = 0.95
-    utterance.pitch = 1.0
-    utterance.volume = 1.0
-    utterance.lang = "en-US"
-
-    console.log(
-      "[v0] 📢 Utterance configured - Rate:",
-      utterance.rate,
-      "Pitch:",
-      utterance.pitch,
-      "Volume:",
-      utterance.volume,
-    )
-
-    // Event handlers
-    utterance.onstart = () => {
-      console.log("[v0] ✅ AUDIO STARTED - Speaking question:", questionIndex)
-      setIsSpeaking(true)
-
-      // Stop listening while speaking
-      if (recognitionRef.current && isListening) {
-        try {
-          recognitionRef.current.stop()
-          setIsListening(false)
-        } catch (e) {
-          console.log("[v0] Error stopping recognition:", e)
-        }
-      }
-    }
-
-    utterance.onend = () => {
-      console.log("[v0] ✅ AUDIO ENDED - Finished question:", questionIndex)
-      setIsSpeaking(false)
-
-      // Start listening after speech ends
-      if (!isPaused) {
-        setTimeout(() => {
-          console.log("[v0] 🎙️ Starting to listen after question")
-          startListening()
-        }, 500)
-      }
-    }
-
-    utterance.onerror = (event) => {
-      console.log("[v0] ❌ SPEECH ERROR:", event.error, "Message:", event)
-      setIsSpeaking(false)
-
-      // If synthesis fails, still try to continue
-      if (!isPaused) {
-        setTimeout(() => {
-          console.log("[v0] Error recovery - starting to listen anyway")
-          startListening()
-        }, 500)
-      }
-    }
-
-    // Attempt to speak
-    try {
-      console.log("[v0] 🚀 Calling speechSynthesis.speak()...")
-      synthRef.current.speak(utterance)
-      console.log("[v0] ✓ speak() called successfully")
-
-      // Fallback: If onstart doesn't fire within 2 seconds, something is wrong
-      setTimeout(() => {
-        if (!isSpeaking && synthRef.current && synthRef.current.speaking) {
-          console.log("[v0] ⚠️ Speech synthesis stuck - forcing resume")
-          synthRef.current.resume()
-        } else if (!isSpeaking) {
-          console.log("[v0] ❌ Speech never started - may need user interaction")
-          // Show a visual indicator or button for user to click to enable audio
-        }
-      }, 2000)
-    } catch (error) {
-      console.log("[v0] ❌ Exception calling speak():", error)
-      setIsSpeaking(false)
-    }
-  }
-
-  const speakAcknowledgment = (text: string, callback: () => void) => {
-    if (!synthRef.current || !voicesLoaded) {
-      console.log("[v0] Cannot speak acknowledgment - calling callback anyway")
-      callback()
-      return
-    }
-
-    console.log("[v0] 🎤 Speaking acknowledgment:", text)
-    const utterance = new SpeechSynthesisUtterance(text)
-
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current
-    }
-
-    utterance.rate = 0.95
-    utterance.pitch = 1.0
-    utterance.volume = 1.0
-    utterance.lang = "en-US"
-
-    utterance.onstart = () => {
-      console.log("[v0] ✅ Acknowledgment started")
-      setIsSpeaking(true)
-
-      if (recognitionRef.current && isListening) {
-        try {
-          recognitionRef.current.stop()
-          setIsListening(false)
-        } catch (e) {
-          console.log("[v0] Error stopping recognition:", e)
-        }
-      }
-    }
-
-    utterance.onend = () => {
-      console.log("[v0] ✅ Acknowledgment ended")
-      setIsSpeaking(false)
-      setTimeout(() => {
-        callback()
-      }, 300)
-    }
-
-    utterance.onerror = (event) => {
-      console.log("[v0] ❌ Acknowledgment error:", event.error)
-      setIsSpeaking(false)
-      callback()
-    }
-
-    try {
-      synthRef.current.speak(utterance)
-    } catch (error) {
-      console.log("[v0] ❌ Exception in acknowledgment:", error)
-      callback()
-    }
-  }
-
-  const startListening = () => {
-    if (!recognitionRef.current || isPaused) {
-      console.log("[v0] Cannot start listening - recognition not ready or paused")
-      return
-    }
-
-    if (isListening) {
-      console.log("[v0] Already listening, skipping start")
+  const startListening = useCallback(() => {
+    if (!recognitionRef.current) {
+      toast.error("Voice recognition is not available in this browser.")
       return
     }
 
@@ -769,15 +556,6 @@ export default function StaffReportPage() {
         if (!response.ok) {
           throw new Error(`Investigator answer failed (${response.status})`)
         }
-        synthRef.current?.speak(finalUtterance)
-      })
-    } else {
-      // Move to next question
-      const nextIndex = currentQuestionIndex + 1
-      console.log("[v0] Moving to next question:", nextIndex, "out of", conversationScript.length)
-
-      // Update state before speaking
-      setCurrentQuestionIndex(nextIndex)
 
         const data: AnswerConversationResponse = await response.json()
         setRemainingMissing(data.remainingMissing)
@@ -977,67 +755,6 @@ export default function StaffReportPage() {
       }
     }
   }
-
-  const handleRepeatQuestion = () => {
-    console.log("[v0] 🔄 Repeat question requested")
-    if (synthRef.current) {
-      synthRef.current.cancel()
-    }
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-    }
-    setIsListening(false)
-    setIsSpeaking(false)
-
-    setTimeout(() => {
-      speakQuestion(currentQuestionIndex)
-    }, 500)
-  }
-
-  const handleExit = () => {
-    setIsExiting(true)
-
-    // Stop all speech and recognition
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-    }
-    if (synthRef.current) {
-      synthRef.current.cancel()
-    }
-    setIsListening(false)
-    setIsSpeaking(false)
-
-    // Speak exit message
-    const exitMessage = "Thank you for starting this process. You can resume anytime you want."
-    const utterance = new SpeechSynthesisUtterance(exitMessage)
-
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current
-    }
-
-    utterance.onend = () => {
-      setTimeout(() => {
-        router.push("/staff/dashboard")
-      }, 1000)
-    }
-
-    synthRef.current?.speak(utterance)
-  }
-
-  if (!browserSupport) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Browser Not Supported</h1>
-          <p className="text-muted-foreground">
-            Your browser does not support the Web Speech API. Please use Chrome, Edge, or Safari to access this feature.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  const currentQuestion = conversationScript[currentQuestionIndex]
 
   return (
     <div className="min-h-screen bg-background py-10">

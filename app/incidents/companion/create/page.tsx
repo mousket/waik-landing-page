@@ -4,41 +4,40 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/lib/auth-store"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Volume2, VolumeX, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, Volume2, VolumeX, CheckCircle2, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
-import { CompanionWaveAnimation } from "@/components/companion-wave-animation"
+import { CompanionWaveAnimation } from "../../../../components/companion-wave-animation"
 
-type ConversationStep =
-  | "greeting"
-  | "narrative-1" // Resident name and room
-  | "narrative-2" // What happened
-  | "narrative-3" // Resident state
-  | "narrative-4" // Environment
-  | "analyzing"
-  | "follow-up-1"
-  | "follow-up-2"
-  | "follow-up-3"
-  | "follow-up-4"
-  | "saving"
-  | "report-card"
-  | "complete"
+type ConversationStep = "greeting" | "narrative" | "analyzing" | "follow-up" | "report-card" | "complete"
+type NarrativeKey = "resident" | "incident" | "residentState" | "environment"
+
+const NARRATIVE_PROMPTS: Array<{ key: NarrativeKey; prompt: string }> = [
+  {
+    key: "resident",
+    prompt:
+      "First, please share the resident’s full name and room number so we can anchor the report correctly.",
+  },
+  {
+    key: "incident",
+    prompt:
+      "Now walk me through everything that happened in detail. Include what led up to the fall and what you observed.",
+  },
+  {
+    key: "residentState",
+    prompt:
+      "Tell me about the resident’s current state—physical condition, injuries, mood, clothing, and overall disposition.",
+  },
+  {
+    key: "environment",
+    prompt:
+      "Describe the environment and circumstances around the fall. Mention hazards, lighting, equipment, or anything in the room that matters.",
+  },
+]
 
 const AI_MESSAGES = {
   greeting:
-    "Hello! I'm WAiK, your AI assistant. I'm here to help you report an incident. Let's start by gathering the basic information.",
-  "narrative-1": "Can you please tell me the resident's name and room number?",
-  "narrative-2":
-    "Thank you. Now, can you tell me everything that happened? Please describe the incident in as much detail as possible.",
-  "narrative-3":
-    "Got it. Now tell me about the resident's state - their physical condition, mental state, clothing, and overall disposition at the time of the incident.",
-  "narrative-4":
-    "Almost done with the basics. Please tell me about the environment - describe the room, the circumstances surrounding the fall, and any details that could have influenced or contributed to what happened.",
+    "Hello! I'm WAiK, your AI companion. We'll capture a complete fall report together—I'll ask four quick questions to build your narrative, then handle the rest.",
   analyzing: "Thank you. Let me analyze that and prepare some follow-up questions...",
-  "follow-up-1": "Was the floor wet or cluttered at the time of the incident?",
-  "follow-up-2": "What was the resident wearing on their feet?",
-  "follow-up-3": "Were there any witnesses to the incident?",
-  "follow-up-4": "What was the lighting like in the area where the incident occurred?",
-  saving: "Thank you. I'm now creating your incident report...",
   reportCard: "Your report has been created successfully. Here's your quality score.",
 }
 
@@ -50,18 +49,25 @@ export default function CompanionCreatePage() {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [autoSpeak, setAutoSpeak] = useState(true)
   const [currentStep, setCurrentStep] = useState<ConversationStep>("greeting")
+  const [currentPromptIndex, setCurrentPromptIndex] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [voicesLoaded, setVoicesLoaded] = useState(false)
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null)
   const [reportScore, setReportScore] = useState<number | null>(null)
   const [reportFeedback, setReportFeedback] = useState<string>("")
   const [showDetailedReport, setShowDetailedReport] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({
+    strengths: true,
+    gaps: true,
+    narrative: false,
+  })
   const [reportDetails, setReportDetails] = useState<{
     whatYouDidWell: string[]
     whatWasMissed: string[]
   } | null>(null)
   const [awaitingStart, setAwaitingStart] = useState(true)
   const [interimTranscript, setInterimTranscript] = useState("")
+  const [initialNarrative, setInitialNarrative] = useState("")
 
   const recognitionRef = useRef<any>(null)
   const synthRef = useRef<SpeechSynthesis | null>(null)
@@ -70,14 +76,35 @@ export default function CompanionCreatePage() {
   const isListeningRef = useRef(false)
   const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const narrative1Ref = useRef("") // Name and room
-  const narrative2Ref = useRef("") // What happened
-  const narrative3Ref = useRef("") // Resident state
-  const narrative4Ref = useRef("") // Environment
-  const followUp1Ref = useRef("")
-  const followUp2Ref = useRef("")
-  const followUp3Ref = useRef("")
-  const followUp4Ref = useRef("")
+  const narrativeRef = useRef("")
+  const narrativeAnswersRef = useRef<Record<NarrativeKey, string>>({
+    resident: "",
+    incident: "",
+    residentState: "",
+    environment: "",
+  })
+  const [agentSessionId, setAgentSessionId] = useState<string | null>(null)
+  const [currentAgentQuestion, setCurrentAgentQuestion] = useState<{ id: string; text: string } | null>(null)
+  const askedQuestionIdsRef = useRef<Set<string>>(new Set())
+  const currentTextRef = useRef("")
+  const currentStepRef = useRef<ConversationStep>("greeting")
+  const currentPromptIndexRef = useRef(0)
+  const awaitingSubmissionRef = useRef(false)
+  const micErrorRef = useRef(false)
+  const resumeTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [awaitingSubmission, setAwaitingSubmission] = useState(false)
+
+  useEffect(() => {
+    currentTextRef.current = currentText
+  }, [currentText])
+
+  useEffect(() => {
+    currentStepRef.current = currentStep
+  }, [currentStep])
+
+  useEffect(() => {
+    currentPromptIndexRef.current = currentPromptIndex
+  }, [currentPromptIndex])
 
   useEffect(() => {
     console.log("[v0] 🎤 Initializing voice systems...")
@@ -123,7 +150,7 @@ export default function CompanionCreatePage() {
       console.log("[v0] ✅ Speech recognition available")
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
       recognitionRef.current = new SpeechRecognition()
-      recognitionRef.current.continuous = true
+      recognitionRef.current.continuous = false
       recognitionRef.current.interimResults = true
       recognitionRef.current.lang = "en-US"
 
@@ -132,6 +159,7 @@ export default function CompanionCreatePage() {
       }
 
       recognitionRef.current.onresult = (event: any) => {
+        console.log("[v0] 📝 Speech recognition result event")
         let finalTranscript = ""
         let interimText = ""
 
@@ -139,46 +167,100 @@ export default function CompanionCreatePage() {
           const transcript = event.results[i][0].transcript
           if (event.results[i].isFinal) {
             finalTranscript += transcript
+            console.log("[v0] ✅ Final transcript:", transcript)
           } else {
             interimText += transcript
+            console.log("[v0] 💭 Interim transcript:", transcript)
           }
         }
 
         if (finalTranscript) {
+          awaitingSubmissionRef.current = true
+          setAwaitingSubmission(true)
+          clearResumeTimer()
+          if (speechEndTimerRef.current) {
+            clearTimeout(speechEndTimerRef.current)
+            speechEndTimerRef.current = null
+          }
+
           setCurrentText((prev) => {
             const newText = (prev + " " + finalTranscript).trim()
+            console.log("[v0] 📝 Updated current text:", newText)
             return newText
           })
 
-          if (speechEndTimerRef.current) {
-            clearTimeout(speechEndTimerRef.current)
-          }
-          speechEndTimerRef.current = setTimeout(() => {
-            handleSubmit()
-          }, 2000)
+          isListeningRef.current = false
+          setIsListening(false)
+
+          resumeTimerRef.current = setTimeout(() => {
+            if (
+              awaitingSubmissionRef.current &&
+              !isListeningRef.current &&
+              !micErrorRef.current &&
+              currentStepRef.current !== "report-card" &&
+              currentStepRef.current !== "complete"
+            ) {
+              console.log("[v0] 🔁 Resuming listening to capture additional details after pause")
+              try {
+                recognitionRef.current?.start()
+                isListeningRef.current = true
+                setIsListening(true)
+              } catch (error) {
+                console.log("[v0] ⚠️ Resume listening failed:", error)
+              }
+            }
+            resumeTimerRef.current = null
+          }, 4500)
         }
+
         setInterimTranscript(interimText)
       }
 
       recognitionRef.current.onerror = (event: any) => {
         console.error("[v0] ❌ Speech recognition error:", event.error)
-        if (event.error !== "no-speech" && event.error !== "aborted") {
+        isListeningRef.current = false
+        setIsListening(false)
+        awaitingSubmissionRef.current = false
+        setAwaitingSubmission(false)
+        clearResumeTimer()
+
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          micErrorRef.current = true
+          toast.error("Microphone access is blocked. Please allow mic permissions in your browser and restart this conversation.")
+          setAwaitingStart(true)
+          setCurrentStep("greeting")
+          currentStepRef.current = "greeting"
+          setCurrentPromptIndex(0)
+          currentPromptIndexRef.current = 0
+          setIsProcessing(false)
+          return
+        } else if (event.error !== "no-speech" && event.error !== "aborted") {
           toast.error(`Speech recognition error: ${event.error}`)
         }
       }
 
       recognitionRef.current.onend = () => {
         console.log("[v0] 🔚 Speech recognition ended")
+        isListeningRef.current = false
+        setIsListening(false)
+
+        if (micErrorRef.current) {
+          console.log("[v0] 🚫 Mic error present; skipping restart")
+          return
+        }
+
         if (
-          isListeningRef.current &&
-          currentStep !== "report-card" &&
-          currentStep !== "complete" &&
-          currentStep !== "analyzing" &&
-          currentStep !== "saving"
+          !awaitingSubmissionRef.current &&
+          currentStepRef.current !== "report-card" &&
+          currentStepRef.current !== "complete" &&
+          currentStepRef.current !== "analyzing"
         ) {
           console.log("[v0] 🔄 Restarting speech recognition...")
           try {
+            awaitingSubmissionRef.current = false
             recognitionRef.current.start()
+            isListeningRef.current = true
+            setIsListening(true)
           } catch (error) {
             console.log("[v0] ⚠️ Recognition restart failed:", error)
           }
@@ -190,6 +272,7 @@ export default function CompanionCreatePage() {
     }
 
     return () => {
+      console.log("[v0] 🧹 Cleaning up voice systems...")
       if (recognitionRef.current) {
         recognitionRef.current.stop()
       }
@@ -261,24 +344,44 @@ export default function CompanionCreatePage() {
       setIsSpeaking(false)
       currentUtteranceRef.current = null
 
+      const step = currentStepRef.current
+
+      if (step === "greeting") {
+        console.log("[v0] 📋 Greeting finished, queuing first narrative prompt")
+        setTimeout(() => {
+          setCurrentStep("narrative")
+          currentStepRef.current = "narrative"
+          setCurrentPromptIndex(0)
+          currentPromptIndexRef.current = 0
+          speak(NARRATIVE_PROMPTS[0].prompt)
+        }, 600)
+        return
+      }
+
       if (
         !isListeningRef.current &&
-        currentStep !== "report-card" &&
-        currentStep !== "complete" &&
-        currentStep !== "analyzing" &&
-        currentStep !== "saving"
+        step !== "report-card" &&
+        step !== "complete" &&
+        step !== "analyzing"
       ) {
-        console.log("[v0] 🎤 Starting listening after speech ended")
+        const promptIdx = currentPromptIndexRef.current
+        const delay =
+          step === "narrative"
+            ? promptIdx === 0
+              ? 3200
+              : 2200
+            : step === "follow-up"
+              ? 1500
+              : 1000
+        console.log("[v0] 🎤 Starting listening after speech ended in", delay, "ms")
         setTimeout(() => {
           startListening()
-        }, 500)
+        }, delay)
       }
     }
 
     utterance.onerror = (event) => {
-      if (event.error !== "canceled") {
-        console.error("[v0] ❌ Speech synthesis error:", event.error)
-      }
+      console.error("[v0] ❌ Speech synthesis error:", event.error)
       isSpeakingRef.current = false
       setIsSpeaking(false)
       currentUtteranceRef.current = null
@@ -318,6 +421,8 @@ export default function CompanionCreatePage() {
 
     try {
       console.log("[v0] 🔊 Starting speech recognition...")
+      micErrorRef.current = false
+      clearResumeTimer()
       recognitionRef.current.start()
       isListeningRef.current = true
       setIsListening(true)
@@ -337,22 +442,30 @@ export default function CompanionCreatePage() {
     }
   }
 
-  const speakWhenReady = (text: string, maxWaitMs = 2000) => {
-    const startTime = Date.now()
+  const buildNarrativeSummary = (answers: Record<NarrativeKey, string>) => {
+    const sections = [
+      answers.resident.trim()
+        ? `Resident & Location:\n${answers.resident.trim()}`
+        : "",
+      answers.incident.trim()
+        ? `Incident Details:\n${answers.incident.trim()}`
+        : "",
+      answers.residentState.trim()
+        ? `Resident Status:\n${answers.residentState.trim()}`
+        : "",
+      answers.environment.trim()
+        ? `Environment & Contributing Factors:\n${answers.environment.trim()}`
+        : "",
+    ].filter(Boolean)
 
-    const attemptSpeak = () => {
-      if (!isSpeakingRef.current) {
-        speak(text)
-      } else if (Date.now() - startTime < maxWaitMs) {
-        setTimeout(attemptSpeak, 100)
-      } else {
-        console.log("[v0] ⚠️ Timeout waiting for speech to end, forcing speak")
-        stopSpeaking()
-        setTimeout(() => speak(text), 200)
-      }
-    }
+    return sections.join("\n\n")
+  }
 
-    attemptSpeak()
+  const toggleSection = (section: "strengths" | "gaps" | "narrative") => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
   }
 
   const handleStartConversation = () => {
@@ -363,11 +476,39 @@ export default function CompanionCreatePage() {
       toast.error("Voice system is still loading. Please wait a moment.")
       return
     }
+    setReportScore(null)
+    setReportFeedback("")
+    setReportDetails(null)
+    setShowDetailedReport(false)
+    setExpandedSections({
+      strengths: true,
+      gaps: true,
+      narrative: false,
+    })
+    setInitialNarrative("")
+    narrativeRef.current = ""
+    narrativeAnswersRef.current = {
+      resident: "",
+      incident: "",
+      residentState: "",
+      environment: "",
+    }
+    askedQuestionIdsRef.current = new Set()
+    setCurrentPromptIndex(0)
+    currentPromptIndexRef.current = 0
+    setCurrentStep("greeting")
+    currentStepRef.current = "greeting"
+    awaitingSubmissionRef.current = false
+    setAwaitingSubmission(false)
+    clearResumeTimer()
     setAwaitingStart(false)
+    // Prompt for microphone permission immediately on user gesture, then let WAiK speak
+    startListening()
     setTimeout(() => {
+      stopListening()
       console.log("[v0] 💬 Speaking greeting message...")
       speak(AI_MESSAGES.greeting)
-    }, 500)
+    }, 250)
   }
 
   const handleSubmit = async () => {
@@ -383,8 +524,22 @@ export default function CompanionCreatePage() {
 
     if (!userResponse) {
       console.log("[v0] ⚠️ No user response to submit")
+      awaitingSubmissionRef.current = false
+      setAwaitingSubmission(false)
+      clearResumeTimer()
+      if (!isListeningRef.current && currentStep !== "report-card" && currentStep !== "complete") {
+        setTimeout(() => {
+          if (!isListeningRef.current) {
+            startListening()
+          }
+        }, 300)
+      }
       return
     }
+
+    awaitingSubmissionRef.current = false
+    setAwaitingSubmission(false)
+    clearResumeTimer()
 
     console.log("[v0] 📝 User response:", userResponse)
     console.log("[v0] 📍 Current step:", currentStep)
@@ -392,128 +547,205 @@ export default function CompanionCreatePage() {
     setCurrentText("")
     setInterimTranscript("")
 
-    switch (currentStep) {
-      case "greeting":
-        setCurrentStep("narrative-1")
-        setTimeout(() => {
-          speakWhenReady(AI_MESSAGES["narrative-1"])
-        }, 500)
-        break
+    if (currentStep === "greeting" || currentStep === "narrative") {
+      const promptIndex = currentStep === "greeting" ? 0 : currentPromptIndex
+      const promptMeta = NARRATIVE_PROMPTS[promptIndex]
 
-      case "narrative-1":
-        narrative1Ref.current = userResponse
-        setCurrentStep("narrative-2")
-        setTimeout(() => {
-          speakWhenReady(AI_MESSAGES["narrative-2"])
-        }, 500)
-        break
+      if (promptMeta) {
+        narrativeAnswersRef.current[promptMeta.key] = userResponse
+      }
 
-      case "narrative-2":
-        narrative2Ref.current = userResponse
-        setCurrentStep("narrative-3")
-        setTimeout(() => {
-          speakWhenReady(AI_MESSAGES["narrative-3"])
-        }, 500)
-        break
+      const nextIndex = promptIndex + 1
 
-      case "narrative-3":
-        narrative3Ref.current = userResponse
-        setCurrentStep("narrative-4")
-        setTimeout(() => {
-          speakWhenReady(AI_MESSAGES["narrative-4"])
-        }, 500)
-        break
+      if (nextIndex < NARRATIVE_PROMPTS.length) {
+        setCurrentPromptIndex(nextIndex)
+        currentPromptIndexRef.current = nextIndex
+        setCurrentStep("narrative")
+        currentStepRef.current = "narrative"
+        speak(NARRATIVE_PROMPTS[nextIndex].prompt)
+        return
+      }
 
-      case "narrative-4":
-        narrative4Ref.current = userResponse
+      const narrativeSummary = buildNarrativeSummary(narrativeAnswersRef.current)
+      narrativeRef.current = narrativeSummary
+      setInitialNarrative(narrativeSummary)
         setIsProcessing(true)
         setCurrentStep("analyzing")
-        speakWhenReady(AI_MESSAGES.analyzing)
+      currentStepRef.current = "analyzing"
+        speak(AI_MESSAGES.analyzing)
 
-        setTimeout(() => {
+      try {
+        const incidentResponse = await fetch("/api/incidents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: `${name || "Staff"} Incident Report`,
+            narrative: narrativeSummary,
+            description: narrativeSummary,
+            residentName: "Resident",
+            residentRoom: "Unknown",
+            staffId: userId,
+            staffName: name,
+            reportedByRole: role,
+          }),
+        })
+
+        if (!incidentResponse.ok) {
+          const payload = await incidentResponse.json().catch(() => ({}))
+          throw new Error(payload?.error ?? "Failed to create incident.")
+        }
+
+        const incident = await incidentResponse.json()
+
+        const startResponse = await fetch("/api/agent/report-conversational", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "start",
+            incidentId: incident.id,
+            narrative: narrativeSummary,
+            initialNarrative: narrativeSummary,
+            investigatorId: "agent-companion",
+            investigatorName: "WAiK Companion Investigator",
+            reporterName: name || "Staff Reporter",
+            assignedStaffIds: userId ? [userId] : undefined,
+          }),
+        })
+
+        if (!startResponse.ok) {
+          const payload = await startResponse.json().catch(() => ({}))
+          throw new Error(payload?.error ?? "Failed to initialize investigator.")
+        }
+
+        const startData = await startResponse.json()
+
+        setAgentSessionId(startData.sessionId)
+        const firstQuestion = startData.questions?.[0]
+        if (firstQuestion) {
+          askedQuestionIdsRef.current = new Set([firstQuestion.id])
+          setCurrentAgentQuestion(firstQuestion)
+          setCurrentStep("follow-up")
+          currentStepRef.current = "follow-up"
           setIsProcessing(false)
-          setCurrentStep("follow-up-1")
-          setTimeout(() => {
-            speakWhenReady(AI_MESSAGES["follow-up-1"])
-          }, 1000)
-        }, 3000)
-        break
+          speak(firstQuestion.text)
+        } else {
+          setIsProcessing(false)
+          setCurrentStep("report-card")
+          currentStepRef.current = "report-card"
+          setReportScore(startData.score ?? null)
+          setReportFeedback(startData.feedback ?? "")
+          setReportDetails({
+            whatYouDidWell: startData.strengths ?? [],
+            whatWasMissed: startData.gaps ?? [],
+          })
+          setShowDetailedReport(false)
+          setExpandedSections({
+            strengths: true,
+            gaps: true,
+            narrative: false,
+          })
+          speak("I didn't find any follow-up questions. Your report is ready.")
+        }
+      } catch (error) {
+        console.error("[companion] Error starting investigator:", error)
+        toast.error(error instanceof Error ? error.message : "Failed to start investigator.")
+        setIsProcessing(false)
+      }
+      return
+    }
 
-      case "follow-up-1":
-        followUp1Ref.current = userResponse
-        setCurrentStep("follow-up-2")
-        setTimeout(() => {
-          speakWhenReady(AI_MESSAGES["follow-up-2"])
-        }, 500)
-        break
+    if (!agentSessionId || !currentAgentQuestion) {
+      toast.error("We're not connected to the investigator yet. Please restart the conversation.")
+      return
+    }
 
-      case "follow-up-2":
-        followUp2Ref.current = userResponse
-        setCurrentStep("follow-up-3")
-        setTimeout(() => {
-          speakWhenReady(AI_MESSAGES["follow-up-3"])
-        }, 500)
-        break
-
-      case "follow-up-3":
-        followUp3Ref.current = userResponse
-        setCurrentStep("follow-up-4")
-        setTimeout(() => {
-          speakWhenReady(AI_MESSAGES["follow-up-4"])
-        }, 500)
-        break
-
-      case "follow-up-4":
-        followUp4Ref.current = userResponse
         setIsProcessing(true)
-        setCurrentStep("saving")
-        speakWhenReady(AI_MESSAGES.saving)
 
         try {
-          const combinedNarrative = `Resident: ${narrative1Ref.current}\n\nIncident Details: ${narrative2Ref.current}\n\nResident State: ${narrative3Ref.current}\n\nEnvironment: ${narrative4Ref.current}`
-
-          const response = await fetch("/api/agent/report-conversational", {
+      const answerResponse = await fetch("/api/agent/report-conversational", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              narrative: combinedNarrative,
-              followUp1: followUp1Ref.current,
-              followUp2: followUp2Ref.current,
-              followUp3: followUp3Ref.current,
-              followUp4: followUp4Ref.current,
-              reportedBy: userId,
-              reportedByName: name,
+          action: "answer",
+          sessionId: agentSessionId,
+          questionId: currentAgentQuestion.id,
+          answerText: userResponse,
+          answeredBy: userId || "staff-user",
+          answeredByName: name || "Staff Reporter",
+          method: "voice",
             }),
           })
 
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error("[v0] ❌ API error:", errorText)
-            throw new Error(`Failed to create report: ${response.status}`)
-          }
+      if (!answerResponse.ok) {
+        const payload = await answerResponse.json().catch(() => ({}))
+        throw new Error(payload?.error ?? "Failed to submit answer.")
+      }
 
-          const data = await response.json()
+      const data = await answerResponse.json()
 
-          setReportScore(data.score)
-          setReportFeedback(data.feedback)
-          setReportDetails({
-            whatYouDidWell: data.whatYouDidWell || [],
-            whatWasMissed: data.whatWasMissed || [],
-          })
-
+      if (data.status === "completed") {
           setIsProcessing(false)
+        askedQuestionIdsRef.current = new Set()
+        setCurrentAgentQuestion(null)
+        setReportScore(data.score ?? null)
+        setReportFeedback(data.feedback ?? "")
+        setReportDetails({
+          whatYouDidWell: data.details?.strengths ?? [],
+          whatWasMissed: data.details?.gaps ?? [],
+        })
+        setShowDetailedReport(false)
+        setExpandedSections({
+          strengths: true,
+          gaps: true,
+          narrative: false,
+        })
           setCurrentStep("report-card")
-
+        currentStepRef.current = "report-card"
+        speak(`Thank you. Your report scored ${data.score ?? "a"} out of 10.`)
           setTimeout(() => {
-            const combinedMessage = `Thank you. The report is complete and saved. Your initial narrative scored ${data.score} out of 10. ${data.feedback}`
-            speakWhenReady(combinedMessage)
-          }, 1000)
+          if (data.feedback) {
+              speak(data.feedback)
+          }
+        }, 1500)
+        return
+      }
+
+      const remaining = data.nextQuestions ?? []
+      const nextQuestion = remaining.find((q: any) => !askedQuestionIdsRef.current.has(q.id)) ?? remaining[0]
+
+      if (!nextQuestion) {
+        setIsProcessing(false)
+        setCurrentStep("report-card")
+        currentStepRef.current = "report-card"
+        askedQuestionIdsRef.current = new Set()
+        setCurrentAgentQuestion(null)
+        setReportScore(data.score ?? null)
+        setReportFeedback(data.feedback ?? "")
+        setReportDetails({
+          whatYouDidWell: data.details?.strengths ?? [],
+          whatWasMissed: data.details?.gaps ?? [],
+        })
+        setShowDetailedReport(false)
+        setExpandedSections({
+          strengths: true,
+          gaps: true,
+          narrative: false,
+        })
+        speak("That's everything I needed. I'll finish up your report now.")
+        return
+      }
+
+      askedQuestionIdsRef.current.add(nextQuestion.id)
+      setCurrentAgentQuestion(nextQuestion)
+      setIsProcessing(false)
+      setCurrentStep("follow-up")
+      currentStepRef.current = "follow-up"
+      speak(nextQuestion.text)
         } catch (error) {
-          console.error("[v0] ❌ Error creating report:", error)
-          toast.error("Failed to create report. Please try again.")
+      console.error("[companion] Error saving answer:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to submit answer.")
           setIsProcessing(false)
-        }
-        break
+      startListening()
     }
   }
 
@@ -521,6 +753,7 @@ export default function CompanionCreatePage() {
     console.log("[v0] 🏁 Finishing conversation")
     stopSpeaking()
     stopListening()
+    clearResumeTimer()
     if (role === "admin") {
       router.push("/admin/dashboard")
     } else {
@@ -530,18 +763,40 @@ export default function CompanionCreatePage() {
 
   const getCurrentMessage = () => {
     if (currentStep === "greeting") return AI_MESSAGES.greeting
-    if (currentStep === "narrative-1") return AI_MESSAGES["narrative-1"]
-    if (currentStep === "narrative-2") return AI_MESSAGES["narrative-2"]
-    if (currentStep === "narrative-3") return AI_MESSAGES["narrative-3"]
-    if (currentStep === "narrative-4") return AI_MESSAGES["narrative-4"]
+    if (currentStep === "narrative") return NARRATIVE_PROMPTS[currentPromptIndex]?.prompt ?? ""
     if (currentStep === "analyzing") return AI_MESSAGES.analyzing
-    if (currentStep === "follow-up-1") return AI_MESSAGES["follow-up-1"]
-    if (currentStep === "follow-up-2") return AI_MESSAGES["follow-up-2"]
-    if (currentStep === "follow-up-3") return AI_MESSAGES["follow-up-3"]
-    if (currentStep === "follow-up-4") return AI_MESSAGES["follow-up-4"]
-    if (currentStep === "saving") return AI_MESSAGES.saving
+    if (currentStep === "follow-up") return currentAgentQuestion?.text ?? ""
     if (currentStep === "report-card") return AI_MESSAGES.reportCard
     return ""
+  }
+
+  const safeReportDetails = reportDetails ?? {
+    whatYouDidWell: [],
+    whatWasMissed: [],
+  }
+
+  const clearResumeTimer = () => {
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current)
+      resumeTimerRef.current = null
+    }
+  }
+
+  const handleRetake = () => {
+    console.log("[v0] 🔄 Retaking response")
+    awaitingSubmissionRef.current = false
+    setAwaitingSubmission(false)
+    clearResumeTimer()
+
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current)
+      speechEndTimerRef.current = null
+    }
+
+    stopListening()
+    setCurrentText("")
+    setInterimTranscript("")
+    startListening()
   }
 
   return (
@@ -601,10 +856,10 @@ export default function CompanionCreatePage() {
         </div>
       ) : (
         <>
-          <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 space-y-8 overflow-y-auto pb-24">
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-6 space-y-8">
             {currentStep !== "report-card" ? (
               <>
-                <div className="relative w-64 h-64 sm:w-80 sm:h-80 shrink-0">
+                <div className="relative w-64 h-64 sm:w-80 sm:h-80">
                   <CompanionWaveAnimation isListening={isListening} isSpeaking={isSpeaking} />
                 </div>
 
@@ -613,8 +868,8 @@ export default function CompanionCreatePage() {
                 </div>
 
                 {(currentText || interimTranscript) && (
-                  <div className="max-w-2xl w-full p-4 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl max-h-64 overflow-y-auto">
-                    <p className="text-sm text-white/90 break-words">
+                  <div className="max-w-2xl w-full p-4 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl">
+                    <p className="text-sm text-white/90">
                       <span className="font-semibold">You:</span> {currentText}
                       <span className="text-white/60 italic">{interimTranscript}</span>
                     </p>
@@ -622,83 +877,180 @@ export default function CompanionCreatePage() {
                 )}
 
                 {currentText.trim() && !isProcessing && (
-                  <div className="w-full max-w-2xl flex justify-center pb-4">
-                    <Button
-                      onClick={handleSubmit}
-                      size="lg"
-                      className="bg-white text-indigo-600 hover:bg-white/90 font-semibold px-8 shadow-xl"
-                    >
-                      Submit Response
-                    </Button>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <Button
+                    onClick={handleSubmit}
+                    size="lg"
+                      className="bg-white text-indigo-600 hover:bg-white/90 font-semibold px-8 flex-1"
+                  >
+                    Submit Response
+                  </Button>
+                    {awaitingSubmission ? (
+                      <Button
+                        onClick={handleRetake}
+                        size="lg"
+                        variant="outline"
+                        className="bg-white/20 border-white/40 text-white hover:bg-white/30 flex-1"
+                      >
+                        Retake Response
+                      </Button>
+                    ) : null}
                   </div>
                 )}
               </>
             ) : (
-              <div className="w-full max-w-md h-full pb-8">
-                <div className="p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6">
-                  <div className="text-center space-y-4">
-                    <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
-                    <h2 className="text-3xl font-bold text-white">Report Complete</h2>
-                    <div className="text-7xl font-bold text-white drop-shadow-lg">{reportScore}/10</div>
-                    <p className="text-white/80 text-sm leading-relaxed">{reportFeedback}</p>
+              <div className="max-w-md w-full p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6">
+                <div className="text-center space-y-4">
+                  <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
+                  <h2 className="text-3xl font-bold text-white">Report Complete</h2>
+                  <div className="text-7xl font-bold text-white drop-shadow-lg">
+                    {reportScore !== null ? reportScore : "--"}/10
                   </div>
-
-                  <Button
-                    onClick={() => setShowDetailedReport(!showDetailedReport)}
-                    variant="outline"
-                    className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
-                    size="lg"
-                  >
-                    {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
-                  </Button>
-
-                  {showDetailedReport && reportDetails && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                      <div className="space-y-3 bg-green-500/20 p-4 rounded-2xl border border-green-400/30">
-                        <h3 className="font-semibold text-green-300 flex items-center gap-2">
-                          <CheckCircle2 className="h-5 w-5" />
-                          What You Did Well
-                        </h3>
-                        <ul className="space-y-2">
-                          {reportDetails.whatYouDidWell.map((item, index) => (
-                            <li key={index} className="flex gap-2 text-sm text-white/90">
-                              <span className="text-green-400 shrink-0">[+]</span>
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="space-y-3 bg-orange-500/20 p-4 rounded-2xl border border-orange-400/30">
-                        <h3 className="font-semibold text-orange-300 flex items-center gap-2">
-                          <span className="text-orange-400 text-lg">[!]</span>
-                          What Was Missed
-                        </h3>
-                        <ul className="space-y-2">
-                          {reportDetails.whatWasMissed.map((item, index) => (
-                            <li key={index} className="flex gap-2 text-sm text-white/90">
-                              <span className="text-orange-400 shrink-0">[!]</span>
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={handleFinish}
-                    className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
-                    size="lg"
-                  >
-                    Finish & Return to Dashboard
-                  </Button>
                 </div>
+
+                <div className="space-y-5">
+                  {reportFeedback ? (
+                    <div className="rounded-2xl border border-white/30 bg-white/15 p-4 text-sm leading-relaxed text-white/90">
+                      {reportFeedback}
+                    </div>
+                  ) : null}
+
+                    <Button
+                    onClick={() =>
+                      setShowDetailedReport((prev) => {
+                        const next = !prev
+                        if (next) {
+                          setExpandedSections({
+                            strengths: true,
+                            gaps: true,
+                            narrative: false,
+                          })
+                        }
+                        return next
+                      })
+                    }
+                      variant="outline"
+                      className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
+                      size="lg"
+                    >
+                    {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
+                    </Button>
+
+                  {showDetailedReport ? (
+                    <div className="space-y-4">
+                      <div className="overflow-hidden rounded-2xl border border-white/30 bg-white/20">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-green-200"
+                          onClick={() => toggleSection("strengths")}
+                        >
+                          <span className="flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5" />
+                            What You Did Well
+                          </span>
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${
+                              expandedSections.strengths ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {expandedSections.strengths ? (
+                          <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90">
+                            {safeReportDetails.whatYouDidWell.length > 0 ? (
+                          <ul className="space-y-2">
+                                {safeReportDetails.whatYouDidWell.map((item, index) => (
+                                  <li key={`strength-${index}`} className="flex gap-2">
+                                    <span className="text-green-300 shrink-0">[+]</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                            ) : (
+                              <p className="text-white/70">
+                                {reportDetails
+                                  ? "We'll highlight strengths once more detail is provided."
+                                  : "Detailed strengths will appear once scoring is ready."}
+                              </p>
+                            )}
+                          </div>
+                        ) : null}
+                        </div>
+
+                      <div className="overflow-hidden rounded-2xl border border-white/30 bg-white/20">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-amber-200"
+                          onClick={() => toggleSection("gaps")}
+                        >
+                          <span>What Needs Work</span>
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${expandedSections.gaps ? "rotate-180" : ""}`}
+                          />
+                        </button>
+                        {expandedSections.gaps ? (
+                          <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90">
+                            {safeReportDetails.whatWasMissed.length > 0 ? (
+                          <ul className="space-y-2">
+                                {safeReportDetails.whatWasMissed.map((item, index) => (
+                                  <li key={`gap-${index}`} className="flex gap-2">
+                                    <span className="text-amber-200 shrink-0">[!]</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                            ) : (
+                              <p className="text-white/70">
+                                {reportDetails
+                                  ? "No major gaps identified. Keep this level of detail."
+                                  : "Gap analysis will display as soon as WAiK finishes scoring."}
+                              </p>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="overflow-hidden rounded-2xl border border-white/30 bg-white/20">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-sky-200"
+                          onClick={() => toggleSection("narrative")}
+                        >
+                          <span>See Original Narrative</span>
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${
+                              expandedSections.narrative ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {expandedSections.narrative ? (
+                          <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90 whitespace-pre-line">
+                            {initialNarrative.trim().length > 0
+                              ? initialNarrative
+                              : "No initial narrative captured for this session."}
+                          </div>
+                        ) : null}
+                      </div>
+                      {!reportDetails ? (
+                        <p className="text-xs text-white/70">
+                          Detailed scoring is still loading—sections will fill in automatically once ready.
+                        </p>
+                      ) : null}
+                        </div>
+                  ) : null}
+
+                    <Button
+                      onClick={handleFinish}
+                      className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
+                      size="lg"
+                    >
+                      Finish & Return to Dashboard
+                    </Button>
+                  </div>
               </div>
             )}
           </div>
 
-          <div className="relative z-20 pb-6 flex justify-center pointer-events-none">
+          <div className="relative z-10 pb-6 flex justify-center">
             <div className="px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full">
               <p className="text-sm text-white/80">
                 {isListening

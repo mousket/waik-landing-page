@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuthStore } from "@/lib/auth-store"
 import { escapeHtml } from "@/lib/utils"
-import { markdownToHtml } from "@/lib/utils/markdown-to-html"
+import { renderMarkdownOrHtml } from "@/lib/utils/markdown-to-html"
+import { buildIncidentCombinedNarrative } from "@/lib/utils/incident-narrative"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -26,68 +27,78 @@ import {
   CheckCircle2,
   Send,
   Loader2,
+  ChevronDown,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Incident, User as Staff } from "@/lib/types"
 import { format } from "date-fns"
 import { Textarea } from "@/components/ui/textarea"
 
-const formatInlineHtml = (value: string) => escapeHtml(value).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+type MessageRole = "ai" | "nurse" | "system"
 
-const formatSummaryAsHtml = (value: string) => {
-  const blocks = value
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean)
-
-  const htmlBlocks = blocks.map((block) => {
-    const lines = block
-      .split(/\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-
-    if (lines.length === 0) return ""
-
-    const bulletLines = lines.filter((line) => line.startsWith("- "))
-    const nonBulletLines = lines.filter((line) => !line.startsWith("- "))
-
-    const parts: string[] = []
-
-    if (nonBulletLines.length > 0) {
-      parts.push(`<p>${formatInlineHtml(nonBulletLines.join(" "))}</p>`)
-    }
-
-    if (bulletLines.length > 0) {
-      const items = bulletLines.map((line) => `<li>${formatInlineHtml(line.slice(2))}</li>`).join("")
-      parts.push(`<ul>${items}</ul>`)
-    }
-
-    return parts.join("")
-  })
-
-  return htmlBlocks.join("")
+interface ConversationMessage {
+  id: string
+  role: MessageRole
+  text: string
+  timestamp: string
 }
 
-const ensureSummaryHtml = (value: string) => (/<[^>]+>/.test(value) ? value : formatSummaryAsHtml(value))
+type IntelligenceMessage = {
+  id: string
+  type: "user" | "ai"
+  text: string
+  timestamp: Date
+}
 
-const applyCustomHeadings = (html: string) =>
-  html
-    .replace(/###([^#]+?)###/g, (_, content) => `<h3>${formatInlineHtml(content.trim())}</h3>`)
-    .replace(/##([^#]+?)##/g, (_, content) => `<h2>${formatInlineHtml(content.trim())}</h2>`)
-    .replace(/####([^#]+?)####/g, (_, content) => `<h4>${formatInlineHtml(content.trim())}</h4>`)
-    .replace(/<p>###\s*(.+?)<\/p>/g, (_, content) => `<h2>${formatInlineHtml(content.trim())}</h2>`)
-    .replace(/<p>##\s*(.+?)<\/p>/g, (_, content) => `<h2>${formatInlineHtml(content.trim())}</h2>`)
-    .replace(/<p>####\s*(.+?)<\/p>/g, (_, content) => `<h3>${formatInlineHtml(content.trim())}</h3>`)
+interface PendingQuestion {
+  id: string
+  text: string
+  askedAt?: string
+}
 
-const formatPlainTextAsHtml = (value: string) => `<p>${escapeHtml(value).replace(/\n+/g, "<br />")}</p>`
+const fallbackParagraphHtml = (value: string) =>
+  `<p>${escapeHtml(value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n\n+/g, "</p><p>")
+    .replace(/\n/g, "<br />")}</p>`
 
-// const formatAiContent = (value?: string | null) => {
-//   if (!value) return null
-//   const trimmed = value.trim()
-//   if (!trimmed) return null
-//   const html = ensureSummaryHtml(trimmed)
-//   return applyCustomHeadings(html)
-// }
+const formatScore = (value: number | undefined | null) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return "0"
+  const fixed = value.toFixed(1)
+  return fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed
+}
+
+const buildQuickCritique = (reportCard: {
+  strengths: string[]
+  gaps: string[]
+  feedback: string
+}) => {
+  const primaryStrength = reportCard.strengths[0]
+  const primaryGap = reportCard.gaps[0]
+
+  const strengthsSnippet = primaryStrength
+    ? `You covered ${primaryStrength.toLowerCase()}.`
+    : "Baseline facts captured."
+  const gapsSnippet = primaryGap ? `Missing detail on ${primaryGap.toLowerCase()}.` : "No major gaps flagged."
+
+  const sentences = reportCard.feedback
+    ?.split(/[.!?]+/)
+    .map((chunk) => chunk.trim())
+    .filter((chunk) => chunk.length > 0)
+    .slice(0, 5)
+
+  const adviceSentence =
+    sentences.find((sentence) =>
+      /(next|please|try|consider|remember|ensure|aim|focus|add|include)/i.test(sentence),
+    ) ||
+    (primaryGap ? `Try to include ${primaryGap.toLowerCase()} next time.` : "")
+
+  return {
+    strengthsSnippet,
+    gapsSnippet,
+    adviceSnippet: adviceSentence,
+  }
+}
 
 const formatDate = (dateString: string | undefined, formatString: string): string => {
   if (!dateString) return "Invalid date"
@@ -115,7 +126,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("")
 
-  const [currentPendingQuestionTab, setCurrentPendingQuestionTab] = useState(0)
   const [currentAnsweredQuestionTab, setCurrentAnsweredQuestionTab] = useState(0)
 
   const [currentTextQuestionIndex, setCurrentTextQuestionIndex] = useState(0)
@@ -129,6 +139,21 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const [recognition, setRecognition] = useState<any>(null)
   const [synthesis, setSynthesis] = useState<SpeechSynthesis | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [reportCard, setReportCard] = useState<{
+    score: number
+    completenessScore: number
+    feedback: string
+    strengths: string[]
+    gaps: string[]
+  } | null>(null)
+  const [reportCardLoading, setReportCardLoading] = useState(false)
+  const [reportCardError, setReportCardError] = useState<string | null>(null)
+  const [showDetailedReport, setShowDetailedReport] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({
+    strengths: true,
+    gaps: true,
+    narrative: false,
+  })
 
   const [intelligenceMessages, setIntelligenceMessages] = useState<IntelligenceMessage[]>([])
   const [intelligenceInput, setIntelligenceInput] = useState("")
@@ -140,6 +165,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   const [showOriginalNarrative, setShowOriginalNarrative] = useState(false)
   const [showInvestigativeHighlights, setShowInvestigativeHighlights] = useState(true)
+  const [showReportCard, setShowReportCard] = useState(true)
 
   useEffect(() => {
     fetchIncident()
@@ -225,10 +251,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const handleSaveProgress = async () => {
     if (!incident || !userId) return
 
-    const currentQuestion = unansweredQuestions[currentTextQuestionIndex]
-    const answerText = answers[currentQuestion?.id]
+    const currentQuestion = visibleUnansweredQuestions[currentTextQuestionIndex]
+    const answerText = currentQuestion ? answers[currentQuestion.id] : undefined
 
-    if (!answerText || answerText.trim() === "") {
+    if (!currentQuestion || !answerText || answerText.trim() === "") {
       toast.error("Please provide an answer before saving")
       return
     }
@@ -258,12 +284,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
         return newAnswers
       })
 
-      const remainingQuestions = incident.questions.filter((q) => !q.answer && q.id !== currentQuestion.id)
-      if (remainingQuestions.length > 0) {
-        setCurrentTextQuestionIndex(0)
-      } else {
-        toast.success("All questions answered! Great job!")
-      }
+      setCurrentTextQuestionIndex(0)
     } catch (error) {
       console.error("[v0] Error saving progress:", error)
       toast.error("Failed to save your answer")
@@ -337,7 +358,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const handleSaveCurrentAnswer = async () => {
     if (!currentTranscript.trim() || !incident || !userId) return
 
-    const currentQuestion = unansweredQuestions[currentQuestionIndex]
+    const currentQuestion = visibleUnansweredQuestions[currentQuestionIndex]
+    if (!currentQuestion) {
+      toast.error("No question selected")
+      return
+    }
 
     setSaving(true)
     try {
@@ -366,18 +391,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       setCurrentTranscript("")
       setIsEditingTranscript(false)
 
-      const remainingQuestions = incident.questions.filter((q) => !q.answer && q.id !== currentQuestion.id)
-
-      if (remainingQuestions.length > 0) {
-        // Move to next question
-        setTimeout(() => {
-          speakQuestion(remainingQuestions[0].questionText)
-        }, 500)
-      } else {
-        // All questions answered
-        toast.success("All questions answered! Great job!")
-        setQaMode("text")
-      }
+      setCurrentQuestionIndex(0)
     } catch (error) {
       console.error("[v0] Error saving answer:", error)
       toast.error("Failed to save your answer")
@@ -389,7 +403,8 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   // They are replaced by handleSaveCurrentAnswer
 
   const handleStartVoiceMode = () => {
-    if (!incident || incident.questions.filter((q) => !q.answer).length === 0) {
+    const pendingBatch = visibleUnansweredQuestions
+    if (!incident || pendingBatch.length === 0) {
       toast.error("No questions to answer")
       return
     }
@@ -402,7 +417,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     setCurrentQuestionIndex(0)
     setVoiceAnswers({})
     setTimeout(() => {
-      speakQuestion(incident.questions.filter((q) => !q.answer)[0].questionText || "")
+      speakQuestion(pendingBatch[0]?.questionText || "")
     }, 500)
   }
 
@@ -520,26 +535,141 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [intelligenceMessages, isIntelligenceLoading])
 
+  useEffect(() => {
+    if (!incident?.id) {
+      setReportCard(null)
+      return
+    }
+
+    let cancelled = false
+    const fetchReportCard = async () => {
+      try {
+        setReportCardLoading(true)
+        setReportCardError(null)
+        const response = await fetch(`/api/incidents/${incident.id}/report-card`)
+        if (!response.ok) {
+          throw new Error(`Failed to load report card (${response.status})`)
+        }
+        const data = await response.json()
+        if (!cancelled) {
+          setReportCard(data)
+          setShowDetailedReport(false)
+          setExpandedSections({ strengths: true, gaps: true, narrative: false })
+        }
+      } catch (error) {
+        console.error("[staff incident] report card fetch failed", error)
+        if (!cancelled) {
+          setReportCardError("Unable to load report card.")
+          setReportCard(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setReportCardLoading(false)
+        }
+      }
+    }
+
+    fetchReportCard()
+
+    return () => {
+      cancelled = true
+    }
+  }, [incident?.id])
+
   const unansweredQuestions = incident?.questions.filter((q) => !q.answer) || []
+  const MAX_PENDING_QUESTIONS = 10
+  const visibleUnansweredQuestions = useMemo(
+    () => unansweredQuestions.slice(0, MAX_PENDING_QUESTIONS),
+    [unansweredQuestions],
+  )
+  const hiddenPendingCount = Math.max(0, unansweredQuestions.length - visibleUnansweredQuestions.length)
   const answeredQuestions = incident?.questions.filter((q) => q.answer) || []
+
+  const activeTextQuestion = visibleUnansweredQuestions[currentTextQuestionIndex] ?? null
+  const activeVoiceQuestion = visibleUnansweredQuestions[currentQuestionIndex] ?? null
+
+  useEffect(() => {
+    if (visibleUnansweredQuestions.length === 0) {
+      setCurrentTextQuestionIndex(0)
+      setCurrentQuestionIndex(0)
+      return
+    }
+
+    setCurrentTextQuestionIndex((prev) => Math.min(prev, visibleUnansweredQuestions.length - 1))
+    setCurrentQuestionIndex((prev) => Math.min(prev, visibleUnansweredQuestions.length - 1))
+  }, [visibleUnansweredQuestions.length])
 
   const filteredEmployees = staffList.filter((emp) =>
     emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()),
   )
 
-  const enhancedNarrativeHtml = incident?.initialReport?.enhancedNarrative?.trim()
-  const originalNarrativeRaw = incident?.initialReport?.narrative ?? incident?.description ?? ""
-  const originalNarrative = originalNarrativeRaw.trim()
+  const enhancedNarrativeHtml = renderMarkdownOrHtml(incident?.initialReport?.enhancedNarrative)
+  const aggregatedNarrative = useMemo(
+    () => (incident ? buildIncidentCombinedNarrative(incident) : ""),
+    [incident],
+  )
+
+  const aggregatedNarrativeHtml =
+    aggregatedNarrative
+      ? renderMarkdownOrHtml(aggregatedNarrative) || fallbackParagraphHtml(aggregatedNarrative)
+      : null
+
+  const hasOriginalNarrative = Boolean(aggregatedNarrativeHtml)
+
+  const initialNarrativeRaw = incident?.initialReport?.narrative ?? incident?.description ?? ""
+  const initialNarrative = initialNarrativeRaw.trim()
   const residentStateRaw = incident?.initialReport?.residentState?.trim()
   const environmentNotesRaw = incident?.initialReport?.environmentNotes?.trim()
-  // Replace original narrative formatting with markdownToHtml
-  const narrativeHtml = enhancedNarrativeHtml
-    ? markdownToHtml(enhancedNarrativeHtml)
-    : originalNarrative
-      ? `<p>${originalNarrative.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br />")}</p>`
-      : "<p>No narrative provided.</p>"
-  const residentStateHtml = residentStateRaw ? formatPlainTextAsHtml(residentStateRaw) : null
-  const environmentNotesHtml = environmentNotesRaw ? formatPlainTextAsHtml(environmentNotesRaw) : null
+
+  const narrativeHtml =
+    enhancedNarrativeHtml ??
+    aggregatedNarrativeHtml ??
+    (initialNarrative ? fallbackParagraphHtml(initialNarrative) : "<p>No narrative provided.</p>")
+
+  const residentStateHtml =
+    renderMarkdownOrHtml(incident?.initialReport?.residentState) ||
+    (incident?.initialReport?.residentState ? fallbackParagraphHtml(incident.initialReport.residentState) : null)
+  const environmentNotesHtml =
+    renderMarkdownOrHtml(incident?.initialReport?.environmentNotes) ||
+    (incident?.initialReport?.environmentNotes ? fallbackParagraphHtml(incident.initialReport.environmentNotes) : null)
+
+  const aiSummaryHtml =
+    renderMarkdownOrHtml(incident?.aiReport?.summary) ||
+    (incident?.aiReport?.summary ? fallbackParagraphHtml(incident.aiReport.summary) : null)
+
+  const aiInsightsHtml =
+    renderMarkdownOrHtml(incident?.aiReport?.insights) ||
+    (incident?.aiReport?.insights ? fallbackParagraphHtml(incident.aiReport.insights) : null)
+
+  const aiRecommendationsHtml =
+    renderMarkdownOrHtml(incident?.aiReport?.recommendations) ||
+    (incident?.aiReport?.recommendations
+      ? fallbackParagraphHtml(incident.aiReport.recommendations)
+      : null)
+
+  const aiActionsHtml =
+    renderMarkdownOrHtml(incident?.aiReport?.actions) ||
+    (incident?.aiReport?.actions ? fallbackParagraphHtml(incident.aiReport.actions) : null)
+
+  const quickCritique = useMemo(() => {
+    if (!reportCard) return null
+    return buildQuickCritique(reportCard)
+  }, [reportCard])
+
+  useEffect(() => {
+    if (answeredQuestions.length === 0) {
+      setCurrentAnsweredQuestionTab(0)
+      return
+    }
+    setCurrentAnsweredQuestionTab((prev) => Math.min(prev, answeredQuestions.length - 1))
+  }, [answeredQuestions])
+
+  const toggleDetailSection = useCallback((section: keyof typeof expandedSections) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }, [])
 
   // Mock AI Content function - This is where the original issue was.
   // It should return an object or null, not be a function that returns an object or null.
@@ -637,6 +767,22 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   const aiContent = incident ? getAIContent(incident.id) : null
 
+  const currentAnsweredQuestion = answeredQuestions[currentAnsweredQuestionTab]
+  const currentAnsweredAnsweredAt = useMemo(() => {
+    if (!currentAnsweredQuestion?.answer?.answeredAt) return "Unknown time"
+    return new Date(currentAnsweredQuestion.answer.answeredAt).toLocaleString()
+  }, [currentAnsweredQuestion])
+
+  const handleToggleReportCard = useCallback(() => {
+    setShowReportCard((prev) => {
+      const next = !prev
+      if (!next) {
+        setShowDetailedReport(false)
+      }
+      return next
+    })
+  }, [setShowDetailedReport])
+
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
       <div className="absolute inset-0 -z-10">
@@ -687,93 +833,41 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
           <TabsContent value="overview" className="space-y-6 mt-6">
             <Card className="border-primary/20 bg-white shadow-lg">
               <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-start sm:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex-1 space-y-4">
                     <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
                       {incident?.title}
                     </CardTitle>
-
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {enhancedNarrativeHtml && (
-                            <Badge variant="secondary" className="w-fit uppercase tracking-wide text-[10px]">
-                              AI-enhanced summary
-                            </Badge>
-                          )}
-                        </div>
-                        {showOriginalNarrative && enhancedNarrativeHtml && originalNarrative && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowOriginalNarrative(!showOriginalNarrative)}
-                            className="text-xs"
-                          >
-                            {showOriginalNarrative ? "Hide" : "Show"} Original Voice Narrative
-                          </Button>
-                        )}
-                      </div>
-
+                      {enhancedNarrativeHtml && (
+                        <Badge variant="secondary" className="w-fit uppercase tracking-wide text-[10px]">
+                          AI-enhanced summary
+                        </Badge>
+                      )}
                       <div
                         className="text-sm leading-relaxed text-muted-foreground incident-enhanced-html"
                         dangerouslySetInnerHTML={{ __html: narrativeHtml }}
                       />
-
-                      {showOriginalNarrative && (
-                        <div className="mt-4 rounded-lg border border-muted bg-muted/40 p-4 space-y-2">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                            Original voice narrative
-                          </p>
-                          <div
-                            className="text-sm leading-relaxed text-muted-foreground"
-                            dangerouslySetInnerHTML={{
-                              __html: formatPlainTextAsHtml(originalNarrative),
-                            }}
-                          />
-                        </div>
+                      {hasOriginalNarrative && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto px-0 text-xs text-primary hover:text-primary"
+                          onClick={() => setShowOriginalNarrative((prev) => !prev)}
+                        >
+                          {showOriginalNarrative ? "Hide original voice narrative" : "Show original voice narrative"}
+                        </Button>
                       )}
                     </div>
-
-                    {(residentStateHtml || environmentNotesHtml) && (
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                            Investigative Highlights
-                          </h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowInvestigativeHighlights(!showInvestigativeHighlights)}
-                            className="text-xs"
-                          >
-                            {showInvestigativeHighlights ? "Hide" : "Show"}
-                          </Button>
-                        </div>
-
-                        {showInvestigativeHighlights && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {residentStateHtml && (
-                              <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Resident state</p>
-                                <div
-                                  className="text-sm leading-relaxed text-muted-foreground"
-                                  dangerouslySetInnerHTML={{ __html: residentStateHtml }}
-                                />
-                              </div>
-                            )}
-                            {environmentNotesHtml && (
-                              <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                  Environment notes
-                                </p>
-                                <div
-                                  className="text-sm leading-relaxed text-muted-foreground"
-                                  dangerouslySetInnerHTML={{ __html: environmentNotesHtml }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
+                    {showOriginalNarrative && hasOriginalNarrative && (
+                      <div className="mt-4 rounded-lg border border-muted bg-muted/40 p-4 space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Original voice narrative
+                        </p>
+                        <div
+                          className="text-sm leading-relaxed text-muted-foreground"
+                          dangerouslySetInnerHTML={{ __html: aggregatedNarrativeHtml ?? "<p>No narrative provided.</p>" }}
+                        />
                       </div>
                     )}
                   </div>
@@ -1047,11 +1141,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       <CardDescription>Answer questions assigned to you using text or voice</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        variant={qaMode === "text" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setQaMode("text")}
-                      >
+                      <Button variant={qaMode === "text" ? "default" : "outline"} size="sm" onClick={() => setQaMode("text")}>
                         <Type className="h-4 w-4 mr-2" />
                         Text
                       </Button>
@@ -1071,11 +1161,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {qaMode === "text" ? (
-                    // Text Mode
                     <>
-                      {/* Question Navigation */}
                       <div className="flex gap-2 flex-wrap">
-                        {unansweredQuestions.map((q, idx) => (
+                        {visibleUnansweredQuestions.map((q, idx) => (
                           <button
                             key={q.id}
                             onClick={() => setCurrentTextQuestionIndex(idx)}
@@ -1090,52 +1178,48 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </button>
                         ))}
                       </div>
+                      {hiddenPendingCount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {hiddenPendingCount} additional question{hiddenPendingCount === 1 ? "" : "s"} will unlock once the current batch is answered.
+                        </p>
+                      )}
 
-                      {/* Current Question */}
                       <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
                         <div className="flex items-start gap-3">
                           <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
                           <div className="flex-1">
                             <p className="font-medium text-lg leading-relaxed">
-                              {unansweredQuestions[currentTextQuestionIndex]?.questionText}
+                            {activeTextQuestion?.questionText}
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                               <p className="text-xs text-muted-foreground">
-                                Asked by{" "}
-                                <span className="font-medium">
-                                  {unansweredQuestions[currentTextQuestionIndex]?.askedBy}
-                                </span>
+                                Asked by <span className="font-medium">{activeTextQuestion?.askedBy}</span>
                               </p>
                               <span className="text-xs text-muted-foreground">•</span>
                               <p className="text-xs text-muted-foreground">
-                                {formatDate(
-                                  unansweredQuestions[currentTextQuestionIndex]?.askedAt,
-                                  "MMM d, yyyy 'at' h:mm a",
-                                )}
+                                {formatDate(activeTextQuestion?.askedAt, "MMM d, yyyy 'at' h:mm a")}
                               </p>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Answer Input */}
                       <div className="space-y-3">
                         <Label htmlFor="answer-input">Your Answer</Label>
                         <Textarea
                           id="answer-input"
                           placeholder="Type your answer here..."
-                          value={answers[unansweredQuestions[currentTextQuestionIndex]?.id] || ""}
+                          value={(activeTextQuestion && answers[activeTextQuestion.id]) || ""}
                           onChange={(e) =>
                             setAnswers({
                               ...answers,
-                              [unansweredQuestions[currentTextQuestionIndex]?.id]: e.target.value,
+                              ...(activeTextQuestion ? { [activeTextQuestion.id]: e.target.value } : {}),
                             })
                           }
                           rows={5}
                         />
                       </div>
 
-                      {/* Save Button */}
                       <Button onClick={handleSaveProgress} disabled={saving} className="w-full">
                         {saving ? (
                           <>
@@ -1150,7 +1234,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         )}
                       </Button>
 
-                      {/* Navigation */}
                       <div className="flex gap-2">
                         <Button
                           onClick={() => setCurrentTextQuestionIndex(Math.max(0, currentTextQuestionIndex - 1))}
@@ -1163,11 +1246,17 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </Button>
                         <Button
                           onClick={() =>
-                            setCurrentTextQuestionIndex(
-                              Math.min(unansweredQuestions.length - 1, currentTextQuestionIndex + 1),
+                            setCurrentTextQuestionIndex((prev) =>
+                              Math.min(
+                                Math.max(visibleUnansweredQuestions.length - 1, 0),
+                                prev + 1,
+                              ),
                             )
                           }
-                          disabled={currentTextQuestionIndex === unansweredQuestions.length - 1}
+                          disabled={
+                            visibleUnansweredQuestions.length === 0 ||
+                            currentTextQuestionIndex === visibleUnansweredQuestions.length - 1
+                          }
                           variant="outline"
                           className="flex-1"
                         >
@@ -1178,9 +1267,8 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </>
                   ) : (
                     <>
-                      {/* Question Navigation Tabs */}
                       <div className="flex gap-2 flex-wrap">
-                        {unansweredQuestions.map((q, idx) => (
+                        {visibleUnansweredQuestions.map((q, idx) => (
                           <button
                             key={q.id}
                             onClick={() => {
@@ -1200,35 +1288,32 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </button>
                         ))}
                       </div>
+                      {hiddenPendingCount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {hiddenPendingCount} additional question{hiddenPendingCount === 1 ? "" : "s"} will unlock once the current batch is answered.
+                        </p>
+                      )}
 
-                      {/* Current Question Display */}
                       <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
                         <div className="flex items-start gap-3">
                           <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
                           <div className="flex-1">
                             <p className="font-medium text-lg leading-relaxed">
-                              {unansweredQuestions[currentQuestionIndex]?.questionText}
+                              {activeVoiceQuestion?.questionText}
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                               <p className="text-xs text-muted-foreground">
-                                Asked by{" "}
-                                <span className="font-medium">
-                                  {unansweredQuestions[currentQuestionIndex]?.askedBy}
-                                </span>
+                                Asked by <span className="font-medium">{activeVoiceQuestion?.askedBy}</span>
                               </p>
                               <span className="text-xs text-muted-foreground">•</span>
                               <p className="text-xs text-muted-foreground">
-                                {formatDate(
-                                  unansweredQuestions[currentQuestionIndex]?.askedAt,
-                                  "MMM d, yyyy 'at' h:mm a",
-                                )}
+                                {formatDate(activeVoiceQuestion?.askedAt, "MMM d, yyyy 'at' h:mm a")}
                               </p>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Voice Recording Interface */}
                       <div className="text-center space-y-4 py-8">
                         <div className="mx-auto w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center">
                           {isRecording ? (
@@ -1242,7 +1327,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
                         <div>
                           <p className="text-lg font-semibold mb-2">
-                            Question {currentQuestionIndex + 1} of {unansweredQuestions.length}
+                        Question {currentQuestionIndex + 1} of {visibleUnansweredQuestions.length}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {isSpeaking
@@ -1282,10 +1367,12 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                                   onClick={() => {
                                     setCurrentTranscript("")
                                     setIsEditingTranscript(false)
-                                    setTimeout(
-                                      () => speakQuestion(unansweredQuestions[currentQuestionIndex].questionText),
-                                      300,
-                                    )
+                                    setTimeout(() => {
+                                      const next = visibleUnansweredQuestions[currentQuestionIndex]
+                                      if (next) {
+                                        speakQuestion(next.questionText)
+                                      }
+                                    }, 300)
                                   }}
                                   variant="outline"
                                 >
@@ -1330,7 +1417,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardDescription>Questions that have been responded to - Navigate using tabs below</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Question Navigation Tabs */}
                   <div className="flex gap-2 flex-wrap">
                     {answeredQuestions.map((q, idx) => (
                       <button
@@ -1348,7 +1434,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     ))}
                   </div>
 
-                  {/* Current Question & Answer Display */}
                   <div className="space-y-4">
                     <div className="p-6 border-2 border-primary/20 rounded-lg bg-primary/5">
                       <div className="flex items-start gap-3">
@@ -1361,10 +1446,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <p className="text-xs text-muted-foreground">
-                              Asked by{" "}
-                              <span className="font-medium">
-                                {answeredQuestions[currentAnsweredQuestionTab]?.askedBy}
-                              </span>
+                              Asked by <span className="font-medium">{answeredQuestions[currentAnsweredQuestionTab]?.askedBy}</span>
                             </p>
                             <span className="text-xs text-muted-foreground">•</span>
                             <p className="text-xs text-muted-foreground">
@@ -1387,10 +1469,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <p className="text-xs text-muted-foreground">
-                              Answered by{" "}
-                              <span className="font-medium">
-                                {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredBy}
-                              </span>
+                              Answered by <span className="font-medium">{answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredBy}</span>
                             </p>
                             <span className="text-xs text-muted-foreground">•</span>
                             <p className="text-xs text-muted-foreground">
@@ -1416,7 +1495,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </div>
                   </div>
 
-                  {/* Navigation Buttons */}
                   <div className="flex gap-2">
                     <Button
                       onClick={() => setCurrentAnsweredQuestionTab(Math.max(0, currentAnsweredQuestionTab - 1))}
@@ -1445,7 +1523,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               </Card>
             )}
 
-            {/* No questions message */}
             {unansweredQuestions.length === 0 && answeredQuestions.length === 0 && (
               <Card className="bg-white shadow-lg">
                 <CardContent className="py-12 text-center">
@@ -1574,7 +1651,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                               {message.text}
                             </p>
                             <p
-                              className={`text-[10px] sm:text-xs mt-1.5 sm:mt-2 ${message.type === "user" ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                              className={`text-[10px] sm:text-xs mt-1.5 sm:mt-2 ${
+                                message.type === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                              }`}
                             >
                               {format(message.timestamp, "h:mm a")}
                             </p>
@@ -1679,26 +1758,27 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </Card>
           </TabsContent>
 
+          {/* WAiK Agent Tab */}
           <TabsContent value="waik" className="space-y-6 mt-6">
+            <Card className="border-primary/20 bg-white shadow-lg">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="relative flex-shrink-0">
+                    <Target className="h-5 w-5 text-primary" />
+                    <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
+                  </div>
+                  <CardTitle className="text-base sm:text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent truncate">
+                    WAiK Intelligence
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-xs sm:text-sm">
+                  WAiK summaries, insights, recommendations, and action items
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
             {incident?.aiReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md lg:col-span-2">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <Brain className="h-5 w-5 text-purple-600" />
-                        <div className="absolute -top-1 -right-1 h-2 w-2 bg-purple-600 rounded-full animate-pulse" />
-                      </div>
-                      <CardTitle className="text-lg bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                        WAiK Intelligence
-                      </CardTitle>
-                    </div>
-                    <CardDescription className="text-xs mt-1">
-                      WAiK summaries, insights, recommendations, and action items
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
                   <CardHeader>
                     <div className="flex items-center gap-2">
@@ -1709,7 +1789,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardContent>
                     <div
                       className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.summary || "") }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.summary || "") || "" }}
                     />
                   </CardContent>
                 </Card>
@@ -1724,7 +1804,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardContent>
                     <div
                       className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.insights || "") }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.insights || "") || "" }}
                     />
                   </CardContent>
                 </Card>
@@ -1739,7 +1819,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardContent>
                     <div
                       className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.recommendations || "") }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.recommendations || "") || "" }}
                     />
                   </CardContent>
                 </Card>
@@ -1754,7 +1834,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardContent>
                     <div
                       className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                      dangerouslySetInnerHTML={{ __html: markdownToHtml(incident.aiReport.actions || "") }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.actions || "") || "" }}
                     />
                   </CardContent>
                 </Card>
@@ -1800,11 +1880,4 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       </div>
     </div>
   )
-}
-
-type IntelligenceMessage = {
-  id: string
-  type: "user" | "ai"
-  text: string
-  timestamp: Date
 }
