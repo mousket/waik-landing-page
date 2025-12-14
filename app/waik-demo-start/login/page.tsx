@@ -26,6 +26,7 @@ export default function LoginPage() {
 
     try {
       console.log("[v0] Attempting login via proxy: /api/proxy/auth/login")
+      console.log("[v0] Username:", username)
 
       const response = await fetch("/api/proxy/auth/login", {
         method: "POST",
@@ -36,22 +37,24 @@ export default function LoginPage() {
       })
 
       console.log("[v0] Response received, status:", response.status)
-      console.log("[v0] Response content-type:", response.headers.get("content-type"))
 
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        const textResponse = await response.text()
-        console.error("[v0] Non-JSON response received:", textResponse.substring(0, 200))
-        toast.error("Server returned an unexpected response format")
+      const data = await response.json()
+      console.log("[v0] Response data:", data)
+
+      if (!response.ok) {
+        if (data.details) {
+          console.error("[v0] Backend error details:", data.details)
+          toast.error(`Login failed: ${data.error}. Backend issue: ${data.details.substring(0, 100)}`)
+        } else {
+          toast.error(data.error || data.message || "Login failed")
+        }
         setIsLoading(false)
         return
       }
 
-      const data = await response.json()
-      console.log("[v0] Parsed JSON data:", data)
-
-      if (!response.ok) {
-        toast.error(data.error || "Login failed")
+      if (!data.userId || !data.role) {
+        console.error("[v0] Invalid response structure:", data)
+        toast.error("Invalid login response from server")
         setIsLoading(false)
         return
       }
@@ -66,14 +69,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("[v0] Login error:", error)
-      if (error instanceof TypeError && error.message === "Failed to fetch") {
-        toast.error(
-          "Unable to connect to server. This may be a CORS issue - the API needs to allow requests from this domain.",
-        )
-        console.error("[v0] CORS or network error. The server at waik-demo-vercel.app may need to add CORS headers.")
-      } else {
-        toast.error(`Login error: ${error instanceof Error ? error.message : "Unknown error"}`)
-      }
+      toast.error(`Login error: ${error instanceof Error ? error.message : "Unknown error"}`)
       setIsLoading(false)
     }
   }
