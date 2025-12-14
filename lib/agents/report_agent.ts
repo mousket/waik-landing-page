@@ -298,4 +298,3 @@ Please produce a polished summary (2-3 paragraphs max) and, when helpful, follow
     return `<p>${escapeHtml(summary)}</p>`
   }
 }
-

@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { LoginWaveAnimation } from "@/components/login-wave-animation"
+import { apiUrl } from "@/lib/api-config"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -25,13 +26,28 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/auth/login", {
+      console.log("[v0] Attempting login to:", apiUrl("/api/auth/login"))
+
+      const response = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       })
 
+      console.log("[v0] Response status:", response.status)
+      console.log("[v0] Response content-type:", response.headers.get("content-type"))
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text()
+        console.error("[v0] Non-JSON response received:", textResponse.substring(0, 200))
+        toast.error("Server error: Unable to process login request")
+        setIsLoading(false)
+        return
+      }
+
       const data = await response.json()
+      console.log("[v0] Parsed JSON data:", data)
 
       if (!response.ok) {
         toast.error(data.error || "Login failed")
@@ -49,7 +65,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("[v0] Login error:", error)
-      toast.error("An error occurred during login")
+      toast.error("An error occurred during login. Please check the console for details.")
       setIsLoading(false)
     }
   }

@@ -62,4 +62,3 @@ export function deleteSession(sessionId: string) {
 export function listSessions(): InvestigatorSession[] {
   return Array.from(sessions.values())
 }
-

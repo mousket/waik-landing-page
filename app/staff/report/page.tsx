@@ -10,13 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuthStore } from "@/lib/auth-store"
 import { useSpeechSynthesis } from "@/lib/hooks/useSpeechSynthesis"
+import { apiUrl } from "@/lib/api-config"
 
-type BrowserSpeechRecognition =
-  typeof window extends { SpeechRecognition: infer T }
+type BrowserSpeechRecognition = typeof window extends { SpeechRecognition: infer T }
+  ? T
+  : typeof window extends { webkitSpeechRecognition: infer T }
     ? T
-    : typeof window extends { webkitSpeechRecognition: infer T }
-      ? T
-      : any
+    : any
 
 type MessageRole = "ai" | "nurse" | "system"
 
@@ -106,8 +106,7 @@ function extractResidentDetails(answer: string) {
   const primarySentence = cleaned.split(/[.!?]/)[0]?.trim() ?? ""
   const withoutIntro = primarySentence.replace(/\b(this\s+is|i\s+am|name\s+is)\b/i, "").trim()
   const words = withoutIntro.split(" ").filter(Boolean)
-  const residentName =
-    words.length >= 2 ? words.slice(0, 3).join(" ") : withoutIntro || "Unknown Resident"
+  const residentName = words.length >= 2 ? words.slice(0, 3).join(" ") : withoutIntro || "Unknown Resident"
 
   return { residentName, residentRoom }
 }
@@ -149,9 +148,7 @@ function buildQuickCritique(reportCard: {
       .filter((chunk) => chunk.length > 0) ?? []
 
   const adviceSentence =
-    sentences.find((sentence) =>
-      /(next|please|try|consider|remember|ensure|aim|focus|add|include)/i.test(sentence),
-    ) ||
+    sentences.find((sentence) => /(next|please|try|consider|remember|ensure|aim|focus|add|include)/i.test(sentence)) ||
     (primaryGap ? `Try to include ${primaryGap.toLowerCase()} next time.` : "")
 
   let adviceSnippet = ""
@@ -234,28 +231,24 @@ export default function StaffReportPage() {
     router.push(destination)
   }, [role, router])
 
-function buildSubtypeCoachingMessage(
-  subtypeLabel: string | undefined,
-  nurseName: string,
-  residentName: string,
-): string | null {
-  if (!subtypeLabel) return null
-  const residentDisplay = residentName === "Unknown Resident" ? "the resident" : residentName
-  const nurseDisplay = nurseName || "there"
+  function buildSubtypeCoachingMessage(
+    subtypeLabel: string | undefined,
+    nurseName: string,
+    residentName: string,
+  ): string | null {
+    if (!subtypeLabel) return null
+    const residentDisplay = residentName === "Unknown Resident" ? "the resident" : residentName
+    const nurseDisplay = nurseName || "there"
 
-  const templates: Record<string, string> = {
-    "bed-related fall":
-      `${nurseDisplay}, it sounds like ${residentDisplay} experienced a bed-related fall. Could you share the bed height, rail position, and what they were doing just before they slipped?`,
-    "wheelchair fall":
-      `${nurseDisplay}, I’m reading this as a wheelchair fall for ${residentDisplay}. Tell me more about the chair setup—brakes, cushions, footrests—and how they lost balance.`,
-    "slip or trip":
-      `${nurseDisplay}, this looks like a slip or trip for ${residentDisplay}. Please walk me through the floor condition, footwear, and anything on the ground that contributed.`,
-    "lift or transfer incident":
-      `${nurseDisplay}, I see ${residentDisplay} may have fallen during a lift or transfer. I’ll need more detail about the equipment and hand-off—how did they lose support from staff?`,
+    const templates: Record<string, string> = {
+      "bed-related fall": `${nurseDisplay}, it sounds like ${residentDisplay} experienced a bed-related fall. Could you share the bed height, rail position, and what they were doing just before they slipped?`,
+      "wheelchair fall": `${nurseDisplay}, I’m reading this as a wheelchair fall for ${residentDisplay}. Tell me more about the chair setup—brakes, cushions, footrests—and how they lost balance.`,
+      "slip or trip": `${nurseDisplay}, this looks like a slip or trip for ${residentDisplay}. Please walk me through the floor condition, footwear, and anything on the ground that contributed.`,
+      "lift or transfer incident": `${nurseDisplay}, I see ${residentDisplay} may have fallen during a lift or transfer. I’ll need more detail about the equipment and hand-off—how did they lose support from staff?`,
+    }
+
+    return templates[subtypeLabel] ?? null
   }
-
-  return templates[subtypeLabel] ?? null
-}
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -370,7 +363,9 @@ function buildSubtypeCoachingMessage(
     const fullNarrative =
       initialNarrativeAnswer.length >= 60
         ? initialNarrativeAnswer
-        : [residentInfo, initialNarrativeAnswer].filter(Boolean).join("\n\n").trim() || residentInfo || "Details pending."
+        : [residentInfo, initialNarrativeAnswer].filter(Boolean).join("\n\n").trim() ||
+          residentInfo ||
+          "Details pending."
 
     const narrativeSections = [
       initialNarrativeAnswer && `Incident Narrative:\n${initialNarrativeAnswer}`,
@@ -402,7 +397,7 @@ function buildSubtypeCoachingMessage(
     setIsProcessing(true)
 
     try {
-      const incidentResponse = await fetch("/api/incidents", {
+      const incidentResponse = await fetch(apiUrl("/api/incidents"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(incidentPayload),
@@ -412,8 +407,7 @@ function buildSubtypeCoachingMessage(
         const payload = await incidentResponse.json().catch(() => ({}))
         console.error("[voice-report] Incident create failed", incidentResponse.status, payload, incidentPayload)
         toast.error(
-          payload?.error ??
-            "Incident could not be created. Please verify the resident details and try again.",
+          payload?.error ?? "Incident could not be created. Please verify the resident details and try again.",
         )
         throw new Error(`Failed to create incident (${incidentResponse.status})`)
       }
@@ -421,7 +415,7 @@ function buildSubtypeCoachingMessage(
       const incident = await incidentResponse.json()
       setIncidentId(incident.id)
 
-      const startResponse = await fetch("/api/agent/report-conversational", {
+      const startResponse = await fetch(apiUrl("/api/agent/report-conversational"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -439,10 +433,7 @@ function buildSubtypeCoachingMessage(
       if (!startResponse.ok) {
         const payload = await startResponse.json().catch(() => ({}))
         console.error("[voice-report] Investigator start failed", startResponse.status, payload)
-        toast.error(
-          payload?.error ??
-            "We couldn't start the investigator agent right now. Please retry in a moment.",
-        )
+        toast.error(payload?.error ?? "We couldn't start the investigator agent right now. Please retry in a moment.")
         throw new Error(`Investigator failed to start (${startResponse.status})`)
       }
 
@@ -538,7 +529,7 @@ function buildSubtypeCoachingMessage(
       setIsProcessing(true)
 
       try {
-        const response = await fetch("/api/agent/report-conversational", {
+        const response = await fetch(apiUrl("/api/agent/report-conversational"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -578,10 +569,9 @@ function buildSubtypeCoachingMessage(
           setPhase("completed")
           setAwaitingAnswer(false)
           const scoreLabel = formatScore(data.score)
-          speakAI(
-            `The report is complete. Your initial narrative scored ${scoreLabel} out of 10. ${data.feedback}`,
-            { expectAnswer: false },
-          )
+          speakAI(`The report is complete. Your initial narrative scored ${scoreLabel} out of 10. ${data.feedback}`, {
+            expectAnswer: false,
+          })
         } else {
           deliverNextQuestion(data.nextQuestions)
         }
@@ -641,12 +631,12 @@ function buildSubtypeCoachingMessage(
     setRemainingMissing([])
     setSubtypeLabel(undefined)
     setReportCard(null)
-  setShowDetailedReport(false)
-  setExpandedSections({
-    strengths: true,
-    gaps: true,
-    narrative: false,
-  })
+    setShowDetailedReport(false)
+    setExpandedSections({
+      strengths: true,
+      gaps: true,
+      narrative: false,
+    })
     setIncidentId(null)
     setSessionId(null)
     setIsProcessing(false)
@@ -657,8 +647,7 @@ function buildSubtypeCoachingMessage(
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const SpeechRecognitionImpl =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null
+    const SpeechRecognitionImpl = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null
 
     if (!SpeechRecognitionImpl) {
       toast.error("Your browser doesn't support voice capture. Please switch to Chrome or Edge.")
@@ -762,9 +751,7 @@ function buildSubtypeCoachingMessage(
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Live Voice Investigator</h1>
-            <p className="text-muted-foreground">
-              Answer conversationally and I’ll log every detail for leadership.
-            </p>
+            <p className="text-muted-foreground">Answer conversationally and I’ll log every detail for leadership.</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={toggleVoice}>
@@ -892,8 +879,7 @@ function buildSubtypeCoachingMessage(
                     {quickCritique.strengthsSnippet}
                   </p>
                   <p>
-                    <span className="font-semibold text-amber-700">Needs attention:</span>{" "}
-                    {quickCritique.gapsSnippet}
+                    <span className="font-semibold text-amber-700">Needs attention:</span> {quickCritique.gapsSnippet}
                   </p>
                   {quickCritique.adviceSnippet ? (
                     <p>
@@ -923,10 +909,7 @@ function buildSubtypeCoachingMessage(
                 >
                   {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
                 </Button>
-                <Button
-                  className="w-full bg-teal-500 text-white hover:bg-teal-500/90"
-                  onClick={handleFinish}
-                >
+                <Button className="w-full bg-teal-500 text-white hover:bg-teal-500/90" onClick={handleFinish}>
                   Finish & Return to Dashboard
                 </Button>
               </div>
@@ -953,7 +936,9 @@ function buildSubtypeCoachingMessage(
                             ))}
                           </ul>
                         ) : (
-                          <p className="text-muted-foreground">We’ll highlight strengths once more details are added.</p>
+                          <p className="text-muted-foreground">
+                            We’ll highlight strengths once more details are added.
+                          </p>
                         )}
                       </div>
                     ) : null}
@@ -1020,4 +1005,3 @@ function buildSubtypeCoachingMessage(
     </div>
   )
 }
-

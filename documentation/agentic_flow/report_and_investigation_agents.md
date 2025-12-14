@@ -1,4 +1,4 @@
- Forcing a nurse to stay in a long, branching voice chat at the scene is unrealistic. Their priority is the resident, and their goal is to report the *key facts* and get back to their duties.
+Forcing a nurse to stay in a long, branching voice chat at the scene is unrealistic. Their priority is the resident, and their goal is to report the *key facts* and get back to their duties.
 
 the new **Two-Agent "Handoff" Strategy** is the correct architecture. It perfectly separates the *urgent* "at-the-scene" reporting from the *important* "asynchronous" investigation.
 

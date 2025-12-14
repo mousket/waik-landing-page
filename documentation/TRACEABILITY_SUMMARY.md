@@ -9,7 +9,7 @@
 
 ### **Before (What You Were Worried About):**
 
-```json
+\`\`\`json
 // embeddings.json (OLD)
 {
   "inc-1": {
@@ -18,7 +18,7 @@
     }
   }
 }
-```
+\`\`\`
 
 **Problems:**
 - ❌ Can't tell which answer is vectorized
@@ -31,7 +31,7 @@
 
 ### **After (What We Have Now):**
 
-```json
+\`\`\`json
 // embeddings.json (NEW)
 {
   "inc-1": {
@@ -63,7 +63,7 @@
     }
   }
 }
-```
+\`\`\`
 
 **Solutions:**
 - ✅ **Answer → Question**: `answerId` links answer to question
@@ -78,7 +78,7 @@
 ## 🔧 **What Changed**
 
 ### **1. Enhanced Type Definitions**
-```typescript
+\`\`\`typescript
 // lib/embeddings.ts
 
 interface QuestionEmbeddingMetadata {
@@ -102,24 +102,24 @@ interface IncidentEmbeddingMetadata {
   title: string            // NEW - Incident title
   vectorizedAt: string     // NEW - When vectorized
 }
-```
+\`\`\`
 
 ---
 
 ### **2. Updated getQuestionEmbedding Function**
 
 **Before:**
-```typescript
+\`\`\`typescript
 getQuestionEmbedding(
   incidentId: string,
   questionId: string,
   questionText: string,
   answer?: string  // ❌ Just text, no metadata
 )
-```
+\`\`\`
 
 **After:**
-```typescript
+\`\`\`typescript
 getQuestionEmbedding(
   incidentId: string,
   questionId: string,
@@ -133,14 +133,14 @@ getQuestionEmbedding(
     answeredAt: string    // ✅ When answered
   }
 )
-```
+\`\`\`
 
 ---
 
 ### **3. Updated Auto-Vectorization in APIs**
 
 #### **Questions API:**
-```typescript
+\`\`\`typescript
 // app/api/incidents/[id]/questions/route.ts
 
 // Before
@@ -154,10 +154,10 @@ getQuestionEmbedding(
   question.askedBy,      // ✅ Who asked
   question.askedAt       // ✅ When asked
 )
-```
+\`\`\`
 
 #### **Answers API:**
-```typescript
+\`\`\`typescript
 // app/api/incidents/[id]/answers/route.ts
 
 // Before
@@ -177,24 +177,24 @@ getQuestionEmbedding(
     answeredAt: answer.answeredAt  // ✅ When answered
   }
 )
-```
+\`\`\`
 
 ---
 
 ### **4. Enhanced Search Results**
 
 **Before:**
-```typescript
+\`\`\`typescript
 searchSimilarQuestions(): Promise<{
   questionId: string
   questionText: string
   answer?: string
   similarity: number
 }[]>
-```
+\`\`\`
 
 **After:**
-```typescript
+\`\`\`typescript
 searchSimilarQuestions(): Promise<{
   questionId: string
   questionText: string
@@ -203,14 +203,14 @@ searchSimilarQuestions(): Promise<{
   askedBy: string        // ✅ NEW - Who asked
   answeredBy?: string    // ✅ NEW - Who answered
 }[]>
-```
+\`\`\`
 
 ---
 
 ## ✅ **Complete Relationship Guarantees**
 
 ### **1. Question ↔ Answer Linkage**
-```typescript
+\`\`\`typescript
 // In embeddings.json
 "questionEmbeddings": {
   "q-1": {
@@ -220,20 +220,20 @@ searchSimilarQuestions(): Promise<{
     "answeredAt": "..."          // ✅ When
   }
 }
-```
+\`\`\`
 
 **Verification:**
-```typescript
+\`\`\`typescript
 const embedding = embeddingsDb.data["inc-1"].questionEmbeddings["q-1"]
 const question = incident.questions.find(q => q.id === "q-1")
 
 assert(embedding.answerId === question.answer.id)  // ✅ Guaranteed
-```
+\`\`\`
 
 ---
 
 ### **2. Question → Admin Linkage**
-```typescript
+\`\`\`typescript
 // In embeddings.json
 "questionEmbeddings": {
   "q-1": {
@@ -241,18 +241,18 @@ assert(embedding.answerId === question.answer.id)  // ✅ Guaranteed
     "askedAt": "..."             // ✅ Timestamp
   }
 }
-```
+\`\`\`
 
 **Lookup:**
-```typescript
+\`\`\`typescript
 const admin = getUserById(embedding.askedBy)
 // Returns: { name: "Michael Chen", role: "admin" }
-```
+\`\`\`
 
 ---
 
 ### **3. Answer → Staff Linkage**
-```typescript
+\`\`\`typescript
 // In embeddings.json
 "questionEmbeddings": {
   "q-1": {
@@ -260,18 +260,18 @@ const admin = getUserById(embedding.askedBy)
     "answeredAt": "..."          // ✅ Timestamp
   }
 }
-```
+\`\`\`
 
 **Lookup:**
-```typescript
+\`\`\`typescript
 const staff = getUserById(embedding.answeredBy)
 // Returns: { name: "Sarah Johnson", role: "staff" }
-```
+\`\`\`
 
 ---
 
 ### **4. Incident → Patient Linkage**
-```typescript
+\`\`\`typescript
 // In embeddings.json
 "inc-1": {
   "incidentMetadata": {
@@ -281,20 +281,20 @@ const staff = getUserById(embedding.answeredBy)
     "staffName": "Sarah Johnson"
   }
 }
-```
+\`\`\`
 
 **Access:**
-```typescript
+\`\`\`typescript
 const metadata = embeddingsDb.data["inc-1"].incidentMetadata
 console.log(`Patient: ${metadata.residentName} in Room ${metadata.residentRoom}`)
 // Output: "Patient: John Doe in Room 204A"
-```
+\`\`\`
 
 ---
 
 ## 🔍 **Example: Full Trace from Embedding**
 
-```typescript
+\`\`\`typescript
 // Starting point: Embedding vector
 const embedding = embeddingsDb.data["inc-1"].questionEmbeddings["q-1"]
 
@@ -327,7 +327,7 @@ console.log("Room:", incidentMeta.residentRoom)
 console.log("Asked at:", embedding.askedAt)
 console.log("Answered at:", embedding.answeredAt)
 console.log("Vectorized at:", embedding.vectorizedAt)
-```
+\`\`\`
 
 ---
 
@@ -350,7 +350,7 @@ console.log("Vectorized at:", embedding.vectorizedAt)
 ## ✅ **What You Can Now Do**
 
 ### **1. Verify Answer Linkage**
-```typescript
+\`\`\`typescript
 // Check if embedding matches database
 const embedding = embeddingsDb.data["inc-1"].questionEmbeddings["q-1"]
 const question = incident.questions.find(q => q.id === "q-1")
@@ -358,10 +358,10 @@ const question = incident.questions.find(q => q.id === "q-1")
 if (embedding.answerId === question.answer.id) {
   console.log("✅ Answer is correctly linked")
 }
-```
+\`\`\`
 
 ### **2. Trace to All Entities**
-```typescript
+\`\`\`typescript
 // From any embedding, get:
 - Question text
 - Admin who asked
@@ -370,26 +370,26 @@ if (embedding.answerId === question.answer.id) {
 - Incident details
 - Patient name & room
 - Complete timeline
-```
+\`\`\`
 
 ### **3. Audit Trail**
-```typescript
+\`\`\`typescript
 // Complete history
 const timeline = {
   questionAsked: embedding.askedAt,
   answerProvided: embedding.answeredAt,
   vectorized: embedding.vectorizedAt
 }
-```
+\`\`\`
 
 ### **4. Attribution**
-```typescript
+\`\`\`typescript
 // Always know who did what
 const admin = getUserById(embedding.askedBy)
 const staff = getUserById(embedding.answeredBy)
 
 console.log(`${admin.name} asked, ${staff.name} answered`)
-```
+\`\`\`
 
 ---
 
@@ -439,4 +439,3 @@ console.log(`${admin.name} asked, ${staff.name} answered`)
 ---
 
 **You can now accept these changes with confidence!** 🎉
-

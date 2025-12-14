@@ -1,5 +1,3 @@
-
-
 ### Prompt 1 — “Data model & helpers”
 **Goal:** Extend the incident schema to capture the full reporter → investigator flow and add the service helpers that both agents will call.  
 **Cursor prompt:** inspect `lib/types.ts`, `data/db.json`, and `lib/db.ts`; add `initialReport` blocks (narrative, resident state, environment), investigator metadata (`investigationStatus`, `investigationStartedAt`, `subtype`), notification scaffolding, and enrich the question structure (`source`, `generatedBy`, `assignedTo`). Implement helpers such as `createIncidentFromReport`, `queueInvestigationQuestions`, `markInvestigationComplete`, and ensure `getIncidentsByStaffId` returns incidents where the user is the reporter (staff or admin), is explicitly assigned, or has questions directed to them. The queue helper should mirror the existing add-question flow, including vectorizing every queued question (and later its answer) with metadata covering the reporter, assignees, and timestamps. Require docstrings or brief usage notes for each helper.  
@@ -32,6 +30,3 @@
 **Goal:** Wire the front-end screens to the new backend capabilities.  
 **Cursor prompt:** update the incident creation wizard to surface API progress/errors, show post-submit success, and guard against duplicate submissions. On `app/staff/incidents/[id]/page.tsx` and `app/admin/incidents/[id]/page.tsx`, render the investigator question queue with source badges, assignment chips, and answer entry. Ensure follow-up actions re-fetch using cache-busting.  
 **Test:** end-to-end manual flow—use the voice wizard, land on the dashboard, open the incident detail, answer a question, and see updates reflected immediately on both staff and admin views.
-
-
-

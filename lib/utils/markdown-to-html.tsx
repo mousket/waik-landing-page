@@ -131,4 +131,3 @@ export function renderMarkdownOrHtml(value?: string | null): string | null {
   const cleaned = processed.trim()
   return cleaned.length > 0 ? cleaned : null
 }
-  

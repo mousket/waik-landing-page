@@ -10,7 +10,7 @@
 
 ### **HumanReport Interface:**
 
-```typescript
+\`\`\`typescript
 interface HumanReport {
   summary: string              // Brief incident summary
   insights: string             // What we learned
@@ -21,11 +21,11 @@ interface HumanReport {
   lastEditedBy?: string        // User ID who last edited (optional)
   lastEditedAt?: string        // ISO timestamp (optional)
 }
-```
+\`\`\`
 
 ### **AIReport Interface:**
 
-```typescript
+\`\`\`typescript
 interface AIReport {
   summary: string              // AI-generated summary
   insights: string             // AI analysis
@@ -37,7 +37,7 @@ interface AIReport {
   promptTokens?: number        // Optional usage stats
   completionTokens?: number    // Optional usage stats
 }
-```
+\`\`\`
 
 ---
 
@@ -45,7 +45,7 @@ interface AIReport {
 
 **From incident inc-6 (Skin Tear):**
 
-```json
+\`\`\`json
 {
   "summary": "During morning care, discovered a small skin tear on Dorothy Wilson's left forearm. Wound was cleaned per protocol, antibiotic ointment applied, and covered with non-adherent dressing. Daughter was notified immediately and expressed gratitude for prompt care.",
   
@@ -60,7 +60,7 @@ interface AIReport {
   "lastEditedBy": "user-2",
   "lastEditedAt": "2024-01-20T14:30:00Z"
 }
-```
+\`\`\`
 
 ---
 
@@ -68,7 +68,7 @@ interface AIReport {
 
 **From incident inc-6 (Skin Tear):**
 
-```json
+\`\`\`json
 {
   "summary": "Minor skin tear incident on left forearm of 82-year-old resident during morning care routine. Proper wound care protocol followed immediately. Family notification completed with positive response.",
   
@@ -84,7 +84,7 @@ interface AIReport {
   "promptTokens": 523,
   "completionTokens": 287
 }
-```
+\`\`\`
 
 ---
 
@@ -92,7 +92,7 @@ interface AIReport {
 
 ### **Insights Section (Human Report - Editable)**
 
-```tsx
+\`\`\`tsx
 <Card>
   <CardHeader>
     <CardTitle>📝 Incident Insights (Staff/Admin Report)</CardTitle>
@@ -173,13 +173,13 @@ interface AIReport {
     </Button>
   </CardFooter>
 </Card>
-```
+\`\`\`
 
 ---
 
 ### **WAiK Agent Section (AI Report - Read-Only with Generate)**
 
-```tsx
+\`\`\`tsx
 <Card className="border-gradient-to-r from-primary to-accent">
   <CardHeader className="bg-gradient-to-r from-primary/10 to-accent/10">
     <div className="flex items-center justify-between">
@@ -291,19 +291,19 @@ interface AIReport {
     </CardContent>
   )}
 </Card>
-```
+\`\`\`
 
 ---
 
 ## 📊 **Field Content Examples**
 
 ### **Summary (2-3 sentences):**
-```
+\`\`\`
 "During morning care, discovered a small skin tear on Dorothy Wilson's left forearm. 
 Wound was cleaned per protocol, antibiotic ointment applied, and covered with 
 non-adherent dressing. Daughter was notified immediately and expressed gratitude 
 for prompt care."
-```
+\`\`\`
 
 **Characteristics:**
 - Concise overview
@@ -314,18 +314,18 @@ for prompt care."
 ---
 
 ### **Insights (Analysis - can be numbered list):**
-```
+\`\`\`
 "Skin tear likely occurred during sleep due to fragile skin. No signs of trauma 
 or external cause. Resident takes blood thinners which increases skin fragility."
-```
+\`\`\`
 
 **Or (AI format with structure):**
-```
+\`\`\`
 "1. What happened? Small skin tear discovered during routine morning care
 2. What happened to the resident? Minor injury with proper immediate treatment, no complications
 3. How could we have prevented this? Increased monitoring of skin integrity for residents on anticoagulants
 4. What should we do to prevent future incidents? Implement proactive skin protection protocols"
-```
+\`\`\`
 
 **Characteristics:**
 - Root cause analysis
@@ -336,19 +336,19 @@ or external cause. Resident takes blood thinners which increases skin fragility.
 ---
 
 ### **Recommendations (Action-oriented):**
-```
+\`\`\`
 "Continue monitoring skin integrity during all care activities. Consider long-sleeve 
 protection garments at night. Review blood thinner dosage with physician if skin 
 tears become frequent."
-```
+\`\`\`
 
 **Or (AI format with numbered list):**
-```
+\`\`\`
 "1. Implement protective garment protocol for residents with fragile skin
 2. Staff training on gentle handling techniques for residents on blood thinners
 3. Daily skin integrity assessments during care routines
 4. Consider consult with wound care specialist for prevention strategies"
-```
+\`\`\`
 
 **Characteristics:**
 - Specific recommendations
@@ -359,18 +359,18 @@ tears become frequent."
 ---
 
 ### **Actions (Specific tasks with owners and deadlines):**
-```
+\`\`\`
 "Daily dressing changes for 7 days. Photograph healing progress. Family follow-up 
 call scheduled for end of week."
-```
+\`\`\`
 
 **Or (AI format with responsibility and timeline):**
-```
+\`\`\`
 "1. Nursing Director: Review and update skin care protocols (within 1 week)
 2. CNA Team: Attend skin integrity training session (within 2 weeks)
 3. Charge Nurse: Implement daily skin checks for high-risk residents (immediate)
 4. Facility Manager: Source appropriate protective garments (within 1 week)"
-```
+\`\`\`
 
 **Characteristics:**
 - Specific tasks
@@ -427,7 +427,7 @@ call scheduled for end of week."
 ## 📱 **Mobile-Friendly Layout**
 
 ### **Desktop (md and up):**
-```tsx
+\`\`\`tsx
 <div className="grid gap-6 md:grid-cols-2">
   {/* 2 columns - 2x2 grid */}
   <Card>Summary</Card>
@@ -435,10 +435,10 @@ call scheduled for end of week."
   <Card>Recommendations</Card>
   <Card>Actions</Card>
 </div>
-```
+\`\`\`
 
 ### **Mobile:**
-```tsx
+\`\`\`tsx
 <div className="grid gap-6">
   {/* 1 column - stacked */}
   <Card>Summary</Card>
@@ -446,7 +446,7 @@ call scheduled for end of week."
   <Card>Recommendations</Card>
   <Card>Actions</Card>
 </div>
-```
+\`\`\`
 
 **Responsive classes:**
 - `md:grid-cols-2` - 2 columns on medium screens and up
@@ -459,7 +459,7 @@ call scheduled for end of week."
 
 ### **Mock HumanReport:**
 
-```typescript
+\`\`\`typescript
 const mockHumanReport: HumanReport = {
   summary: "Resident experienced a fall while attempting to get out of bed unassisted. Staff responded immediately, assessed for injuries, and provided comfort. No serious injuries sustained, minor bruising observed on left hip.",
   
@@ -474,13 +474,13 @@ const mockHumanReport: HumanReport = {
   lastEditedBy: "user-2",
   lastEditedAt: "2024-01-20T16:30:00Z"
 }
-```
+\`\`\`
 
 ---
 
 ### **Mock AIReport:**
 
-```typescript
+\`\`\`typescript
 const mockAIReport: AIReport = {
   summary: "Resident fall incident during early morning hours with minor injury. Immediate staff response, proper assessment completed, and preventive measures being implemented. Family communication scheduled.",
   
@@ -496,7 +496,7 @@ const mockAIReport: AIReport = {
   promptTokens: 456,
   completionTokens: 312
 }
-```
+\`\`\`
 
 ---
 
@@ -520,7 +520,7 @@ const mockAIReport: AIReport = {
 ## 💾 **Save/Load Patterns**
 
 ### **Load Human Report:**
-```typescript
+\`\`\`typescript
 useEffect(() => {
   const loadHumanReport = async () => {
     const response = await fetch(`/api/incidents/${incidentId}/human-report`)
@@ -535,10 +535,10 @@ useEffect(() => {
   }
   loadHumanReport()
 }, [incidentId])
-```
+\`\`\`
 
 ### **Save Human Report:**
-```typescript
+\`\`\`typescript
 const handleSave = async () => {
   const { userId } = useAuthStore()
   
@@ -563,10 +563,10 @@ const handleSave = async () => {
     toast.success("Insights saved successfully")
   }
 }
-```
+\`\`\`
 
 ### **Generate & Load AI Report:**
-```typescript
+\`\`\`typescript
 const handleGenerateAI = async () => {
   setGenerating(true)
   
@@ -582,14 +582,14 @@ const handleGenerateAI = async () => {
   
   setGenerating(false)
 }
-```
+\`\`\`
 
 ---
 
 ## 🎨 **Color Palette for V0**
 
 ### **Human Report (Insights) - Soft & Professional:**
-```css
+\`\`\`css
 Summary Card:
 - Border: border-blue-200
 - Background: bg-blue-50/50
@@ -609,12 +609,12 @@ Actions Card:
 - Border: border-orange-200
 - Background: bg-orange-50/50
 - Icon: ✅ orange
-```
+\`\`\`
 
 ---
 
 ### **AI Report (WAiK Agent) - Vibrant & Tech:**
-```css
+\`\`\`css
 Container:
 - Border: border-primary with gradient
 - Header: bg-gradient-to-r from-primary/10 to-accent/10
@@ -639,13 +639,13 @@ Generate Button:
 - bg-gradient-to-r from-primary to-accent
 - Sparkles icon with animate-pulse
 - Loader2 with animate-spin when generating
-```
+\`\`\`
 
 ---
 
 ## ✅ **Complete Structure for V0**
 
-```typescript
+\`\`\`typescript
 // Full incident with both reports
 interface Incident {
   id: string
@@ -665,7 +665,7 @@ interface Incident {
   humanReport?: HumanReport
   aiReport?: AIReport
 }
-```
+\`\`\`
 
 ---
 
@@ -687,4 +687,3 @@ interface Incident {
 - AI: Vibrant gradients, sparkles, animations, generate button
 
 **Everything is ready for V0!** 🚀
-

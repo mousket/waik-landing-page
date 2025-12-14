@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Mic, MicOff, ArrowRight, Loader2, CheckCircle2, Volume2, VolumeX, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { useSpeechSynthesis } from "@/lib/hooks/useSpeechSynthesis"
+import { apiUrl } from "@/lib/api-config"
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 
@@ -255,7 +256,7 @@ export default function CreateIncidentPage() {
       console.log("[v0] User ID:", userId)
       console.log("[v0] User name:", name)
 
-      const response = await fetch("/api/agent/report", {
+      const response = await fetch(apiUrl("/api/agent/report"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -371,7 +372,6 @@ export default function CreateIncidentPage() {
       }
 
       console.log("[v0] Incident created successfully:", createdIncidentId)
-
     } catch (error) {
       console.error("[v0] Error creating incident:", error)
       toast.error("Failed to create incident. Please try again.")

@@ -317,4 +317,3 @@ export function getIntelligenceQA(): IntelligenceQAAgent {
   }
   return qaInstance
 }
-

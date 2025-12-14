@@ -16,7 +16,7 @@
 ## 🔧 **What Was Missing (Fixed)**
 
 ### **BEFORE (Problem):**
-```
+\`\`\`
 Staff completes voice report with 7 questions
     ↓
 Answers collected in memory
@@ -27,12 +27,12 @@ Final message: "Thank you..."
 ❌ No incident created
 ❌ No vectorization
 ❌ Intelligence can't find it
-```
+\`\`\`
 
 ---
 
 ### **AFTER (Solution):**
-```
+\`\`\`
 Staff completes voice report with 7 questions
     ↓
 POST /api/incidents
@@ -41,7 +41,7 @@ POST /api/incidents
 ✅ Store all 7 Q&A pairs
 ✅ Auto-vectorize ALL answers (background)
 ✅ Intelligence can search them immediately!
-```
+\`\`\`
 
 ---
 
@@ -49,7 +49,7 @@ POST /api/incidents
 
 ### **Voice Incident Report Flow:**
 
-```
+\`\`\`
 1. Staff: Opens /staff/report
    ↓
 2. System: "I am ready to start..."
@@ -134,7 +134,7 @@ POST /api/incidents
    }
    ↓
 11. ✅ Intelligence can NOW search these answers!
-```
+\`\`\`
 
 ---
 
@@ -146,7 +146,7 @@ POST /api/incidents
 > "What was the resident's condition after the incident?"
 
 **Intelligence System:**
-```typescript
+\`\`\`typescript
 1. Generate query embedding
 2. Search ALL incidents (including voice reports)
 3. Find similar Q&A pairs
@@ -159,7 +159,7 @@ POST /api/incidents
    
 4. Build context with this answer
 5. Generate grounded response
-```
+\`\`\`
 
 **AI Response:**
 > "The resident was stable after the incident, with minor bruising on the left hip. They were able to walk with assistance. This information comes from the voice incident report provided by Sarah Johnson."
@@ -170,7 +170,7 @@ POST /api/incidents
 
 ### **1. POST /api/incidents - Create Incident Endpoint**
 
-```typescript
+\`\`\`typescript
 // app/api/incidents/route.ts
 
 export async function POST(request: Request) {
@@ -213,7 +213,7 @@ export async function POST(request: Request) {
   
   return NextResponse.json(incident, { status: 201 })
 }
-```
+\`\`\`
 
 **Features:**
 - ✅ Creates incident
@@ -226,7 +226,7 @@ export async function POST(request: Request) {
 
 ### **2. createIncident() - Database Function**
 
-```typescript
+\`\`\`typescript
 // lib/db.ts
 
 export async function createIncident(data: {
@@ -270,7 +270,7 @@ export async function createIncident(data: {
   
   return incident
 }
-```
+\`\`\`
 
 **Features:**
 - ✅ Creates incident with all Q&A pairs
@@ -282,7 +282,7 @@ export async function createIncident(data: {
 
 ### **3. Voice Report Submission**
 
-```typescript
+\`\`\`typescript
 // app/staff/report/page.tsx
 
 const submitIncidentReport = async (allAnswers: string[]) => {
@@ -320,7 +320,7 @@ finalUtterance.onend = async () => {
   await submitIncidentReport(newAnswers)  // ✅ Submit everything
   router.push("/staff/dashboard")
 }
-```
+\`\`\`
 
 **Features:**
 - ✅ Collects all 7 answers
@@ -347,7 +347,7 @@ finalUtterance.onend = async () => {
 ## 🔍 **How Intelligence Finds Voice Answers**
 
 ### **Example 1: Text Q&A**
-```json
+\`\`\`json
 // Admin asks via text:
 {
   "questionText": "Was anyone injured?",
@@ -358,10 +358,10 @@ finalUtterance.onend = async () => {
     "method": "text"  // ✅ Text answer
   }
 }
-```
+\`\`\`
 
 ### **Example 2: Voice Q&A**
-```json
+\`\`\`json
 // Staff answers via voice report:
 {
   "questionText": "What is your assessment of the resident's condition?",
@@ -372,10 +372,10 @@ finalUtterance.onend = async () => {
     "method": "voice"  // ✅ Voice answer
   }
 }
-```
+\`\`\`
 
 ### **Both Are Searchable:**
-```typescript
+\`\`\`typescript
 // Intelligence query: "Was the resident injured?"
 
 // Searches BOTH:
@@ -398,7 +398,7 @@ Returns:
     method: "voice"  // From voice report ✅
   }
 ]
-```
+\`\`\`
 
 **Result:** Intelligence uses BOTH text and voice answers! ✅
 
@@ -407,14 +407,14 @@ Returns:
 ## 📊 **Data Flow Summary**
 
 ### **Text Q&A:**
-```
+\`\`\`
 Admin asks question → Staff answers via text → Vectorized → Searchable
-```
+\`\`\`
 
 ### **Voice Q&A:**
-```
+\`\`\`
 System asks 7 questions → Staff answers via voice → Incident created → All 7 vectorized → Searchable
-```
+\`\`\`
 
 **Both end up in:**
 - ✅ `db.json` - Source of truth
@@ -431,7 +431,7 @@ System asks 7 questions → Staff answers via voice → Incident created → All
 - User asks Intelligence: "What injuries occurred?"
 
 ### **Intelligence Process:**
-```typescript
+\`\`\`typescript
 1. Generate query embedding for "What injuries occurred?"
 
 2. Search embeddings.json for similar Q&A:
@@ -464,7 +464,7 @@ System asks 7 questions → Staff answers via voice → Incident created → All
     Sources:
     - Text Q&A by Sarah Johnson
     - Voice Report by Sarah Johnson"
-```
+\`\`\`
 
 **Result:** Intelligence combines information from BOTH text and voice! ✅
 
@@ -529,4 +529,3 @@ System asks 7 questions → Staff answers via voice → Incident created → All
 - Answers from voice incident reports (voice)
 
 **All requirements met!** 🎉
-

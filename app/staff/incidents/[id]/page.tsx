@@ -29,6 +29,8 @@ import {
   Loader2,
   ChevronDown,
 } from "lucide-react"
+import { apiUrl } from "@/lib/api-config"
+
 import { toast } from "sonner"
 import type { Incident, User as Staff } from "@/lib/types"
 import { format } from "date-fns"
@@ -57,10 +59,7 @@ interface PendingQuestion {
 }
 
 const fallbackParagraphHtml = (value: string) =>
-  `<p>${escapeHtml(value)
-    .replace(/\r\n?/g, "\n")
-    .replace(/\n\n+/g, "</p><p>")
-    .replace(/\n/g, "<br />")}</p>`
+  `<p>${escapeHtml(value).replace(/\r\n?/g, "\n").replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br />")}</p>`
 
 const formatScore = (value: number | undefined | null) => {
   if (typeof value !== "number" || Number.isNaN(value)) return "0"
@@ -88,9 +87,7 @@ const buildQuickCritique = (reportCard: {
     .slice(0, 5)
 
   const adviceSentence =
-    sentences.find((sentence) =>
-      /(next|please|try|consider|remember|ensure|aim|focus|add|include)/i.test(sentence),
-    ) ||
+    sentences.find((sentence) => /(next|please|try|consider|remember|ensure|aim|focus|add|include)/i.test(sentence)) ||
     (primaryGap ? `Try to include ${primaryGap.toLowerCase()} next time.` : "")
 
   return {
@@ -189,7 +186,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   const fetchEmployeeList = async () => {
     try {
-      const response = await fetch("/api/users")
+      const response = await fetch(apiUrl("/api/users"))
       if (response.ok) {
         const users = await response.json()
         setStaffList(users)
@@ -201,7 +198,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   const fetchIncident = async () => {
     try {
-      const response = await fetch(`/api/incidents/${params.id}`)
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}`))
       if (!response.ok) throw new Error("Failed to fetch incident")
       const data = await response.json()
       setIncident(data)
@@ -228,7 +225,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     }
 
     try {
-      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}/assign`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/questions/${questionId}/assign`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -261,7 +258,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/answers`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/answers`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -367,7 +364,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/answers`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/answers`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -447,7 +444,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
     setIsIntelligenceLoading(true)
 
     try {
-      const response = await fetch(`/api/incidents/${params.id}/intelligence`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/intelligence`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: intelligenceInput }),
@@ -557,7 +554,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
       try {
         setReportCardLoading(true)
         setReportCardError(null)
-        const response = await fetch(`/api/incidents/${incident.id}/report-card`)
+        const response = await fetch(apiUrl(`/api/incidents/${incident.id}/report-card`))
         if (!response.ok) {
           throw new Error(`Failed to load report card (${response.status})`)
         }
@@ -595,15 +592,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   )
 
   const enhancedNarrativeHtml = renderMarkdownOrHtml(incident?.initialReport?.enhancedNarrative)
-  const aggregatedNarrative = useMemo(
-    () => (incident ? buildIncidentCombinedNarrative(incident) : ""),
-    [incident],
-  )
+  const aggregatedNarrative = useMemo(() => (incident ? buildIncidentCombinedNarrative(incident) : ""), [incident])
 
-  const aggregatedNarrativeHtml =
-    aggregatedNarrative
-      ? renderMarkdownOrHtml(aggregatedNarrative) || fallbackParagraphHtml(aggregatedNarrative)
-      : null
+  const aggregatedNarrativeHtml = aggregatedNarrative
+    ? renderMarkdownOrHtml(aggregatedNarrative) || fallbackParagraphHtml(aggregatedNarrative)
+    : null
 
   const hasOriginalNarrative = Boolean(aggregatedNarrativeHtml)
 
@@ -634,9 +627,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
   const aiRecommendationsHtml =
     renderMarkdownOrHtml(incident?.aiReport?.recommendations) ||
-    (incident?.aiReport?.recommendations
-      ? fallbackParagraphHtml(incident.aiReport.recommendations)
-      : null)
+    (incident?.aiReport?.recommendations ? fallbackParagraphHtml(incident.aiReport.recommendations) : null)
 
   const aiActionsHtml =
     renderMarkdownOrHtml(incident?.aiReport?.actions) ||
@@ -857,7 +848,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </p>
                         <div
                           className="text-sm leading-relaxed text-muted-foreground"
-                          dangerouslySetInnerHTML={{ __html: aggregatedNarrativeHtml ?? "<p>No narrative provided.</p>" }}
+                          dangerouslySetInnerHTML={{
+                            __html: aggregatedNarrativeHtml ?? "<p>No narrative provided.</p>",
+                          }}
                         />
                       </div>
                     )}
@@ -940,7 +933,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Answer highlights</p>
                       <ul className="space-y-2 text-sm text-muted-foreground">
                         {answeredQuestions.slice(0, 3).map((q) => (
-                          <li key={`qa-highlight-${q.id}`} className="border border-muted/40 rounded-lg p-3 bg-muted/20">
+                          <li
+                            key={`qa-highlight-${q.id}`}
+                            className="border border-muted/40 rounded-lg p-3 bg-muted/20"
+                          >
                             <p className="font-medium">{q.questionText}</p>
                             <p className="mt-1 text-sm text-muted-foreground">
                               {q.answer?.answerText ?? "No answer captured."}
@@ -1000,10 +996,12 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       {quickCritique ? (
                         <div className="rounded-md bg-muted p-4 text-sm leading-relaxed text-muted-foreground">
                           <p>
-                            <span className="font-semibold text-emerald-700">What went well:</span> {quickCritique.strengthsSnippet}
+                            <span className="font-semibold text-emerald-700">What went well:</span>{" "}
+                            {quickCritique.strengthsSnippet}
                           </p>
                           <p>
-                            <span className="font-semibold text-amber-700">Needs attention:</span> {quickCritique.gapsSnippet}
+                            <span className="font-semibold text-amber-700">Needs attention:</span>{" "}
+                            {quickCritique.gapsSnippet}
                           </p>
                           {quickCritique.adviceSnippet ? (
                             <p>
@@ -1016,7 +1014,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       <div className="space-y-3">
                         <Button
                           variant="outline"
-                          className="w-full border border-primary/30 text-primary hover:bg-primary/10"
+                          className="w-full border border-primary/30 text-primary hover:bg-primary/10 bg-transparent"
                           onClick={() => setShowDetailedReport((prev) => !prev)}
                         >
                           {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
@@ -1117,7 +1115,6 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
             </Card>
 
             {/* Q&A content is now located in the dedicated Q&A tab below */}
-
           </TabsContent>
 
           <TabsContent value="qa" className="space-y-6 mt-6">
@@ -1132,7 +1129,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       <CardDescription>Answer questions assigned to you using text or voice</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant={qaMode === "text" ? "default" : "outline"} size="sm" onClick={() => setQaMode("text")}>
+                      <Button
+                        variant={qaMode === "text" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setQaMode("text")}
+                      >
                         <Type className="h-4 w-4 mr-2" />
                         Text
                       </Button>
@@ -1179,11 +1180,17 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                               <p className="text-xs text-muted-foreground">
-                                Asked by <span className="font-medium">{unansweredQuestions[currentTextQuestionIndex]?.askedBy}</span>
+                                Asked by{" "}
+                                <span className="font-medium">
+                                  {unansweredQuestions[currentTextQuestionIndex]?.askedBy}
+                                </span>
                               </p>
                               <span className="text-xs text-muted-foreground">•</span>
                               <p className="text-xs text-muted-foreground">
-                                {formatDate(unansweredQuestions[currentTextQuestionIndex]?.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                                {formatDate(
+                                  unansweredQuestions[currentTextQuestionIndex]?.askedAt,
+                                  "MMM d, yyyy 'at' h:mm a",
+                                )}
                               </p>
                             </div>
                           </div>
@@ -1278,11 +1285,17 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                               <p className="text-xs text-muted-foreground">
-                                Asked by <span className="font-medium">{unansweredQuestions[currentQuestionIndex]?.askedBy}</span>
+                                Asked by{" "}
+                                <span className="font-medium">
+                                  {unansweredQuestions[currentQuestionIndex]?.askedBy}
+                                </span>
                               </p>
                               <span className="text-xs text-muted-foreground">•</span>
                               <p className="text-xs text-muted-foreground">
-                                {formatDate(unansweredQuestions[currentQuestionIndex]?.askedAt, "MMM d, yyyy 'at' h:mm a")}
+                                {formatDate(
+                                  unansweredQuestions[currentQuestionIndex]?.askedAt,
+                                  "MMM d, yyyy 'at' h:mm a",
+                                )}
                               </p>
                             </div>
                           </div>
@@ -1342,7 +1355,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                                   onClick={() => {
                                     setCurrentTranscript("")
                                     setIsEditingTranscript(false)
-                                    setTimeout(() => speakQuestion(unansweredQuestions[currentQuestionIndex].questionText), 300)
+                                    setTimeout(
+                                      () => speakQuestion(unansweredQuestions[currentQuestionIndex].questionText),
+                                      300,
+                                    )
                                   }}
                                   variant="outline"
                                 >
@@ -1416,7 +1432,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <p className="text-xs text-muted-foreground">
-                              Asked by <span className="font-medium">{answeredQuestions[currentAnsweredQuestionTab]?.askedBy}</span>
+                              Asked by{" "}
+                              <span className="font-medium">
+                                {answeredQuestions[currentAnsweredQuestionTab]?.askedBy}
+                              </span>
                             </p>
                             <span className="text-xs text-muted-foreground">•</span>
                             <p className="text-xs text-muted-foreground">
@@ -1439,7 +1458,10 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <p className="text-xs text-muted-foreground">
-                              Answered by <span className="font-medium">{answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredBy}</span>
+                              Answered by{" "}
+                              <span className="font-medium">
+                                {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredBy}
+                              </span>
                             </p>
                             <span className="text-xs text-muted-foreground">•</span>
                             <p className="text-xs text-muted-foreground">
@@ -1789,7 +1811,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <CardContent>
                     <div
                       className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.recommendations || "") || "" }}
+                      dangerouslySetInnerHTML={{
+                        __html: renderMarkdownOrHtml(incident.aiReport.recommendations || "") || "",
+                      }}
                     />
                   </CardContent>
                 </Card>

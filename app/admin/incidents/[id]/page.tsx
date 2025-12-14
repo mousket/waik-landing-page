@@ -41,6 +41,7 @@ import {
 import { toast } from "sonner"
 import { getDisplayNarrative, getRawNarrative } from "@/lib/utils/enhance-narrative"
 import { renderMarkdownOrHtml } from "@/lib/utils/markdown-to-html"
+import { apiUrl } from "@/lib/api-config"
 
 function formatDate(dateString: string | undefined, formatString: string): string {
   if (!dateString) return "Invalid date"
@@ -62,7 +63,7 @@ type IntelligenceMessage = {
   timestamp: Date
 }
 
-export default function AdminIncidentDetailPage({ params }: { params: { id: string } }) {
+export default function AdminIncidentDetail({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { userId, role } = useAuthStore()
   const [incident, setIncident] = useState<Incident | null>(null)
@@ -121,16 +122,12 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   const filteredPendingEmployees = useMemo(() => {
     if (!employeeSearchQuery.trim()) return staffList
-    return staffList.filter((emp) =>
-      emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()),
-    )
+    return staffList.filter((emp) => emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()))
   }, [staffList, employeeSearchQuery])
 
   const filteredNewQuestionEmployees = useMemo(() => {
     if (!newQuestionSearchQuery.trim()) return staffList
-    return staffList.filter((emp) =>
-      emp.name.toLowerCase().includes(newQuestionSearchQuery.toLowerCase()),
-    )
+    return staffList.filter((emp) => emp.name.toLowerCase().includes(newQuestionSearchQuery.toLowerCase()))
   }, [staffList, newQuestionSearchQuery])
 
   const currentPendingQuestion = unansweredQuestions[currentPendingQuestionTab] ?? null
@@ -142,8 +139,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   }, [params.id])
 
   const fetchIncident = async () => {
+    setIsLoading(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}`)
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}`))
       if (response.ok) {
         const data = await response.json()
         setIncident(data)
@@ -161,7 +159,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   const fetchStaffList = async () => {
     try {
-      const response = await fetch("/api/users?role=staff")
+      const response = await fetch(apiUrl("/api/users?role=staff"))
       if (response.ok) {
         const users = await response.json()
         setStaffList(users)
@@ -176,7 +174,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
     setIsSavingIncident(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -208,7 +206,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
     setIsClosingIncident(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "closed" }),
@@ -234,15 +232,13 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
     const answeredQuestions = incident.questions.filter((q) => q.answer)
     if (answeredQuestions.length < 5) {
-      toast.error(
-        `Need at least 5 answered questions to generate AI insights. Currently have ${answeredQuestions.length}.`,
-      )
+      toast.error("Please answer at least 5 questions before generating AI insights")
       return
     }
 
     setIsGeneratingAIReport(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/ai-report`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/ai-report`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       })
@@ -266,7 +262,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const updateStatus = async (status: string) => {
     if (!incident) return
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -286,7 +282,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const updatePriority = async (priority: string) => {
     if (!incident) return
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ priority }),
@@ -308,7 +304,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
     setIsAddingQuestion(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/questions`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/questions`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -337,7 +333,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
   const deleteQuestion = async (questionId: string) => {
     try {
-      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/questions/${questionId}`), {
         method: "DELETE",
       })
 
@@ -368,7 +364,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     setIsIntelligenceLoading(true)
 
     try {
-      const response = await fetch(`/api/incidents/${params.id}/intelligence`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/intelligence`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: intelligenceInput }),
@@ -522,7 +518,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
     }
     setEmployeeSearchQuery("")
     setSelectedEmployees([])
-  }, [currentPendingQuestion?.id])
+  }, [currentPendingQuestion])
 
   if (isLoading) {
     return (
@@ -564,7 +560,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
 
     setIsAddingQuestion(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}/assign`, {
+      const response = await fetch(apiUrl(`/api/incidents/${params.id}/questions/${questionId}/assign`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -771,7 +767,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                           <FileText className="h-3 w-3" /> View original voice transcript
                         </summary>
                         <div className="mt-2 p-3 bg-muted/40 rounded-md border border-muted">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Original Transcript</p>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                            Original Transcript
+                          </p>
                           <div
                             className="text-sm text-foreground leading-relaxed incident-enhanced-html"
                             dangerouslySetInnerHTML={{ __html: rawNarrativeHtml }}
@@ -793,7 +791,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                         )}
                         {environmentNotesHtml && (
                           <div className="p-3 bg-muted/40 rounded-md border border-muted">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Environment Notes</p>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                              Environment Notes
+                            </p>
                             <div
                               className="text-sm leading-relaxed text-foreground incident-enhanced-html"
                               dangerouslySetInnerHTML={{ __html: environmentNotesHtml }}
@@ -1072,7 +1072,7 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                           </p>
                           <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
                             <span>
-                              Answered by {" "}
+                              Answered by{" "}
                               <span className="font-medium">
                                 {currentAnsweredQuestion.answer?.answeredBy ?? "Unknown"}
                               </span>
@@ -1080,7 +1080,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                             {currentAnsweredQuestion.answer?.answeredAt && (
                               <>
                                 <span>•</span>
-                                <span>{formatDate(currentAnsweredQuestion.answer.answeredAt, "MMM d, yyyy 'at' h:mm a")}</span>
+                                <span>
+                                  {formatDate(currentAnsweredQuestion.answer.answeredAt, "MMM d, yyyy 'at' h:mm a")}
+                                </span>
                               </>
                             )}
                             {currentAnsweredQuestion.answer?.method && (
@@ -1456,7 +1458,9 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                   <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
                     WAiK Intelligence
                   </h2>
-                  <p className="text-sm text-muted-foreground mt-1">WAiK summaries, insights, recommendations, and action items</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    WAiK summaries, insights, recommendations, and action items
+                  </p>
                 </div>
                 {role === "admin" && (
                   <Button
@@ -1489,247 +1493,248 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
                 )}
               </div>
 
-            {isGeneratingAIReport && (
-              <Card className="border-purple-200 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 shadow-lg overflow-hidden">
-                <CardContent className="pt-8 pb-8">
-                  <div className="flex flex-col items-center justify-center space-y-6">
-                    <div className="relative">
-                      {/* Animated gradient background */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 blur-3xl opacity-30 animate-pulse" />
-
-                      {/* Pulsing brain icon */}
+              {isGeneratingAIReport && (
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 shadow-lg overflow-hidden">
+                  <CardContent className="pt-8 pb-8">
+                    <div className="flex flex-col items-center justify-center space-y-6">
                       <div className="relative">
-                        <Brain className="h-16 w-16 text-purple-600 animate-pulse" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 opacity-50 blur-xl animate-ping" />
+                        {/* Animated gradient background */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 blur-3xl opacity-30 animate-pulse" />
+
+                        {/* Pulsing brain icon */}
+                        <div className="relative">
+                          <Brain className="h-16 w-16 text-purple-600 animate-pulse" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 opacity-50 blur-xl animate-ping" />
+                        </div>
+                      </div>
+
+                      <div className="text-center space-y-2">
+                        <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                          WAiK is analyzing the incident...
+                        </h3>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          Processing {answeredQuestions.length} answered questions and generating comprehensive insights
+                        </p>
+                      </div>
+
+                      {/* Animated dots */}
+                      <div className="flex gap-2">
+                        <div className="h-3 w-3 rounded-full bg-purple-600 animate-bounce [animation-delay:-0.3s]" />
+                        <div className="h-3 w-3 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.15s]" />
+                        <div className="h-3 w-3 rounded-full bg-cyan-600 animate-bounce" />
+                      </div>
+
+                      {/* Scanning effect */}
+                      <div className="w-full max-w-md h-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 animate-[scan_2s_ease-in-out_infinite]" />
                       </div>
                     </div>
-
-                    <div className="text-center space-y-2">
-                      <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                        WAiK is analyzing the incident...
-                      </h3>
-                      <p className="text-sm text-muted-foreground max-w-md">
-                        Processing {answeredQuestions.length} answered questions and generating comprehensive insights
-                      </p>
-                    </div>
-
-                    {/* Animated dots */}
-                    <div className="flex gap-2">
-                      <div className="h-3 w-3 rounded-full bg-purple-600 animate-bounce [animation-delay:-0.3s]" />
-                      <div className="h-3 w-3 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.15s]" />
-                      <div className="h-3 w-3 rounded-full bg-cyan-600 animate-bounce" />
-                    </div>
-
-                    {/* Scanning effect */}
-                    <div className="w-full max-w-md h-1 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 animate-[scan_2s_ease-in-out_infinite]" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {!canGenerateAIReport && !incident.aiReport && (
-              <Card className="border-yellow-200 bg-yellow-50">
-                <CardContent className="pt-6">
-                  <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                      <Brain className="h-4 w-4 text-yellow-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-yellow-900">More data needed</p>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        At least 5 answered questions are required to generate WAiK insights. Currently have {answeredQuestions.length} answered question{answeredQuestions.length !== 1 ? "s" : ""}.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {incident.aiReport ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Summary</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {aiSummaryHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiSummaryHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No summary available.</p>
-                    )}
                   </CardContent>
                 </Card>
+              )}
 
-                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Insights</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {aiInsightsHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiInsightsHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No insights available.</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Lightbulb className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Recommendations</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {aiRecommendationsHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiRecommendationsHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No recommendations available.</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Target className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Recommended Action Items</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {aiActionsHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiActionsHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No action items available.</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-purple-100 bg-purple-50/50 lg:col-span-2">
+              {!canGenerateAIReport && !incident.aiReport && (
+                <Card className="border-yellow-200 bg-yellow-50">
                   <CardContent className="pt-6">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        Generated: {formatDate(incident.aiReport.generatedAt, "MMM d, yyyy 'at' h:mm a")}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Brain className="h-3.5 w-3.5 text-purple-600" />
-                        <span>Model: {incident.aiReport.model}</span>
-                        <span>•</span>
-                        <span>Confidence: {(incident.aiReport.confidence * 100).toFixed(0)}%</span>
+                    <div className="flex items-start gap-3">
+                      <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                        <Brain className="h-4 w-4 text-yellow-600" />
                       </div>
-                      {incident.aiReport.promptTokens && incident.aiReport.completionTokens && (
-                        <span>
-                          Tokens: {incident.aiReport.promptTokens + incident.aiReport.completionTokens} total
-                        </span>
+                      <div>
+                        <p className="font-medium text-yellow-900">More data needed</p>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          At least 5 answered questions are required to generate WAiK insights. Currently have{" "}
+                          {answeredQuestions.length} answered question{answeredQuestions.length !== 1 ? "s" : ""}.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {incident.aiReport ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                    <CardHeader>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-purple-600" />
+                        <CardTitle className="text-base">WAiK Summary</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {aiSummaryHtml ? (
+                        <div
+                          className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                          dangerouslySetInnerHTML={{ __html: aiSummaryHtml }}
+                        />
+                      ) : (
+                        <p className="text-sm leading-relaxed text-muted-foreground">No summary available.</p>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Summary</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
 
-                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
+                  <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                    <CardHeader>
                       <div className="flex items-center gap-2">
-                        <Brain className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Insights</CardTitle>
+                        <Brain className="h-5 w-5 text-purple-600" />
+                        <CardTitle className="text-base">WAiK Insights</CardTitle>
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardHeader>
+                    <CardContent>
+                      {aiInsightsHtml ? (
+                        <div
+                          className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                          dangerouslySetInnerHTML={{ __html: aiInsightsHtml }}
+                        />
+                      ) : (
+                        <p className="text-sm leading-relaxed text-muted-foreground">No insights available.</p>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
+                  <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                    <CardHeader>
                       <div className="flex items-center gap-2">
-                        <Lightbulb className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Recommendations</CardTitle>
+                        <Lightbulb className="h-5 w-5 text-purple-600" />
+                        <CardTitle className="text-base">WAiK Recommendations</CardTitle>
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardHeader>
+                    <CardContent>
+                      {aiRecommendationsHtml ? (
+                        <div
+                          className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                          dangerouslySetInnerHTML={{ __html: aiRecommendationsHtml }}
+                        />
+                      ) : (
+                        <p className="text-sm leading-relaxed text-muted-foreground">No recommendations available.</p>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
+                  <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                    <CardHeader>
                       <div className="flex items-center gap-2">
-                        <Target className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Recommended Action Items</CardTitle>
+                        <Target className="h-5 w-5 text-purple-600" />
+                        <CardTitle className="text-base">WAiK Recommended Action Items</CardTitle>
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </div>
+                    </CardHeader>
+                    <CardContent>
+                      {aiActionsHtml ? (
+                        <div
+                          className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                          dangerouslySetInnerHTML={{ __html: aiActionsHtml }}
+                        />
+                      ) : (
+                        <p className="text-sm leading-relaxed text-muted-foreground">No action items available.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-purple-100 bg-purple-50/50 lg:col-span-2">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Generated: {formatDate(incident.aiReport.generatedAt, "MMM d, yyyy 'at' h:mm a")}</span>
+                        <div className="flex items-center gap-2">
+                          <Brain className="h-3.5 w-3.5 text-purple-600" />
+                          <span>Model: {incident.aiReport.model}</span>
+                          <span>•</span>
+                          <span>Confidence: {(incident.aiReport.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                        {incident.aiReport.promptTokens && incident.aiReport.completionTokens && (
+                          <span>
+                            Tokens: {incident.aiReport.promptTokens + incident.aiReport.completionTokens} total
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-5 w-5 text-purple-400" />
+                          <CardTitle className="text-base text-muted-foreground">WAiK Summary</CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          Pending
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                        <span>Awaiting WAiK generation</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Brain className="h-5 w-5 text-purple-400" />
+                          <CardTitle className="text-base text-muted-foreground">WAiK Insights</CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          Pending
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                        <span>Awaiting WAiK generation</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Lightbulb className="h-5 w-5 text-purple-400" />
+                          <CardTitle className="text-base text-muted-foreground">WAiK Recommendations</CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          Pending
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                        <span>Awaiting WAiK generation</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-5 w-5 text-purple-400" />
+                          <CardTitle className="text-base text-muted-foreground">
+                            WAiK Recommended Action Items
+                          </CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          Pending
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                        <span>Awaiting WAiK generation</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

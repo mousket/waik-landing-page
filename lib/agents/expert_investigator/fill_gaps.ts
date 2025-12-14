@@ -288,4 +288,3 @@ export async function fillGapsWithAnswer(input: FillGapsInput): Promise<FillGaps
     remainingMissing: collectMissingFields(sanitizedState),
   }
 }
-

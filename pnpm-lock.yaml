@@ -16,10 +16,10 @@ importers:
         version: 3.10.0(react-hook-form@7.60.0(react@18.2.0))
       '@langchain/core':
         specifier: ^1.0.2
-        version: 1.0.2(openai@6.7.0(zod@3.25.76))
+        version: 1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       '@langchain/openai':
         specifier: ^1.0.0
-        version: 1.0.0(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))
+        version: 1.0.0(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
       '@radix-ui/react-accordion':
         specifier: 1.2.2
         version: 1.2.2(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -52,7 +52,7 @@ importers:
         version: 1.1.4(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@radix-ui/react-label':
         specifier: latest
-        version: 2.1.7(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 2.1.8(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@radix-ui/react-menubar':
         specifier: 1.1.4
         version: 1.1.4(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -76,13 +76,13 @@ importers:
         version: 2.2.6(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@radix-ui/react-separator':
         specifier: latest
-        version: 1.1.7(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.1.8(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@radix-ui/react-slider':
         specifier: 1.2.2
         version: 1.2.2(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@radix-ui/react-slot':
         specifier: latest
-        version: 1.2.3(@types/react@18.2.45)(react@18.2.0)
+        version: 1.2.4(@types/react@18.2.45)(react@18.2.0)
       '@radix-ui/react-switch':
         specifier: 1.1.2
         version: 1.1.2(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -103,13 +103,16 @@ importers:
         version: 1.1.6(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@vercel/analytics':
         specifier: latest
-        version: 1.5.0(next@14.2.6(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)
+        version: 1.6.1(next@14.2.35(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)
       autoprefixer:
         specifier: ^10.4.20
         version: 10.4.20(postcss@8.5.0)
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
+      bcryptjs:
+        specifier: 3.0.3
+        version: 3.0.3
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -136,13 +139,13 @@ importers:
         version: 5.1.0
       immer:
         specifier: latest
-        version: 10.2.0
+        version: 11.0.1
       input-otp:
         specifier: 1.4.1
         version: 1.4.1(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       langchain:
         specifier: ^1.0.2
-        version: 1.0.2(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))(openai@6.7.0(zod@3.25.76))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.0.2(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       lowdb:
         specifier: ^7.0.1
         version: 7.0.1
@@ -150,8 +153,8 @@ importers:
         specifier: ^0.454.0
         version: 0.454.0(react@18.2.0)
       next:
-        specifier: 14.2.6
-        version: 14.2.6(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: 14.2.35
+        version: 14.2.35(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       next-themes:
         specifier: latest
         version: 0.4.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -160,7 +163,7 @@ importers:
         version: 11.6.2
       openai:
         specifier: ^6.7.0
-        version: 6.7.0(zod@3.25.76)
+        version: 6.7.0(ws@8.18.3)(zod@3.25.76)
       pnpm:
         specifier: ^10.20.0
         version: 10.20.0
@@ -200,12 +203,15 @@ importers:
       vaul:
         specifier: ^0.9.9
         version: 0.9.9(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      ws:
+        specifier: latest
+        version: 8.18.3
       zod:
         specifier: 3.25.76
         version: 3.25.76
       zustand:
         specifier: latest
-        version: 5.0.8(@types/react@18.2.45)(immer@10.2.0)(react@18.2.0)(use-sync-external-store@1.6.0(react@18.2.0))
+        version: 5.0.9(@types/react@18.2.45)(immer@11.0.1)(react@18.2.0)(use-sync-external-store@1.6.0(react@18.2.0))
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.1.9
@@ -509,62 +515,62 @@ packages:
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
 
-  '@next/env@14.2.6':
-    resolution: {integrity: sha512-bs5DFKV+08EjWrl8EB+KKqev1ZTNONH1vFCaHh911aaB362NnP32UDTbE9VQhyiAgbFqJsfDkSxFERNDDb3j0g==}
+  '@next/env@14.2.35':
+    resolution: {integrity: sha512-DuhvCtj4t9Gwrx80dmz2F4t/zKQ4ktN8WrMwOuVzkJfBilwAwGr6v16M5eI8yCuZ63H9TTuEU09Iu2HqkzFPVQ==}
 
   '@next/eslint-plugin-next@16.0.1':
     resolution: {integrity: sha512-g4Cqmv/gyFEXNeVB2HkqDlYKfy+YrlM2k8AVIO/YQVEPfhVruH1VA99uT1zELLnPLIeOnx8IZ6Ddso0asfTIdw==}
 
-  '@next/swc-darwin-arm64@14.2.6':
-    resolution: {integrity: sha512-BtJZb+hYXGaVJJivpnDoi3JFVn80SHKCiiRUW3kk1SY6UCUy5dWFFSbh+tGi5lHAughzeduMyxbLt3pspvXNSg==}
+  '@next/swc-darwin-arm64@14.2.33':
+    resolution: {integrity: sha512-HqYnb6pxlsshoSTubdXKu15g3iivcbsMXg4bYpjL2iS/V6aQot+iyF4BUc2qA/J/n55YtvE4PHMKWBKGCF/+wA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@next/swc-darwin-x64@14.2.6':
-    resolution: {integrity: sha512-ZHRbGpH6KHarzm6qEeXKSElSXh8dS2DtDPjQt3IMwY8QVk7GbdDYjvV4NgSnDA9huGpGgnyy3tH8i5yHCqVkiQ==}
+  '@next/swc-darwin-x64@14.2.33':
+    resolution: {integrity: sha512-8HGBeAE5rX3jzKvF593XTTFg3gxeU4f+UWnswa6JPhzaR6+zblO5+fjltJWIZc4aUalqTclvN2QtTC37LxvZAA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@next/swc-linux-arm64-gnu@14.2.6':
-    resolution: {integrity: sha512-O4HqUEe3ZvKshXHcDUXn1OybN4cSZg7ZdwHJMGCXSUEVUqGTJVsOh17smqilIjooP/sIJksgl+1kcf2IWMZWHg==}
+  '@next/swc-linux-arm64-gnu@14.2.33':
+    resolution: {integrity: sha512-JXMBka6lNNmqbkvcTtaX8Gu5by9547bukHQvPoLe9VRBx1gHwzf5tdt4AaezW85HAB3pikcvyqBToRTDA4DeLw==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
 
-  '@next/swc-linux-arm64-musl@14.2.6':
-    resolution: {integrity: sha512-xUcdhr2hfalG8RDDGSFxQ75yOG894UlmFS4K2M0jLrUhauRBGOtUOxoDVwiIIuZQwZ3Y5hDsazNjdYGB0cQ9yQ==}
+  '@next/swc-linux-arm64-musl@14.2.33':
+    resolution: {integrity: sha512-Bm+QulsAItD/x6Ih8wGIMfRJy4G73tu1HJsrccPW6AfqdZd0Sfm5Imhgkgq2+kly065rYMnCOxTBvmvFY1BKfg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
 
-  '@next/swc-linux-x64-gnu@14.2.6':
-    resolution: {integrity: sha512-InosKxw8UMcA/wEib5n2QttwHSKHZHNSbGcMepBM0CTcNwpxWzX32KETmwbhKod3zrS8n1vJ+DuJKbL9ZAB0Ag==}
+  '@next/swc-linux-x64-gnu@14.2.33':
+    resolution: {integrity: sha512-FnFn+ZBgsVMbGDsTqo8zsnRzydvsGV8vfiWwUo1LD8FTmPTdV+otGSWKc4LJec0oSexFnCYVO4hX8P8qQKaSlg==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
 
-  '@next/swc-linux-x64-musl@14.2.6':
-    resolution: {integrity: sha512-d4QXfJmt5pGJ7cG8qwxKSBnO5AXuKAFYxV7qyDRHnUNvY/dgDh+oX292gATpB2AAHgjdHd5ks1wXxIEj6muLUQ==}
+  '@next/swc-linux-x64-musl@14.2.33':
+    resolution: {integrity: sha512-345tsIWMzoXaQndUTDv1qypDRiebFxGYx9pYkhwY4hBRaOLt8UGfiWKr9FSSHs25dFIf8ZqIFaPdy5MljdoawA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
 
-  '@next/swc-win32-arm64-msvc@14.2.6':
-    resolution: {integrity: sha512-AlgIhk4/G+PzOG1qdF1b05uKTMsuRatFlFzAi5G8RZ9h67CVSSuZSbqGHbJDlcV1tZPxq/d4G0q6qcHDKWf4aQ==}
+  '@next/swc-win32-arm64-msvc@14.2.33':
+    resolution: {integrity: sha512-nscpt0G6UCTkrT2ppnJnFsYbPDQwmum4GNXYTeoTIdsmMydSKFz9Iny2jpaRupTb+Wl298+Rh82WKzt9LCcqSQ==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@next/swc-win32-ia32-msvc@14.2.6':
-    resolution: {integrity: sha512-hNukAxq7hu4o5/UjPp5jqoBEtrpCbOmnUqZSKNJG8GrUVzfq0ucdhQFVrHcLRMvQcwqqDh1a5AJN9ORnNDpgBQ==}
+  '@next/swc-win32-ia32-msvc@14.2.33':
+    resolution: {integrity: sha512-pc9LpGNKhJ0dXQhZ5QMmYxtARwwmWLpeocFmVG5Z0DzWq5Uf0izcI8tLc+qOpqxO1PWqZ5A7J1blrUIKrIFc7Q==}
     engines: {node: '>= 10'}
     cpu: [ia32]
     os: [win32]
 
-  '@next/swc-win32-x64-msvc@14.2.6':
-    resolution: {integrity: sha512-NANtw+ead1rSDK1jxmzq3TYkl03UNK2KHqUYf1nIhNci6NkeqBD4s1njSzYGIlSHxCK+wSaL8RXZm4v+NF/pMw==}
+  '@next/swc-win32-x64-msvc@14.2.33':
+    resolution: {integrity: sha512-nOjfZMy8B94MdisuzZo9/57xuFVLHJaDj5e/xrduJp9CV2/HrfxTRH2fbyLe+K9QT41WBLUd4iXX3R7jBp0EUg==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
@@ -934,8 +940,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@radix-ui/react-label@2.1.7':
-    resolution: {integrity: sha512-YT1GqPSL8kJn20djelMX7/cTRp/Y9w5IZHvfxQTVHrOqa2yMl7i/UfMqKRU5V7mEyKTrUVgJXhNQPVCG8PBLoQ==}
+  '@radix-ui/react-label@2.1.8':
+    resolution: {integrity: sha512-FmXs37I6hSBVDlO4y764TNz1rLgKwjJMQ0EGte6F3Cb3f4bIuHB/iLa/8I9VKkmOy+gNHq8rql3j686ACVV21A==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -1116,6 +1122,19 @@ packages:
       '@types/react-dom':
         optional: true
 
+  '@radix-ui/react-primitive@2.1.4':
+    resolution: {integrity: sha512-9hQc4+GNVtJAIEPEqlYqW5RiYdrr8ea5XQ0ZOnD6fgru+83kqT15mq2OCcbe8KnjRZl5vF3ks69AKz3kh1jrhg==}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+
   '@radix-ui/react-progress@1.1.1':
     resolution: {integrity: sha512-6diOawA84f/eMxFHcWut0aE1C2kyE9dOyCTQOMRR2C/qPiXz/X0SaiA/RLbapQaXUCmy0/hLMf9meSccD1N0pA==}
     peerDependencies:
@@ -1194,8 +1213,8 @@ packages:
       '@types/react-dom':
         optional: true
 
-  '@radix-ui/react-separator@1.1.7':
-    resolution: {integrity: sha512-0HEb8R9E8A+jZjvmFCy/J4xhbXy3TV+9XSnGJ3KvTtjlIUy/YQ/p6UYZvi7YbeoeXdyU9+Y3scizK6hkY37baA==}
+  '@radix-ui/react-separator@1.1.8':
+    resolution: {integrity: sha512-sDvqVY4itsKwwSMEe0jtKgfTh+72Sy3gPmQpjqcQneqQ4PFmr/1I0YA+2/puilhggCe2gJcx5EBAYFkWkdpa5g==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -1231,6 +1250,15 @@ packages:
 
   '@radix-ui/react-slot@1.2.3':
     resolution: {integrity: sha512-aeNmHnBxbi2St0au6VBVC7JXFlhLlOnvIIlePNniyUNAClzmtAUEY8/pBiK3iHjufOlwA+c20/8jngo7xcrg8A==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
+  '@radix-ui/react-slot@1.2.4':
+    resolution: {integrity: sha512-Jl+bCv8HxKnlTLVrcDE8zTMJ09R9/ukw4qBs/oZClOfoQk/cOTbDn+NceXfV7j09YPVQUryJPHurafcSg6EVKA==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
@@ -1858,8 +1886,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@vercel/analytics@1.5.0':
-    resolution: {integrity: sha512-MYsBzfPki4gthY5HnYN7jgInhAZ7Ac1cYDoRWFomwGHWEX7odTEzbtg9kf/QSo7XEsEAqlQugA6gJ2WS2DEa3g==}
+  '@vercel/analytics@1.6.1':
+    resolution: {integrity: sha512-oH9He/bEM+6oKlv3chWuOOcp8Y6fo6/PSro8hEkgCW3pu9/OiCXiUpRUogDh3Fs3LH2sosDrx8CxeOLBEE+afg==}
     peerDependencies:
       '@remix-run/react': ^2
       '@sveltejs/kit': ^1 || ^2
@@ -2002,6 +2030,10 @@ packages:
   bcrypt@6.0.0:
     resolution: {integrity: sha512-cU8v/EGSrnH+HnxV2z0J7/blxH8gq7Xh2JFT6Aroax7UohdmiJJlxApMxtKfuI7z68NvvVcmR78k2LbT6efhRg==}
     engines: {node: '>= 18'}
+
+  bcryptjs@3.0.3:
+    resolution: {integrity: sha512-GlF5wPWnSa/X5LKM1o0wz0suXIINz1iHRLvTS+sLyi7XPbe5ycmYI3DlZqVGZZtDgl4DmasFg7gOB3JYbphV5g==}
+    hasBin: true
 
   binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
@@ -2683,8 +2715,8 @@ packages:
     resolution: {integrity: sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg==}
     engines: {node: '>= 4'}
 
-  immer@10.2.0:
-    resolution: {integrity: sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==}
+  immer@11.0.1:
+    resolution: {integrity: sha512-naDCyggtcBWANtIrjQEajhhBEuL9b0Zg4zmlWK2CzS6xCWSE39/vvf4LqnMjUAWHBhot4m9MHCM/Z+mfWhUkiA==}
 
   import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
@@ -3094,8 +3126,8 @@ packages:
       react: ^16.8 || ^17 || ^18 || ^19 || ^19.0.0-rc
       react-dom: ^16.8 || ^17 || ^18 || ^19 || ^19.0.0-rc
 
-  next@14.2.6:
-    resolution: {integrity: sha512-57Su7RqXs5CBKKKOagt8gPhMM3CpjgbeQhrtei2KLAA1vTNm7jfKS+uDARkSW8ZETUflDCBIsUKGSyQdRs4U4g==}
+  next@14.2.35:
+    resolution: {integrity: sha512-KhYd2Hjt/O1/1aZVX3dCwGXM1QmOV4eNM2UTacK5gipDdPN/oHHK/4oVGy7X8GMfPMsUTUEmGlsy0EY1YGAkig==}
     engines: {node: '>=18.17.0'}
     hasBin: true
     peerDependencies:
@@ -3925,6 +3957,18 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
+  ws@8.18.3:
+    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -3953,8 +3997,8 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zustand@5.0.8:
-    resolution: {integrity: sha512-gyPKpIaxY9XcO2vSMrLbiER7QMAMGOQZVRdJ6Zi782jkbzZygq5GI9nG8g+sMgitRtndwaBSl7uiqC49o1SSiw==}
+  zustand@5.0.9:
+    resolution: {integrity: sha512-ALBtUj0AfjJt3uNRQoL1tL2tMvj6Gp/6e39dnfT6uzpelGru8v1tPOGBzayOWbPJvujM8JojDk3E1LxeFisBNg==}
     engines: {node: '>=12.20.0'}
     peerDependencies:
       '@types/react': '>=18.0.0'
@@ -4214,14 +4258,14 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76))':
+  '@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       ansi-styles: 5.2.0
       camelcase: 6.3.0
       decamelize: 1.2.0
       js-tiktoken: 1.0.21
-      langsmith: 0.3.77(openai@6.7.0(zod@3.25.76))
+      langsmith: 0.3.77(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       mustache: 4.2.0
       p-queue: 6.6.2
       p-retry: 4.6.2
@@ -4233,37 +4277,37 @@ snapshots:
       - '@opentelemetry/sdk-trace-base'
       - openai
 
-  '@langchain/langgraph-checkpoint@1.0.0(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))':
+  '@langchain/langgraph-checkpoint@1.0.0(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))':
     dependencies:
-      '@langchain/core': 1.0.2(openai@6.7.0(zod@3.25.76))
+      '@langchain/core': 1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       uuid: 10.0.0
 
-  '@langchain/langgraph-sdk@1.0.0(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@langchain/langgraph-sdk@1.0.0(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       p-queue: 6.6.2
       p-retry: 4.6.2
       uuid: 9.0.1
     optionalDependencies:
-      '@langchain/core': 1.0.2(openai@6.7.0(zod@3.25.76))
+      '@langchain/core': 1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
-  '@langchain/langgraph@1.0.1(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(zod@3.25.76)':
+  '@langchain/langgraph@1.0.1(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(zod@3.25.76)':
     dependencies:
-      '@langchain/core': 1.0.2(openai@6.7.0(zod@3.25.76))
-      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))
-      '@langchain/langgraph-sdk': 1.0.0(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@langchain/core': 1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
+      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))
+      '@langchain/langgraph-sdk': 1.0.0(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       uuid: 10.0.0
       zod: 3.25.76
     transitivePeerDependencies:
       - react
       - react-dom
 
-  '@langchain/openai@1.0.0(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))':
+  '@langchain/openai@1.0.0(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)':
     dependencies:
-      '@langchain/core': 1.0.2(openai@6.7.0(zod@3.25.76))
+      '@langchain/core': 1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       js-tiktoken: 1.0.21
-      openai: 6.7.0(zod@3.25.76)
+      openai: 6.7.0(ws@8.18.3)(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:
       - ws
@@ -4275,37 +4319,37 @@ snapshots:
       '@tybys/wasm-util': 0.10.1
     optional: true
 
-  '@next/env@14.2.6': {}
+  '@next/env@14.2.35': {}
 
   '@next/eslint-plugin-next@16.0.1':
     dependencies:
       fast-glob: 3.3.1
 
-  '@next/swc-darwin-arm64@14.2.6':
+  '@next/swc-darwin-arm64@14.2.33':
     optional: true
 
-  '@next/swc-darwin-x64@14.2.6':
+  '@next/swc-darwin-x64@14.2.33':
     optional: true
 
-  '@next/swc-linux-arm64-gnu@14.2.6':
+  '@next/swc-linux-arm64-gnu@14.2.33':
     optional: true
 
-  '@next/swc-linux-arm64-musl@14.2.6':
+  '@next/swc-linux-arm64-musl@14.2.33':
     optional: true
 
-  '@next/swc-linux-x64-gnu@14.2.6':
+  '@next/swc-linux-x64-gnu@14.2.33':
     optional: true
 
-  '@next/swc-linux-x64-musl@14.2.6':
+  '@next/swc-linux-x64-musl@14.2.33':
     optional: true
 
-  '@next/swc-win32-arm64-msvc@14.2.6':
+  '@next/swc-win32-arm64-msvc@14.2.33':
     optional: true
 
-  '@next/swc-win32-ia32-msvc@14.2.6':
+  '@next/swc-win32-ia32-msvc@14.2.33':
     optional: true
 
-  '@next/swc-win32-x64-msvc@14.2.6':
+  '@next/swc-win32-x64-msvc@14.2.33':
     optional: true
 
   '@nodelib/fs.scandir@2.1.5':
@@ -4650,9 +4694,9 @@ snapshots:
     optionalDependencies:
       '@types/react': 18.2.45
 
-  '@radix-ui/react-label@2.1.7(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@radix-ui/react-label@2.1.8(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
-      '@radix-ui/react-primitive': 2.1.3(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@radix-ui/react-primitive': 2.1.4(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
     optionalDependencies:
@@ -4868,6 +4912,15 @@ snapshots:
       '@types/react': 18.2.45
       '@types/react-dom': 18.2.21
 
+  '@radix-ui/react-primitive@2.1.4(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+    dependencies:
+      '@radix-ui/react-slot': 1.2.4(@types/react@18.2.45)(react@18.2.0)
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    optionalDependencies:
+      '@types/react': 18.2.45
+      '@types/react-dom': 18.2.21
+
   '@radix-ui/react-progress@1.1.1(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       '@radix-ui/react-context': 1.1.1(@types/react@18.2.45)(react@18.2.0)
@@ -4976,9 +5029,9 @@ snapshots:
       '@types/react': 18.2.45
       '@types/react-dom': 18.2.21
 
-  '@radix-ui/react-separator@1.1.7(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@radix-ui/react-separator@1.1.8(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
-      '@radix-ui/react-primitive': 2.1.3(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@radix-ui/react-primitive': 2.1.4(@types/react-dom@18.2.21)(@types/react@18.2.45)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
     optionalDependencies:
@@ -5012,6 +5065,13 @@ snapshots:
       '@types/react': 18.2.45
 
   '@radix-ui/react-slot@1.2.3(@types/react@18.2.45)(react@18.2.0)':
+    dependencies:
+      '@radix-ui/react-compose-refs': 1.1.2(@types/react@18.2.45)(react@18.2.0)
+      react: 18.2.0
+    optionalDependencies:
+      '@types/react': 18.2.45
+
+  '@radix-ui/react-slot@1.2.4(@types/react@18.2.45)(react@18.2.0)':
     dependencies:
       '@radix-ui/react-compose-refs': 1.1.2(@types/react@18.2.45)(react@18.2.0)
       react: 18.2.0
@@ -5600,9 +5660,9 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.11.1':
     optional: true
 
-  '@vercel/analytics@1.5.0(next@14.2.6(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)':
+  '@vercel/analytics@1.6.1(next@14.2.35(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)':
     optionalDependencies:
-      next: 14.2.6(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      next: 14.2.35(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react: 18.2.0
 
   accepts@2.0.0:
@@ -5747,6 +5807,8 @@ snapshots:
     dependencies:
       node-addon-api: 8.5.0
       node-gyp-build: 4.8.4
+
+  bcryptjs@3.0.3: {}
 
   binary-extensions@2.3.0: {}
 
@@ -6597,7 +6659,7 @@ snapshots:
 
   ignore@7.0.5: {}
 
-  immer@10.2.0: {}
+  immer@11.0.1: {}
 
   import-fresh@3.3.1:
     dependencies:
@@ -6796,12 +6858,12 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  langchain@1.0.2(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))(openai@6.7.0(zod@3.25.76))(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+  langchain@1.0.2(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(openai@6.7.0(ws@8.18.3)(zod@3.25.76))(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
-      '@langchain/core': 1.0.2(openai@6.7.0(zod@3.25.76))
-      '@langchain/langgraph': 1.0.1(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(zod@3.25.76)
-      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.0.2(openai@6.7.0(zod@3.25.76)))
-      langsmith: 0.3.77(openai@6.7.0(zod@3.25.76))
+      '@langchain/core': 1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
+      '@langchain/langgraph': 1.0.1(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(zod@3.25.76)
+      '@langchain/langgraph-checkpoint': 1.0.0(@langchain/core@1.0.2(openai@6.7.0(ws@8.18.3)(zod@3.25.76)))
+      langsmith: 0.3.77(openai@6.7.0(ws@8.18.3)(zod@3.25.76))
       uuid: 10.0.0
       zod: 3.25.76
     transitivePeerDependencies:
@@ -6813,7 +6875,7 @@ snapshots:
       - react-dom
       - zod-to-json-schema
 
-  langsmith@0.3.77(openai@6.7.0(zod@3.25.76)):
+  langsmith@0.3.77(openai@6.7.0(ws@8.18.3)(zod@3.25.76)):
     dependencies:
       '@types/uuid': 10.0.0
       chalk: 4.1.2
@@ -6823,7 +6885,7 @@ snapshots:
       semver: 7.7.3
       uuid: 10.0.0
     optionalDependencies:
-      openai: 6.7.0(zod@3.25.76)
+      openai: 6.7.0(ws@8.18.3)(zod@3.25.76)
 
   language-subtag-registry@0.3.23: {}
 
@@ -6965,9 +7027,9 @@ snapshots:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
-  next@14.2.6(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+  next@14.2.35(@babel/core@7.28.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
-      '@next/env': 14.2.6
+      '@next/env': 14.2.35
       '@swc/helpers': 0.5.5
       busboy: 1.6.0
       caniuse-lite: 1.0.30001751
@@ -6977,15 +7039,15 @@ snapshots:
       react-dom: 18.2.0(react@18.2.0)
       styled-jsx: 5.1.1(@babel/core@7.28.5)(react@18.2.0)
     optionalDependencies:
-      '@next/swc-darwin-arm64': 14.2.6
-      '@next/swc-darwin-x64': 14.2.6
-      '@next/swc-linux-arm64-gnu': 14.2.6
-      '@next/swc-linux-arm64-musl': 14.2.6
-      '@next/swc-linux-x64-gnu': 14.2.6
-      '@next/swc-linux-x64-musl': 14.2.6
-      '@next/swc-win32-arm64-msvc': 14.2.6
-      '@next/swc-win32-ia32-msvc': 14.2.6
-      '@next/swc-win32-x64-msvc': 14.2.6
+      '@next/swc-darwin-arm64': 14.2.33
+      '@next/swc-darwin-x64': 14.2.33
+      '@next/swc-linux-arm64-gnu': 14.2.33
+      '@next/swc-linux-arm64-musl': 14.2.33
+      '@next/swc-linux-x64-gnu': 14.2.33
+      '@next/swc-linux-x64-musl': 14.2.33
+      '@next/swc-win32-arm64-msvc': 14.2.33
+      '@next/swc-win32-ia32-msvc': 14.2.33
+      '@next/swc-win32-x64-msvc': 14.2.33
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
@@ -7065,8 +7127,9 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  openai@6.7.0(zod@3.25.76):
+  openai@6.7.0(ws@8.18.3)(zod@3.25.76):
     optionalDependencies:
+      ws: 8.18.3
       zod: 3.25.76
 
   optionator@0.9.4:
@@ -7855,6 +7918,8 @@ snapshots:
 
   wrappy@1.0.2: {}
 
+  ws@8.18.3: {}
+
   xtend@4.0.2: {}
 
   yallist@3.1.1: {}
@@ -7871,9 +7936,9 @@ snapshots:
 
   zod@3.25.76: {}
 
-  zustand@5.0.8(@types/react@18.2.45)(immer@10.2.0)(react@18.2.0)(use-sync-external-store@1.6.0(react@18.2.0)):
+  zustand@5.0.9(@types/react@18.2.45)(immer@11.0.1)(react@18.2.0)(use-sync-external-store@1.6.0(react@18.2.0)):
     optionalDependencies:
       '@types/react': 18.2.45
-      immer: 10.2.0
+      immer: 11.0.1
       react: 18.2.0
       use-sync-external-store: 1.6.0(react@18.2.0)

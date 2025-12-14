@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Volume2, VolumeX, CheckCircle2, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { CompanionWaveAnimation } from "../../../../components/companion-wave-animation"
+import { apiUrl } from "@/lib/api-config"
 
 type ConversationStep = "greeting" | "narrative" | "analyzing" | "follow-up" | "report-card" | "complete"
 type NarrativeKey = "resident" | "incident" | "residentState" | "environment"
@@ -14,8 +15,7 @@ type NarrativeKey = "resident" | "incident" | "residentState" | "environment"
 const NARRATIVE_PROMPTS: Array<{ key: NarrativeKey; prompt: string }> = [
   {
     key: "resident",
-    prompt:
-      "First, please share the resident’s full name and room number so we can anchor the report correctly.",
+    prompt: "First, please share the resident’s full name and room number so we can anchor the report correctly.",
   },
   {
     key: "incident",
@@ -226,7 +226,9 @@ export default function CompanionCreatePage() {
 
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           micErrorRef.current = true
-          toast.error("Microphone access is blocked. Please allow mic permissions in your browser and restart this conversation.")
+          toast.error(
+            "Microphone access is blocked. Please allow mic permissions in your browser and restart this conversation.",
+          )
           setAwaitingStart(true)
           setCurrentStep("greeting")
           currentStepRef.current = "greeting"
@@ -358,21 +360,9 @@ export default function CompanionCreatePage() {
         return
       }
 
-      if (
-        !isListeningRef.current &&
-        step !== "report-card" &&
-        step !== "complete" &&
-        step !== "analyzing"
-      ) {
+      if (!isListeningRef.current && step !== "report-card" && step !== "complete" && step !== "analyzing") {
         const promptIdx = currentPromptIndexRef.current
-        const delay =
-          step === "narrative"
-            ? promptIdx === 0
-              ? 3200
-              : 2200
-            : step === "follow-up"
-              ? 1500
-              : 1000
+        const delay = step === "narrative" ? (promptIdx === 0 ? 3200 : 2200) : step === "follow-up" ? 1500 : 1000
         console.log("[v0] 🎤 Starting listening after speech ended in", delay, "ms")
         setTimeout(() => {
           startListening()
@@ -444,18 +434,10 @@ export default function CompanionCreatePage() {
 
   const buildNarrativeSummary = (answers: Record<NarrativeKey, string>) => {
     const sections = [
-      answers.resident.trim()
-        ? `Resident & Location:\n${answers.resident.trim()}`
-        : "",
-      answers.incident.trim()
-        ? `Incident Details:\n${answers.incident.trim()}`
-        : "",
-      answers.residentState.trim()
-        ? `Resident Status:\n${answers.residentState.trim()}`
-        : "",
-      answers.environment.trim()
-        ? `Environment & Contributing Factors:\n${answers.environment.trim()}`
-        : "",
+      answers.resident.trim() ? `Resident & Location:\n${answers.resident.trim()}` : "",
+      answers.incident.trim() ? `Incident Details:\n${answers.incident.trim()}` : "",
+      answers.residentState.trim() ? `Resident Status:\n${answers.residentState.trim()}` : "",
+      answers.environment.trim() ? `Environment & Contributing Factors:\n${answers.environment.trim()}` : "",
     ].filter(Boolean)
 
     return sections.join("\n\n")
@@ -569,13 +551,13 @@ export default function CompanionCreatePage() {
       const narrativeSummary = buildNarrativeSummary(narrativeAnswersRef.current)
       narrativeRef.current = narrativeSummary
       setInitialNarrative(narrativeSummary)
-        setIsProcessing(true)
-        setCurrentStep("analyzing")
+      setIsProcessing(true)
+      setCurrentStep("analyzing")
       currentStepRef.current = "analyzing"
-        speak(AI_MESSAGES.analyzing)
+      speak(AI_MESSAGES.analyzing)
 
       try {
-        const incidentResponse = await fetch("/api/incidents", {
+        const incidentResponse = await fetch(apiUrl("/api/incidents"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -597,7 +579,7 @@ export default function CompanionCreatePage() {
 
         const incident = await incidentResponse.json()
 
-        const startResponse = await fetch("/api/agent/report-conversational", {
+        const startResponse = await fetch(apiUrl("/api/agent/report-conversational"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -659,13 +641,13 @@ export default function CompanionCreatePage() {
       return
     }
 
-        setIsProcessing(true)
+    setIsProcessing(true)
 
-        try {
-      const answerResponse = await fetch("/api/agent/report-conversational", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+    try {
+      const answerResponse = await fetch(apiUrl("/api/agent/report-conversational"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           action: "answer",
           sessionId: agentSessionId,
           questionId: currentAgentQuestion.id,
@@ -673,8 +655,8 @@ export default function CompanionCreatePage() {
           answeredBy: userId || "staff-user",
           answeredByName: name || "Staff Reporter",
           method: "voice",
-            }),
-          })
+        }),
+      })
 
       if (!answerResponse.ok) {
         const payload = await answerResponse.json().catch(() => ({}))
@@ -684,7 +666,7 @@ export default function CompanionCreatePage() {
       const data = await answerResponse.json()
 
       if (data.status === "completed") {
-          setIsProcessing(false)
+        setIsProcessing(false)
         askedQuestionIdsRef.current = new Set()
         setCurrentAgentQuestion(null)
         setReportScore(data.score ?? null)
@@ -699,12 +681,12 @@ export default function CompanionCreatePage() {
           gaps: true,
           narrative: false,
         })
-          setCurrentStep("report-card")
+        setCurrentStep("report-card")
         currentStepRef.current = "report-card"
         speak(`Thank you. Your report scored ${data.score ?? "a"} out of 10.`)
-          setTimeout(() => {
+        setTimeout(() => {
           if (data.feedback) {
-              speak(data.feedback)
+            speak(data.feedback)
           }
         }, 1500)
         return
@@ -741,10 +723,10 @@ export default function CompanionCreatePage() {
       setCurrentStep("follow-up")
       currentStepRef.current = "follow-up"
       speak(nextQuestion.text)
-        } catch (error) {
+    } catch (error) {
       console.error("[companion] Error saving answer:", error)
       toast.error(error instanceof Error ? error.message : "Failed to submit answer.")
-          setIsProcessing(false)
+      setIsProcessing(false)
       startListening()
     }
   }
@@ -878,13 +860,13 @@ export default function CompanionCreatePage() {
 
                 {currentText.trim() && !isProcessing && (
                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                  <Button
-                    onClick={handleSubmit}
-                    size="lg"
+                    <Button
+                      onClick={handleSubmit}
+                      size="lg"
                       className="bg-white text-indigo-600 hover:bg-white/90 font-semibold px-8 flex-1"
-                  >
-                    Submit Response
-                  </Button>
+                    >
+                      Submit Response
+                    </Button>
                     {awaitingSubmission ? (
                       <Button
                         onClick={handleRetake}
@@ -915,7 +897,7 @@ export default function CompanionCreatePage() {
                     </div>
                   ) : null}
 
-                    <Button
+                  <Button
                     onClick={() =>
                       setShowDetailedReport((prev) => {
                         const next = !prev
@@ -929,12 +911,12 @@ export default function CompanionCreatePage() {
                         return next
                       })
                     }
-                      variant="outline"
-                      className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
-                      size="lg"
-                    >
+                    variant="outline"
+                    className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
+                    size="lg"
+                  >
                     {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
-                    </Button>
+                  </Button>
 
                   {showDetailedReport ? (
                     <div className="space-y-4">
@@ -949,22 +931,20 @@ export default function CompanionCreatePage() {
                             What You Did Well
                           </span>
                           <ChevronDown
-                            className={`h-4 w-4 transition-transform ${
-                              expandedSections.strengths ? "rotate-180" : ""
-                            }`}
+                            className={`h-4 w-4 transition-transform ${expandedSections.strengths ? "rotate-180" : ""}`}
                           />
                         </button>
                         {expandedSections.strengths ? (
                           <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90">
                             {safeReportDetails.whatYouDidWell.length > 0 ? (
-                          <ul className="space-y-2">
+                              <ul className="space-y-2">
                                 {safeReportDetails.whatYouDidWell.map((item, index) => (
                                   <li key={`strength-${index}`} className="flex gap-2">
                                     <span className="text-green-300 shrink-0">[+]</span>
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             ) : (
                               <p className="text-white/70">
                                 {reportDetails
@@ -974,7 +954,7 @@ export default function CompanionCreatePage() {
                             )}
                           </div>
                         ) : null}
-                        </div>
+                      </div>
 
                       <div className="overflow-hidden rounded-2xl border border-white/30 bg-white/20">
                         <button
@@ -990,14 +970,14 @@ export default function CompanionCreatePage() {
                         {expandedSections.gaps ? (
                           <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90">
                             {safeReportDetails.whatWasMissed.length > 0 ? (
-                          <ul className="space-y-2">
+                              <ul className="space-y-2">
                                 {safeReportDetails.whatWasMissed.map((item, index) => (
                                   <li key={`gap-${index}`} className="flex gap-2">
                                     <span className="text-amber-200 shrink-0">[!]</span>
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             ) : (
                               <p className="text-white/70">
                                 {reportDetails
@@ -1017,9 +997,7 @@ export default function CompanionCreatePage() {
                         >
                           <span>See Original Narrative</span>
                           <ChevronDown
-                            className={`h-4 w-4 transition-transform ${
-                              expandedSections.narrative ? "rotate-180" : ""
-                            }`}
+                            className={`h-4 w-4 transition-transform ${expandedSections.narrative ? "rotate-180" : ""}`}
                           />
                         </button>
                         {expandedSections.narrative ? (
@@ -1035,17 +1013,17 @@ export default function CompanionCreatePage() {
                           Detailed scoring is still loading—sections will fill in automatically once ready.
                         </p>
                       ) : null}
-                        </div>
+                    </div>
                   ) : null}
 
-                    <Button
-                      onClick={handleFinish}
-                      className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
-                      size="lg"
-                    >
-                      Finish & Return to Dashboard
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={handleFinish}
+                    className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
+                    size="lg"
+                  >
+                    Finish & Return to Dashboard
+                  </Button>
+                </div>
               </div>
             )}
           </div>

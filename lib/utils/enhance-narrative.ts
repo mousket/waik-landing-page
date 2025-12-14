@@ -63,4 +63,3 @@ export function enhanceNarrative(rawTranscript: string): string {
   }): string | null {
     return incident.initialReport?.narrative || incident.description || null
   }
-  
