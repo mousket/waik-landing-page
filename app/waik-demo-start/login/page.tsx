@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { LoginWaveAnimation } from "@/components/login-wave-animation"
-import { apiUrl } from "@/lib/api-config"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -26,16 +25,14 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      console.log("[v0] Attempting login to:", apiUrl("/api/auth/login"))
+      console.log("[v0] Attempting login via proxy: /api/proxy/auth/login")
 
-      const response = await fetch(apiUrl("/api/auth/login"), {
+      const response = await fetch("/api/proxy/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ username, password }),
-        mode: "cors",
-        credentials: "include",
       })
 
       console.log("[v0] Response received, status:", response.status)
