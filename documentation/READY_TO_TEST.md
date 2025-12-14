@@ -33,36 +33,36 @@ Your WAiK demo now has:
 ### **Environment Variables:**
 
 Create `.env.local` in project root:
-```env
+\`\`\`env
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_LLM_MODEL=gpt-4o-mini
 OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
-```
+\`\`\`
 
 ---
 
 ## 🚀 **How to Get Started**
 
 ### **1. Get OpenAI API Key** (2 minutes)
-```
+\`\`\`
 https://platform.openai.com/api-keys
 → Create new secret key
 → Copy it
-```
+\`\`\`
 
 ### **2. Add to Project** (1 minute)
-```bash
+\`\`\`bash
 # In project root, create .env.local
 echo "OPENAI_API_KEY=sk-your-key-here" > .env.local
 echo "OPENAI_LLM_MODEL=gpt-4o-mini" >> .env.local
 echo "OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small" >> .env.local
-```
+\`\`\`
 
 ### **3. Restart Server** (30 seconds)
-```bash
+\`\`\`bash
 pkill -9 node
 npm run dev
-```
+\`\`\`
 
 ### **4. Test!** (5 minutes)
 See test scenarios below ⬇️
@@ -74,12 +74,12 @@ See test scenarios below ⬇️
 ### **Test 1: Generate AI Report**
 
 **Via API:**
-```bash
+\`\`\`bash
 curl -X POST http://localhost:3000/api/incidents/inc-1/ai-report
-```
+\`\`\`
 
 **Expected:**
-```json
+\`\`\`json
 {
   "success": true,
   "aiReport": {
@@ -91,7 +91,7 @@ curl -X POST http://localhost:3000/api/incidents/inc-1/ai-report
     "confidence": 0.9
   }
 }
-```
+\`\`\`
 
 **Time**: 10-15 seconds  
 **Cost**: ~$0.0004  
@@ -101,21 +101,21 @@ curl -X POST http://localhost:3000/api/incidents/inc-1/ai-report
 ### **Test 2: Ask Intelligence Question**
 
 **Via API:**
-```bash
+\`\`\`bash
 curl -X POST http://localhost:3000/api/incidents/inc-1/intelligence \
   -H "Content-Type: application/json" \
   -d '{"question": "Was the resident injured in the fall?"}'
-```
+\`\`\`
 
 **Expected:**
-```json
+\`\`\`json
 {
   "success": true,
   "question": "Was the resident injured in the fall?",
   "answer": "Yes, according to the incident report...",
   "timestamp": "2024-11-01T..."
 }
-```
+\`\`\`
 
 **Time**: 2-5 seconds  
 **Cost**: ~$0.00014  
@@ -125,12 +125,12 @@ curl -X POST http://localhost:3000/api/incidents/inc-1/intelligence \
 ### **Test 3: View Sample Reports**
 
 **Via Browser:**
-```
+\`\`\`
 1. Go to: http://localhost:3000/waik-demo-start/login
 2. Login: waik-demo-admin / waik1+demo-admin!@#
 3. Click on "Skin Tear - Left Forearm" (inc-6)
 4. Incident #6 has BOTH reports pre-loaded!
-```
+\`\`\`
 
 **You'll see:**
 - ✅ Human Report - Created by Emily, edited by Michael
@@ -141,7 +141,7 @@ curl -X POST http://localhost:3000/api/incidents/inc-1/intelligence \
 ### **Test 4: Create Human Report**
 
 **Via API:**
-```bash
+\`\`\`bash
 curl -X PUT http://localhost:3000/api/incidents/inc-1/human-report \
   -H "Content-Type: application/json" \
   -d '{
@@ -151,15 +151,15 @@ curl -X PUT http://localhost:3000/api/incidents/inc-1/human-report \
     "actions": "Steps I am taking immediately",
     "userId": "user-1"
   }'
-```
+\`\`\`
 
 **Expected:**
-```json
+\`\`\`json
 {
   "success": true,
   "humanReport": { ... }
 }
-```
+\`\`\`
 
 ---
 
@@ -282,4 +282,3 @@ You've built a **production-ready AI system** for healthcare incident management
 **Difficulty**: Easy - just add API key!  
 
 **Let's see that AI intelligence work!** ✨
-

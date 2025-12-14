@@ -189,4 +189,3 @@ export function getIncidentAnalyzer(): IncidentAnalyzerAgent {
   }
   return analyzerInstance
 }
-

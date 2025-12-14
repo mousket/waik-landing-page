@@ -37,9 +37,9 @@
 ### **3 Main Components Needed:**
 
 #### **1. AI Report Display** (Priority: HIGH)
-```tsx
+\`\`\`tsx
 <AIReportDisplay incidentId={id} />
-```
+\`\`\`
 - Shows AI-generated report (4 sections)
 - "Generate Report" button
 - Loading state (10-15 seconds)
@@ -50,9 +50,9 @@
 ---
 
 #### **2. Human Report Form** (Priority: HIGH)
-```tsx
+\`\`\`tsx
 <HumanReportForm incidentId={id} userId={userId} />
-```
+\`\`\`
 - 4 text areas (summary, insights, recommendations, actions)
 - Save button
 - Auto-save drafts
@@ -63,9 +63,9 @@
 ---
 
 #### **3. Intelligence Chat** (Priority: HIGH)
-```tsx
+\`\`\`tsx
 <IntelligenceChat incidentId={id} />
-```
+\`\`\`
 - Chat interface
 - Ask questions about incident
 - AI answers using RAG
@@ -86,20 +86,20 @@
 - Context-aware responses
 
 **New Agent:**
-```typescript
+\`\`\`typescript
 // lib/agents/voice-conversation-agent.ts
 class VoiceConversationAgent {
   async handleInput(transcript: string, context: any)
   async generateNextQuestion(answers: any[])
   async validateResponse(answer: string, expectedInfo: string[])
 }
-```
+\`\`\`
 
 **New API:**
-```typescript
+\`\`\`typescript
 // POST /api/voice/interact
 // Handles voice conversation flow
-```
+\`\`\`
 
 ---
 
@@ -112,14 +112,14 @@ class VoiceConversationAgent {
 - Trend analysis
 
 **New Agent:**
-```typescript
+\`\`\`typescript
 // lib/agents/pattern-analyzer.ts
 class PatternAnalyzerAgent {
   async findPatterns(incidents: Incident[])
   async predictRisks(facilityData: any)
   async generateTrends(timeRange: string)
 }
-```
+\`\`\`
 
 ---
 
@@ -184,7 +184,7 @@ class PatternAnalyzerAgent {
 ## 🎯 **Immediate Next Steps**
 
 ### **Step 1: Test Backend** (You - 10 minutes)
-```bash
+\`\`\`bash
 # Add OpenAI key to .env.local
 echo "OPENAI_API_KEY=sk-your-key" >> .env.local
 
@@ -195,7 +195,7 @@ curl -X POST http://localhost:3000/api/incidents/inc-1/ai-report
 curl -X POST http://localhost:3000/api/incidents/inc-1/intelligence \
   -H "Content-Type: application/json" \
   -d '{"question": "Was anyone injured?"}'
-```
+\`\`\`
 
 ---
 
@@ -203,7 +203,7 @@ curl -X POST http://localhost:3000/api/incidents/inc-1/intelligence \
 
 Use this prompt for V0:
 
-```
+\`\`\`
 "I need you to create 3 React components for our AI intelligence system:
 
 1. AIReportDisplay - Shows AI-generated incident reports with 4 sections 
@@ -223,7 +223,7 @@ replacing the placeholder tabs. Use our current design system (shadcn/ui,
 primary/accent gradients, lucide-react icons).
 
 See documentation/V0_UI_REQUIREMENTS.md for full specs."
-```
+\`\`\`
 
 ---
 
@@ -330,4 +330,3 @@ See documentation/V0_UI_REQUIREMENTS.md for full specs."
 **ETA to Full Demo**: 3-5 days  
 
 🚀 **The backend is rock solid. Let's get V0 to build the beautiful UI!**
-

@@ -22,61 +22,32 @@ export interface Answer {
 export interface Question {
   id: string
   incidentId?: string
-  questionText: string
+  question: string
   askedBy: string
   askedByName?: string
   askedAt: string
   assignedTo?: string[]
-  answer?: Answer
-  source?: "voice-report" | "ai-generated" | "manual"
-  generatedBy?: string
-  vectorizedAt?: string
-  metadata?: {
-    reporterId?: string
-    reporterName?: string
-    reporterRole?: UserRole
-    assignedStaffIds?: string[]
-    createdVia?: "voice" | "text" | "system"
+  answer?: {
+    text: string
+    answeredBy: string
+    answeredAt: string
+    method?: "text" | "voice"
   }
+  source?: "ai-generated" | "manual"
+  generatedBy?: string
 }
 
-export interface IncidentInitialReport {
-  capturedAt: string
-  narrative: string
-  residentState?: string
-  environmentNotes?: string
-  enhancedNarrative?: string
-  recordedById: string
-  recordedByName: string
-  recordedByRole: UserRole
-}
-
-export type InvestigationStatus = "not-started" | "in-progress" | "completed"
-
-import type { GoldStandardFallReport, FallSubtypeStandards } from "./gold_standards"
-
-export interface IncidentInvestigationMetadata {
-  status: InvestigationStatus
-  subtype?: string
-  startedAt?: string
-  completedAt?: string
-  investigatorId?: string
-  investigatorName?: string
-  goldStandard?: GoldStandardFallReport | null
-  subTypeData?: FallSubtypeStandards | null
-  score?: number | null
-  completenessScore?: number | null
-  feedback?: string | null
-}
-
-export interface IncidentNotification {
-  id: string
-  incidentId: string
-  type: "incident-created" | "investigation-started" | "follow-up-required" | "investigation-completed"
-  message: string
+export interface InitialReport {
+  narrative: string // Raw voice transcript
+  enhancedNarrative: string // AI-polished version
+  residentState?: string // Raw voice transcript
+  enhancedResidentState?: string // AI-polished version
+  environmentNotes?: string // Raw voice transcript
+  enhancedEnvironmentNotes?: string // AI-polished version
+  createdBy: string
+  createdByName: string
   createdAt: string
-  readAt?: string
-  targetUserId: string
+  method: "voice" | "text"
 }
 
 export interface HumanReport {
@@ -118,6 +89,7 @@ export interface Incident {
   initialReport?: IncidentInitialReport
   investigation?: IncidentInvestigationMetadata
   summary?: string | null
+  initialReport?: InitialReport
   humanReport?: HumanReport
   aiReport?: AIReport
 }

@@ -228,4 +228,3 @@ function createIncidentText(incident: Incident): string {
 
   return parts.join("\n")
 }
-

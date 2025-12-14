@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useMemo } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -39,8 +39,8 @@ import {
   Type,
 } from "lucide-react"
 import { toast } from "sonner"
-import { getDisplayNarrative, getRawNarrative } from "@/lib/utils/enhance-narrative"
-import { renderMarkdownOrHtml } from "@/lib/utils/markdown-to-html"
+import { getDisplayNarrative } from "@/lib/utils/enhance-narrative"
+import { markdownTohtml } from "@/lib/utils/markdown-to-html"
 
 function formatDate(dateString: string | undefined, formatString: string): string {
   if (!dateString) return "Invalid date"
@@ -70,6 +70,10 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("overview")
 
+  const [showOriginalNarrative, setShowOriginalNarrative] = useState(false)
+  const [showInvestigativeHighlights, setShowInvestigativeHighlights] = useState(true)
+  const [showReportCard, setShowReportCard] = useState(true)
+
   const [isEditingIncident, setIsEditingIncident] = useState(false)
   const [editedTitle, setEditedTitle] = useState("")
   const [editedDescription, setEditedDescription] = useState("")
@@ -78,12 +82,18 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const [isSavingIncident, setIsSavingIncident] = useState(false)
   const [isClosingIncident, setIsClosingIncident] = useState(false)
 
+  const [isEditingHumanReport, setIsEditingHumanReport] = useState(false)
+  const [humanReportSummary, setHumanReportSummary] = useState("")
+  const [humanReportInsights, setHumanReportInsights] = useState("")
+  const [humanReportRecommendations, setHumanReportRecommendations] = useState("")
+  const [humanReportActions, setHumanReportActions] = useState("")
+  const [isSavingHumanReport, setIsSavingHumanReport] = useState(false)
+
   const [isGeneratingAIReport, setIsGeneratingAIReport] = useState(false)
 
   const [newQuestion, setNewQuestion] = useState("")
   const [isAddingQuestion, setIsAddingQuestion] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState<string[]>([])
-  const [newQuestionSearchQuery, setNewQuestionSearchQuery] = useState("")
 
   const [intelligenceMessages, setIntelligenceMessages] = useState<IntelligenceMessage[]>([])
   const [intelligenceInput, setIntelligenceInput] = useState("")
@@ -99,53 +109,10 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("")
 
-  const answeredQuestions = incident?.questions?.filter((q) => q.answer) ?? []
-  const unansweredQuestions = incident?.questions?.filter((q) => !q.answer) ?? []
-  const MAX_PENDING_QUESTIONS = 10
-  const visiblePendingQuestions = useMemo(
-    () => unansweredQuestions.slice(0, MAX_PENDING_QUESTIONS),
-    [unansweredQuestions],
-  )
-  const hiddenPendingCount = Math.max(0, unansweredQuestions.length - visiblePendingQuestions.length)
-
-  const canGenerateAIReport = answeredQuestions.length >= 5
-
-  console.log("[v0] WAiK Agent Debug Info:", {
-    role,
-    answeredQuestionsCount: answeredQuestions.length,
-    canGenerateAIReport,
-    hasAIReport: !!incident?.aiReport,
-    isGeneratingAIReport,
-    shouldShowButton: role === "admin",
-  })
-
-  const staffNameMap = useMemo(() => {
-    const map = new Map<string, string>()
-    staffList.forEach((staff) => map.set(staff.id, staff.name))
-    return map
-  }, [staffList])
-
-  const filteredPendingEmployees = useMemo(() => {
-    if (!employeeSearchQuery.trim()) return staffList
-    return staffList.filter((emp) =>
-      emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()),
-    )
-  }, [staffList, employeeSearchQuery])
-
-  const filteredNewQuestionEmployees = useMemo(() => {
-    if (!newQuestionSearchQuery.trim()) return staffList
-    return staffList.filter((emp) =>
-      emp.name.toLowerCase().includes(newQuestionSearchQuery.toLowerCase()),
-    )
-  }, [staffList, newQuestionSearchQuery])
-
-  const currentPendingQuestion = visiblePendingQuestions[currentPendingQuestionTab] ?? null
-  const currentAnsweredQuestion = answeredQuestions[currentAnsweredQuestionTab] ?? null
-
-useEffect(() => {
-  fetchIncident()
-  fetchStaffList()
-}, [params.id])
+  useEffect(() => {
+    fetchIncident()
+    fetchStaffList()
+  }, [params.id])
 
   const fetchIncident = async () => {
     try {
@@ -157,6 +124,13 @@ useEffect(() => {
         setEditedDescription(getDisplayNarrative(data))
         setEditedResidentName(data.residentName)
         setEditedResidentRoom(data.residentRoom)
+
+        if (data.humanReport) {
+          setHumanReportSummary(data.humanReport.summary)
+          setHumanReportInsights(data.humanReport.insights)
+          setHumanReportRecommendations(data.humanReport.recommendations)
+          setHumanReportActions(data.humanReport.actions)
+        }
       }
     } catch (error) {
       console.error("[v0] Error fetching incident:", error)
@@ -167,7 +141,7 @@ useEffect(() => {
 
   const fetchStaffList = async () => {
     try {
-      const response = await fetch("/api/users?role=staff")
+      const response = await fetch("/api/users")
       if (response.ok) {
         const users = await response.json()
         setStaffList(users)
@@ -232,6 +206,38 @@ useEffect(() => {
       toast.error("Failed to close incident")
     } finally {
       setIsClosingIncident(false)
+    }
+  }
+
+  const handleSaveHumanReport = async () => {
+    if (!incident || !userId) return
+
+    setIsSavingHumanReport(true)
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/human-report`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: humanReportSummary,
+          insights: humanReportInsights,
+          recommendations: humanReportRecommendations,
+          actions: humanReportActions,
+          userId,
+        }),
+      })
+
+      if (response.ok) {
+        await fetchIncident()
+        setIsEditingHumanReport(false)
+        toast.success("Insights saved successfully")
+      } else {
+        toast.error("Failed to save insights")
+      }
+    } catch (error) {
+      console.error("[v0] Error saving human report:", error)
+      toast.error("Failed to save insights")
+    } finally {
+      setIsSavingHumanReport(false)
     }
   }
 
@@ -328,7 +334,6 @@ useEffect(() => {
         toast.success("Question sent to staff")
         setNewQuestion("")
         setSelectedStaff([])
-        setNewQuestionSearchQuery("")
         fetchIncident()
       } else {
         toast.error("Failed to send question")
@@ -356,6 +361,33 @@ useEffect(() => {
     } catch (error) {
       console.error("[v0] Error deleting question:", error)
       toast.error("Failed to delete question")
+    }
+  }
+
+  const handleAssignQuestion = async (questionId: string) => {
+    if (selectedEmployees.length === 0) {
+      toast.error("Please select at least one employee")
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}/assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assignedTo: selectedEmployees,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to assign question")
+
+      toast.success(`Question assigned to ${selectedEmployees.length} employee(s)`)
+      setSelectedEmployees([])
+      setEmployeeSearchQuery("")
+      await fetchIncident()
+    } catch (error) {
+      console.error("[v0] Error assigning question:", error)
+      toast.error("Failed to assign question")
     }
   }
 
@@ -504,32 +536,6 @@ useEffect(() => {
     scrollToBottom()
   }, [intelligenceMessages, isIntelligenceLoading])
 
-useEffect(() => {
-  if (visiblePendingQuestions.length === 0) {
-    setCurrentPendingQuestionTab(0)
-    return
-  }
-  setCurrentPendingQuestionTab((prev) => Math.min(prev, visiblePendingQuestions.length - 1))
-}, [visiblePendingQuestions.length])
-
-  useEffect(() => {
-    if (answeredQuestions.length === 0) {
-      setCurrentAnsweredQuestionTab(0)
-      return
-    }
-    setCurrentAnsweredQuestionTab((prev) => Math.min(prev, answeredQuestions.length - 1))
-  }, [answeredQuestions.length])
-
-  useEffect(() => {
-    if (!currentPendingQuestion) {
-      setEmployeeSearchQuery("")
-      setSelectedEmployees([])
-      return
-    }
-    setEmployeeSearchQuery("")
-    setSelectedEmployees([])
-  }, [currentPendingQuestion?.id])
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -553,47 +559,22 @@ useEffect(() => {
     isAdmin: role === "admin",
   })
 
-  const displayNarrative = getDisplayNarrative(incident)
-  const displayNarrativeHtml = renderMarkdownOrHtml(displayNarrative)
-  const rawNarrative = getRawNarrative(incident)
-  const rawNarrativeHtml = renderMarkdownOrHtml(rawNarrative)
-  const residentStateHtml = renderMarkdownOrHtml(incident.initialReport?.residentState)
-  const environmentNotesHtml = renderMarkdownOrHtml(incident.initialReport?.environmentNotes)
+  const answeredQuestions = incident.questions.filter((q) => q.answer)
+  const unansweredQuestions = incident.questions.filter((q) => !q.answer)
+  const canGenerateAIReport = answeredQuestions.length >= 5
 
-  const aiSummaryHtml = renderMarkdownOrHtml(incident.aiReport?.summary)
-  const aiInsightsHtml = renderMarkdownOrHtml(incident.aiReport?.insights)
-  const aiRecommendationsHtml = renderMarkdownOrHtml(incident.aiReport?.recommendations)
-  const aiActionsHtml = renderMarkdownOrHtml(incident.aiReport?.actions)
+  console.log("[v0] WAiK Agent Debug Info:", {
+    role,
+    answeredQuestionsCount: answeredQuestions.length,
+    canGenerateAIReport,
+    hasAIReport: !!incident?.aiReport,
+    isGeneratingAIReport,
+    shouldShowButton: role === "admin",
+  })
 
-  const handleAssignQuestion = async (questionId: string) => {
-    if (!incident || !userId) return
-
-    setIsAddingQuestion(true)
-    try {
-      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assignedTo: selectedEmployees,
-          assignedBy: userId,
-        }),
-      })
-
-      if (response.ok) {
-        toast.success("Questions assigned successfully")
-        setSelectedEmployees([])
-        setEmployeeSearchQuery("")
-        fetchIncident()
-      } else {
-        toast.error("Failed to assign questions")
-      }
-    } catch (error) {
-      console.error("[v0] Error assigning questions:", error)
-      toast.error("Failed to assign questions")
-    } finally {
-      setIsAddingQuestion(false)
-    }
-  }
+  const filteredEmployees = staffList.filter((emp) =>
+    emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()),
+  )
 
   return (
     <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
@@ -747,63 +728,95 @@ useEffect(() => {
               {!isEditingIncident && (
                 <CardContent className="pt-0">
                   <Separator className="mb-4" />
+
                   <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                         Incident Narrative
                       </h3>
-                      {displayNarrativeHtml ? (
-                        <>
-                          {incident.initialReport?.enhancedNarrative && (
-                            <Badge variant="secondary" className="mb-2">
-                              <Sparkles className="h-3 w-3 mr-1" /> WAiK Enhanced
-                            </Badge>
-                          )}
-                          <div
-                            className="text-sm leading-relaxed text-foreground incident-enhanced-html"
-                            dangerouslySetInnerHTML={{ __html: displayNarrativeHtml }}
-                          />
-                        </>
-                      ) : (
-                        <p className="text-sm leading-relaxed text-foreground">
-                          {displayNarrative || "No narrative provided."}
-                        </p>
+                      {incident.initialReport?.enhancedNarrative && incident.initialReport?.narrative && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowOriginalNarrative(!showOriginalNarrative)}
+                          className="text-xs"
+                        >
+                          {showOriginalNarrative ? "Hide" : "Show"} Original Voice Narrative
+                        </Button>
                       )}
                     </div>
 
-                    {rawNarrativeHtml && incident.initialReport?.enhancedNarrative && (
-                      <details className="mt-4">
-                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-                          <FileText className="h-3 w-3" /> View original voice transcript
-                        </summary>
-                        <div className="mt-2 p-3 bg-muted/40 rounded-md border border-muted">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Original Transcript</p>
-                          <div
-                            className="text-sm text-foreground leading-relaxed incident-enhanced-html"
-                            dangerouslySetInnerHTML={{ __html: rawNarrativeHtml }}
-                          />
-                        </div>
-                      </details>
+                    {incident.initialReport?.enhancedNarrative ? (
+                      <>
+                        <Badge variant="secondary" className="mb-2">
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          AI-Enhanced
+                        </Badge>
+                        <div
+                          className="text-sm leading-relaxed text-foreground incident-enhanced-html"
+                          dangerouslySetInnerHTML={{
+                            __html: markdownTohtml(incident.initialReport.enhancedNarrative),
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                        {incident.initialReport?.narrative || incident.description || "No narrative provided."}
+                      </p>
                     )}
 
-                    {(residentStateHtml || environmentNotesHtml) && (
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {residentStateHtml && (
-                          <div className="p-3 bg-muted/40 rounded-md border border-muted">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Resident State</p>
-                            <div
-                              className="text-sm leading-relaxed text-foreground incident-enhanced-html"
-                              dangerouslySetInnerHTML={{ __html: residentStateHtml }}
-                            />
-                          </div>
-                        )}
-                        {environmentNotesHtml && (
-                          <div className="p-3 bg-muted/40 rounded-md border border-muted">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Environment Notes</p>
-                            <div
-                              className="text-sm leading-relaxed text-foreground incident-enhanced-html"
-                              dangerouslySetInnerHTML={{ __html: environmentNotesHtml }}
-                            />
+                    {showOriginalNarrative &&
+                      incident.initialReport?.narrative &&
+                      incident.initialReport?.enhancedNarrative &&
+                      incident.initialReport.narrative !== incident.initialReport.enhancedNarrative && (
+                        <div className="mt-4 p-3 bg-muted/40 rounded-md border border-muted">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                            Original Transcript
+                          </p>
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
+                            {incident.initialReport.narrative}
+                          </p>
+                        </div>
+                      )}
+
+                    {(incident.initialReport?.residentState || incident.initialReport?.environmentNotes) && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            Investigative Highlights
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowInvestigativeHighlights(!showInvestigativeHighlights)}
+                            className="text-xs"
+                          >
+                            {showInvestigativeHighlights ? "Hide" : "Show"}
+                          </Button>
+                        </div>
+
+                        {showInvestigativeHighlights && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {incident.initialReport.residentState && (
+                              <div className="p-3 bg-muted/40 rounded-md border border-muted">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                                  Resident State
+                                </p>
+                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                                  {incident.initialReport.residentState}
+                                </p>
+                              </div>
+                            )}
+                            {incident.initialReport.environmentNotes && (
+                              <div className="p-3 bg-muted/40 rounded-md border border-muted">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                                  Environment Notes
+                                </p>
+                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
+                                  {incident.initialReport.environmentNotes}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -884,164 +897,20 @@ useEffect(() => {
           </TabsContent>
 
           <TabsContent value="qa" className="space-y-6 mt-6">
-            {currentPendingQuestion ? (
-              <Card className="bg-white shadow-lg border-accent/40">
-                <CardHeader>
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-lg text-accent">
-                        Pending Questions ({unansweredQuestions.length})
-                      </CardTitle>
-                      <CardDescription>Questions awaiting staff response</CardDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteQuestion(currentPendingQuestion.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 md:self-start"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" /> Remove question
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-2 flex-wrap">
-                    {visiblePendingQuestions.map((question, idx) => (
-                      <button
-                        key={question.id}
-                        onClick={() => setCurrentPendingQuestionTab(idx)}
-                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
-                          idx === currentPendingQuestionTab
-                            ? "bg-accent text-accent-foreground shadow-md"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        <span className="font-medium">Q{idx + 1}</span>
-                      </button>
-                    ))}
-                  </div>
-                    {hiddenPendingCount > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {hiddenPendingCount} additional question{hiddenPendingCount === 1 ? "" : "s"} will appear once the current batch is answered.
-                      </p>
-                    )}
-
-                  <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Badge variant="outline" className="mt-1">
-                        Q
-                      </Badge>
-                      <div className="flex-1 space-y-3">
-                        <p className="font-medium text-lg leading-relaxed">{currentPendingQuestion.questionText}</p>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span>
-                            Asked by <span className="font-medium">{currentPendingQuestion.askedBy}</span>
-                          </span>
-                          <span>•</span>
-                          <span>{formatDate(currentPendingQuestion.askedAt, "MMM d, yyyy 'at' h:mm a")}</span>
-                        </div>
-                        {currentPendingQuestion.assignedTo && currentPendingQuestion.assignedTo.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-semibold">Assigned to:</span>
-                            {currentPendingQuestion.assignedTo.map((assignee) => (
-                              <Badge key={assignee} variant="secondary" className="text-xs">
-                                {staffNameMap.get(assignee) ?? assignee}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
-                    <div className="flex items-center gap-2">
-                      <UserPlus className="h-4 w-4 text-primary" />
-                      <Label className="text-sm font-semibold">Assign to Employee(s)</Label>
-                    </div>
-                    <Input
-                      placeholder="Start typing a name..."
-                      value={employeeSearchQuery}
-                      onChange={(e) => setEmployeeSearchQuery(e.target.value)}
-                      className="w-full"
-                    />
-                    {employeeSearchQuery && (
-                      <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
-                        {filteredPendingEmployees.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No employees found</p>
-                        ) : (
-                          filteredPendingEmployees.map((emp) => (
-                            <div key={emp.id} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`pending-${emp.id}`}
-                                checked={selectedEmployees.includes(emp.id)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedEmployees([...selectedEmployees, emp.id])
-                                  } else {
-                                    setSelectedEmployees(selectedEmployees.filter((id) => id !== emp.id))
-                                  }
-                                }}
-                              />
-                              <label
-                                htmlFor={`pending-${emp.id}`}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
-                              >
-                                {emp.name}
-                                <Badge variant="outline" className="text-xs">
-                                  {emp.role}
-                                </Badge>
-                              </label>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-
-                    {selectedEmployees.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEmployees.map((empId) => (
-                          <Badge key={empId} variant="secondary" className="flex items-center gap-1">
-                            {staffNameMap.get(empId) ?? empId}
-                            <button
-                              onClick={() => setSelectedEmployees(selectedEmployees.filter((id) => id !== empId))}
-                              className="ml-1 hover:text-destructive"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    <Button
-                      onClick={() => currentPendingQuestion && handleAssignQuestion(currentPendingQuestion.id)}
-                      disabled={selectedEmployees.length === 0 || !currentPendingQuestion}
-                      size="sm"
-                      className="w-full sm:w-auto"
-                    >
-                      <UserPlus className="mr-2 h-4 w-4" /> Assign to {selectedEmployees.length} Employee
-                      {selectedEmployees.length === 1 ? "" : "s"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-
-            {currentAnsweredQuestion ? (
+            {answeredQuestions.length > 0 && (
               <Card className="bg-white shadow-lg border-primary/20">
                 <CardHeader>
                   <CardTitle className="text-lg text-primary">
                     Answered Questions ({answeredQuestions.length})
                   </CardTitle>
-                  <CardDescription>Questions that have been answered by staff</CardDescription>
+                  <CardDescription>Questions that have been responded to - Navigate using tabs below</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Question Navigation Tabs */}
                   <div className="flex gap-2 flex-wrap">
-                    {answeredQuestions.map((question, idx) => (
+                    {answeredQuestions.map((q, idx) => (
                       <button
-                        key={question.id}
+                        key={q.id}
                         onClick={() => setCurrentAnsweredQuestionTab(idx)}
                         className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
                           idx === currentAnsweredQuestionTab
@@ -1055,6 +924,7 @@ useEffect(() => {
                     ))}
                   </div>
 
+                  {/* Current Question & Answer Display */}
                   <div className="space-y-4">
                     <div className="p-6 border-2 border-primary/20 rounded-lg bg-primary/5">
                       <div className="flex items-start gap-3">
@@ -1062,13 +932,23 @@ useEffect(() => {
                           Q
                         </Badge>
                         <div className="flex-1">
-                          <p className="font-medium text-lg leading-relaxed">{currentAnsweredQuestion.questionText}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
-                            <span>
-                              Asked by <span className="font-medium">{currentAnsweredQuestion.askedBy}</span>
-                            </span>
-                            <span>•</span>
-                            <span>{formatDate(currentAnsweredQuestion.askedAt, "MMM d, yyyy 'at' h:mm a")}</span>
+                          <p className="font-medium text-lg leading-relaxed">
+                            {answeredQuestions[currentAnsweredQuestionTab]?.questionText}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Asked by{" "}
+                              <span className="font-medium">
+                                {answeredQuestions[currentAnsweredQuestionTab]?.askedBy}
+                              </span>
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(
+                                answeredQuestions[currentAnsweredQuestionTab]?.askedAt,
+                                "MMM d, yyyy 'at' h:mm a",
+                              )}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1079,40 +959,40 @@ useEffect(() => {
                         <Badge className="bg-primary mt-1">A</Badge>
                         <div className="flex-1">
                           <p className="text-lg leading-relaxed">
-                            {currentAnsweredQuestion.answer?.answerText ?? "No answer provided."}
+                            {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answerText}
                           </p>
-                          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
-                            <span>
-                              Answered by {" "}
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Answered by{" "}
                               <span className="font-medium">
-                                {currentAnsweredQuestion.answer?.answeredBy ?? "Unknown"}
+                                {answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredBy}
                               </span>
-                            </span>
-                            {currentAnsweredQuestion.answer?.answeredAt && (
-                              <>
-                                <span>•</span>
-                                <span>{formatDate(currentAnsweredQuestion.answer.answeredAt, "MMM d, yyyy 'at' h:mm a")}</span>
-                              </>
-                            )}
-                            {currentAnsweredQuestion.answer?.method && (
-                              <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                                {currentAnsweredQuestion.answer.method === "voice" ? (
-                                  <>
-                                    <Mic className="h-3 w-3" /> voice
-                                  </>
-                                ) : (
-                                  <>
-                                    <Type className="h-3 w-3" /> text
-                                  </>
-                                )}
-                              </Badge>
-                            )}
+                            </p>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(
+                                answeredQuestions[currentAnsweredQuestionTab]?.answer?.answeredAt,
+                                "MMM d, yyyy 'at' h:mm a",
+                              )}
+                            </p>
+                            <Badge variant="secondary" className="text-xs">
+                              {answeredQuestions[currentAnsweredQuestionTab]?.answer?.method === "voice" ? (
+                                <>
+                                  <Mic className="h-3 w-3 mr-1" /> voice
+                                </>
+                              ) : (
+                                <>
+                                  <Type className="h-3 w-3 mr-1" /> text
+                                </>
+                              )}
+                            </Badge>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
+                  {/* Navigation Buttons */}
                   <div className="flex gap-2">
                     <Button
                       onClick={() => setCurrentAnsweredQuestionTab(Math.max(0, currentAnsweredQuestionTab - 1))}
@@ -1120,7 +1000,8 @@ useEffect(() => {
                       variant="outline"
                       className="flex-1"
                     >
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Previous
                     </Button>
                     <Button
                       onClick={() =>
@@ -1132,13 +1013,201 @@ useEffect(() => {
                       variant="outline"
                       className="flex-1"
                     >
-                      Next <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                      Next
+                      <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            ) : null}
+            )}
 
+            {unansweredQuestions.length > 0 && (
+              <Card className="bg-white shadow-lg border-accent/40">
+                <CardHeader>
+                  <CardTitle className="text-lg text-accent">
+                    Pending Questions ({unansweredQuestions.length})
+                  </CardTitle>
+                  <CardDescription>Questions awaiting response - Navigate using tabs below</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Question Navigation Tabs */}
+                  <div className="flex gap-2 flex-wrap">
+                    {unansweredQuestions.map((q, idx) => (
+                      <button
+                        key={q.id}
+                        onClick={() => setCurrentPendingQuestionTab(idx)}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                          idx === currentPendingQuestionTab
+                            ? "bg-accent text-accent-foreground shadow-md"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        <span className="font-medium">Q{idx + 1}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Current Question Display */}
+                  <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                    <div className="flex items-start gap-3">
+                      <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-medium text-lg leading-relaxed">
+                          {unansweredQuestions[currentPendingQuestionTab]?.questionText}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            Asked by{" "}
+                            <span className="font-medium">
+                              {unansweredQuestions[currentPendingQuestionTab]?.askedBy}
+                            </span>
+                          </p>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(
+                              unansweredQuestions[currentPendingQuestionTab]?.askedAt,
+                              "MMM d, yyyy 'at' h:mm a",
+                            )}
+                          </p>
+                          {unansweredQuestions[currentPendingQuestionTab]?.assignedTo &&
+                            unansweredQuestions[currentPendingQuestionTab].assignedTo!.length > 0 && (
+                              <div className="flex items-center gap-2">
+                                <UserPlus className="h-3 w-3 text-muted-foreground" />
+                                <p className="text-xs text-muted-foreground">
+                                  Assigned to:{" "}
+                                  {unansweredQuestions[currentPendingQuestionTab]
+                                    .assignedTo!.map((empId) => {
+                                      const emp = staffList.find((s) => s.id === empId)
+                                      return emp?.name || empId
+                                    })
+                                    .join(", ")}
+                                </p>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteQuestion(unansweredQuestions[currentPendingQuestionTab].id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Assignment Section */}
+                  <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-semibold">Assign to Employee(s)</Label>
+                    </div>
+
+                    {/* Search Input */}
+                    <Input
+                      placeholder="Start typing a name..."
+                      value={employeeSearchQuery}
+                      onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                      className="w-full"
+                    />
+
+                    {/* Employee Selection */}
+                    {employeeSearchQuery && (
+                      <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
+                        {filteredEmployees.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No employees found</p>
+                        ) : (
+                          filteredEmployees.map((emp) => (
+                            <div key={emp.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={emp.id}
+                                checked={selectedEmployees.includes(emp.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedEmployees([...selectedEmployees, emp.id])
+                                  } else {
+                                    setSelectedEmployees(selectedEmployees.filter((id) => id !== emp.id))
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={emp.id}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                              >
+                                {emp.name}
+                                <Badge variant="outline" className="text-xs">
+                                  {emp.role}
+                                </Badge>
+                              </label>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* Selected Employees Display */}
+                    {selectedEmployees.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedEmployees.map((empId) => {
+                          const emp = staffList.find((s) => s.id === empId)
+                          return (
+                            <Badge key={empId} variant="secondary" className="flex items-center gap-1">
+                              {emp?.name}
+                              <button
+                                onClick={() => setSelectedEmployees(selectedEmployees.filter((id) => id !== empId))}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={() => handleAssignQuestion(unansweredQuestions[currentPendingQuestionTab].id)}
+                      disabled={selectedEmployees.length === 0}
+                      size="sm"
+                      className="w-full"
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Assign to {selectedEmployees.length} Employee{selectedEmployees.length !== 1 ? "s" : ""}
+                    </Button>
+                  </div>
+
+                  {/* Navigation Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setCurrentPendingQuestionTab(Math.max(0, currentPendingQuestionTab - 1))}
+                      disabled={currentPendingQuestionTab === 0}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        setCurrentPendingQuestionTab(
+                          Math.min(unansweredQuestions.length - 1, currentPendingQuestionTab + 1),
+                        )
+                      }
+                      disabled={currentPendingQuestionTab === unansweredQuestions.length - 1}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Next
+                      <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* No questions message */}
             {unansweredQuestions.length === 0 && answeredQuestions.length === 0 && (
               <Card className="bg-white shadow-lg">
                 <CardContent className="py-12 text-center">
@@ -1153,6 +1222,7 @@ useEffect(() => {
 
             <Separator className="my-4" />
 
+            {/* START OF UPDATED SECTION */}
             <Card className="border-accent/20 bg-white shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg text-accent">Send New Question to Staff</CardTitle>
@@ -1171,26 +1241,31 @@ useEffect(() => {
                   />
                 </div>
 
+                {/* Employee Assignment Section - Same UI as Pending Questions */}
                 <div className="space-y-3 p-4 border border-primary/20 rounded-lg bg-primary/5">
                   <div className="flex items-center gap-2">
                     <UserPlus className="h-4 w-4 text-primary" />
                     <Label className="text-sm font-semibold">Assign to Employee(s) (Optional)</Label>
                   </div>
+
+                  {/* Search Input */}
                   <Input
                     placeholder="Start typing a name..."
-                    value={newQuestionSearchQuery}
-                    onChange={(e) => setNewQuestionSearchQuery(e.target.value)}
+                    value={employeeSearchQuery}
+                    onChange={(e) => setEmployeeSearchQuery(e.target.value)}
                     className="w-full"
                   />
-                  {newQuestionSearchQuery && (
+
+                  {/* Employee Selection */}
+                  {employeeSearchQuery && (
                     <div className="space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto bg-white">
-                      {filteredNewQuestionEmployees.length === 0 ? (
+                      {filteredEmployees.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No employees found</p>
                       ) : (
-                        filteredNewQuestionEmployees.map((emp) => (
-                          <div key={`new-${emp.id}`} className="flex items-center space-x-2">
+                        filteredEmployees.map((emp) => (
+                          <div key={emp.id} className="flex items-center space-x-2">
                             <Checkbox
-                              id={`new-${emp.id}`}
+                              id={`new-q-${emp.id}`}
                               checked={selectedStaff.includes(emp.id)}
                               onCheckedChange={(checked) => {
                                 if (checked) {
@@ -1201,7 +1276,7 @@ useEffect(() => {
                               }}
                             />
                             <label
-                              htmlFor={`new-${emp.id}`}
+                              htmlFor={`new-q-${emp.id}`}
                               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
                             >
                               {emp.name}
@@ -1215,19 +1290,23 @@ useEffect(() => {
                     </div>
                   )}
 
+                  {/* Selected Employees Display */}
                   {selectedStaff.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {selectedStaff.map((empId) => (
-                        <Badge key={empId} variant="secondary" className="flex items-center gap-1">
-                          {staffNameMap.get(empId) ?? empId}
-                          <button
-                            onClick={() => setSelectedStaff(selectedStaff.filter((id) => id !== empId))}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
+                      {selectedStaff.map((empId) => {
+                        const emp = staffList.find((s) => s.id === empId)
+                        return (
+                          <Badge key={empId} variant="secondary" className="flex items-center gap-1">
+                            {emp?.name}
+                            <button
+                              onClick={() => setSelectedStaff(selectedStaff.filter((id) => id !== empId))}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -1242,6 +1321,7 @@ useEffect(() => {
                 </Button>
               </CardContent>
             </Card>
+            {/* END OF UPDATED SECTION */}
           </TabsContent>
 
           <TabsContent value="intelligence" className="space-y-6 mt-6">
@@ -1460,45 +1540,39 @@ useEffect(() => {
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="waik" className="space-y-6 mt-6">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    WAiK Intelligence
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-1">WAiK summaries, insights, recommendations, and action items</p>
-                </div>
-                {role === "admin" && (
-                  <Button
-                    onClick={handleGenerateAIReport}
-                    disabled={!canGenerateAIReport || isGeneratingAIReport || !!incident.aiReport}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 relative overflow-hidden group"
-                  >
-                    {isGeneratingAIReport && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 animate-pulse opacity-50" />
+            {role === "admin" && (
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleGenerateAIReport}
+                  disabled={!canGenerateAIReport || isGeneratingAIReport || !!incident.aiReport}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 relative overflow-hidden group"
+                >
+                  {isGeneratingAIReport && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 animate-pulse opacity-50" />
+                  )}
+                  <span className="relative z-10 flex items-center">
+                    {isGeneratingAIReport ? (
+                      <>
+                        <Brain className="mr-2 h-4 w-4 animate-pulse" />
+                        Analyzing Incident...
+                      </>
+                    ) : incident.aiReport ? (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Regenerate Analysis
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4 group-hover:animate-pulse" />
+                        Generate WAiK's Analysis
+                      </>
                     )}
-                    <span className="relative z-10 flex items-center">
-                      {isGeneratingAIReport ? (
-                        <>
-                          <Brain className="mr-2 h-4 w-4 animate-pulse" />
-                          Analyzing Incident...
-                        </>
-                      ) : incident.aiReport ? (
-                        <>
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Regenerate WAiK Insights
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="mr-2 h-4 w-4 group-hover:animate-pulse" />
-                          Generate WAiK Insights
-                        </>
-                      )}
-                    </span>
-                  </Button>
-                )}
+                  </span>
+                </Button>
               </div>
+            )}
 
             {isGeneratingAIReport && (
               <Card className="border-purple-200 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 shadow-lg overflow-hidden">
@@ -1550,7 +1624,8 @@ useEffect(() => {
                     <div>
                       <p className="font-medium text-yellow-900">More data needed</p>
                       <p className="text-sm text-yellow-700 mt-1">
-                        At least 5 answered questions are required to generate WAiK insights. Currently have {answeredQuestions.length} answered question{answeredQuestions.length !== 1 ? "s" : ""}.
+                        At least 5 answered questions are required to generate AI insights. Currently have{" "}
+                        {answeredQuestions.length} answered question{answeredQuestions.length !== 1 ? "s" : ""}.
                       </p>
                     </div>
                   </div>
@@ -1560,22 +1635,32 @@ useEffect(() => {
 
             {incident.aiReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md lg:col-span-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Brain className="h-5 w-5 text-purple-600" />
+                        <div className="absolute -top-1 -right-1 h-2 w-2 bg-purple-600 rounded-full animate-pulse" />
+                      </div>
+                      <CardTitle className="text-lg bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                        WAiK Intelligence
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-xs mt-1">
+                      WAiK summaries, insights, recommendations, and action items
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Summary</CardTitle>
+                      <CardTitle className="text-base">AI Summary</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {aiSummaryHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiSummaryHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No summary available.</p>
-                    )}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.summary}</p>
                   </CardContent>
                 </Card>
 
@@ -1583,18 +1668,11 @@ useEffect(() => {
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Brain className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Insights</CardTitle>
+                      <CardTitle className="text-base">AI Insights</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {aiInsightsHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiInsightsHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No insights available.</p>
-                    )}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.insights}</p>
                   </CardContent>
                 </Card>
 
@@ -1602,18 +1680,11 @@ useEffect(() => {
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Lightbulb className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Recommendations</CardTitle>
+                      <CardTitle className="text-base">AI Recommendations</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {aiRecommendationsHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiRecommendationsHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No recommendations available.</p>
-                    )}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.recommendations}</p>
                   </CardContent>
                 </Card>
 
@@ -1621,37 +1692,34 @@ useEffect(() => {
                   <CardHeader>
                     <div className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-base">WAiK Recommended Action Items</CardTitle>
+                      <CardTitle className="text-base">AI Actions</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {aiActionsHtml ? (
-                      <div
-                        className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                        dangerouslySetInnerHTML={{ __html: aiActionsHtml }}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-muted-foreground">No action items available.</p>
-                    )}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{incident.aiReport.actions}</p>
                   </CardContent>
                 </Card>
 
                 <Card className="border-purple-100 bg-purple-50/50 lg:col-span-2">
                   <CardContent className="pt-6">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        Generated: {formatDate(incident.aiReport.generatedAt, "MMM d, yyyy 'at' h:mm a")}
-                      </span>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Brain className="h-3.5 w-3.5 text-purple-600" />
                         <span>Model: {incident.aiReport.model}</span>
-                        <span>•</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-600" />
                         <span>Confidence: {(incident.aiReport.confidence * 100).toFixed(0)}%</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <span>Generated: {formatDate(incident.aiReport.generatedAt, "MMM d, yyyy 'at' h:mm a")}</span>
+                      </div>
                       {incident.aiReport.promptTokens && incident.aiReport.completionTokens && (
-                        <span>
-                          Tokens: {incident.aiReport.promptTokens + incident.aiReport.completionTokens} total
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span>
+                            Tokens: {incident.aiReport.promptTokens + incident.aiReport.completionTokens} total
+                          </span>
+                        </div>
                       )}
                     </div>
                   </CardContent>
@@ -1659,88 +1727,84 @@ useEffect(() => {
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md lg:col-span-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Brain className="h-5 w-5 text-purple-400" />
+                        <div className="absolute -top-1 -right-1 h-2 w-2 bg-purple-400 rounded-full animate-pulse" />
+                      </div>
+                      <CardTitle className="text-lg bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                        WAiK Intelligence
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-xs mt-1">
+                      WAiK summaries, insights, recommendations, and action items
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Summary</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Summary</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
+                      <span>Awaiting AI generation</span>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Brain className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Insights</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Insights</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
+                      <span>Awaiting AI generation</span>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Lightbulb className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Recommendations</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Recommendations</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
+                      <span>Awaiting AI generation</span>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Target className="h-5 w-5 text-purple-400" />
-                        <CardTitle className="text-base text-muted-foreground">WAiK Recommended Action Items</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        Pending
-                      </Badge>
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-purple-400" />
+                      <CardTitle className="text-base text-muted-foreground">AI Actions</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span>Awaiting WAiK generation</span>
+                      <span>Awaiting AI generation</span>
                     </div>
                   </CardContent>
                 </Card>
               </div>
             )}
-          </div>
           </TabsContent>
         </Tabs>
       </div>
