@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Incident, User as Staff } from "@/lib/types"
+import { DocumentationScore } from "@/components/documentation-score"
 import { format } from "date-fns"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -166,6 +167,18 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   const [showOriginalNarrative, setShowOriginalNarrative] = useState(false)
   const [showInvestigativeHighlights, setShowInvestigativeHighlights] = useState(true)
   const [showReportCard, setShowReportCard] = useState(true)
+  
+  // Documentation score state
+  const [documentationScore, setDocumentationScore] = useState<{
+    completenessScore: number
+    filledFields: string[]
+    missingFields: string[]
+    totalQuestions: number
+    answeredQuestions: number
+    pendingCriticalQuestions: number
+    incidentCategory: string
+    incidentSubtype: string | null
+  } | null>(null)
 
   useEffect(() => {
     fetchIncident()
@@ -213,11 +226,26 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
         }
       })
       setAnswers(initialAnswers)
+      
+      // Fetch documentation score
+      fetchDocumentationScore()
     } catch (error) {
       console.error("[v0] Error fetching incident:", error)
       toast.error("Failed to load incident details")
     } finally {
       setLoading(false)
+    }
+  }
+  
+  const fetchDocumentationScore = async () => {
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/score`)
+      if (response.ok) {
+        const data = await response.json()
+        setDocumentationScore(data)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching documentation score:", error)
     }
   }
 
@@ -584,6 +612,18 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   )
   const hiddenPendingCount = Math.max(0, unansweredQuestions.length - visibleUnansweredQuestions.length)
   const answeredQuestions = incident?.questions.filter((q) => q.answer) || []
+  
+  // Final Critical Questions - for Investigative Highlights section
+  // These are the 8 "Phase 1 closing" questions that are always asked
+  const finalCriticalQuestions = useMemo(() => {
+    return incident?.questions.filter((q: any) => 
+      q.priority?.phase === "final-critical" || 
+      q.generatedBy === "beta-interview-final-critical"
+    ) || []
+  }, [incident?.questions])
+  
+  const answeredFinalCriticalQuestions = finalCriticalQuestions.filter((q) => q.answer)
+  const pendingFinalCriticalQuestions = finalCriticalQuestions.filter((q) => !q.answer)
 
   const activeTextQuestion = visibleUnansweredQuestions[currentTextQuestionIndex] ?? null
   const activeVoiceQuestion = visibleUnansweredQuestions[currentQuestionIndex] ?? null
@@ -841,7 +881,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     <div className="space-y-3">
                       {enhancedNarrativeHtml && (
                         <Badge variant="secondary" className="w-fit uppercase tracking-wide text-[10px]">
-                          AI-enhanced summary
+                          WAiK Enhanced Incident Summary
                         </Badge>
                       )}
                       <div
@@ -907,7 +947,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                 <div>
                   <CardTitle className="text-lg text-primary">Investigative Highlights</CardTitle>
                   <CardDescription>
-                    Notes captured during follow-up along with resident state and environment observations
+                    Final critical questions that complete the Phase 1 investigation
                   </CardDescription>
                 </div>
                 <Button
@@ -921,47 +961,79 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               </CardHeader>
               {showInvestigativeHighlights && (
                 <CardContent className="space-y-4">
-                  {(residentStateHtml || environmentNotesHtml) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {residentStateHtml && (
-                        <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Resident state</p>
-                          <div
-                            className="text-sm leading-relaxed text-muted-foreground"
-                            dangerouslySetInnerHTML={{ __html: residentStateHtml ?? "" }}
-                          />
-                        </div>
-                      )}
-                      {environmentNotesHtml && (
-                        <div className="rounded-lg border border-muted/40 bg-muted/30 p-4 space-y-1">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Environment notes</p>
-                          <div
-                            className="text-sm leading-relaxed text-muted-foreground"
-                            dangerouslySetInnerHTML={{ __html: environmentNotesHtml ?? "" }}
-                          />
-                        </div>
-                      )}
+                  {/* Progress indicator for Final Critical Questions */}
+                  {finalCriticalQuestions.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className={`h-2 w-2 rounded-full ${
+                        answeredFinalCriticalQuestions.length === finalCriticalQuestions.length 
+                          ? "bg-green-500" 
+                          : "bg-amber-500"
+                      }`} />
+                      <span className="text-muted-foreground">
+                        {answeredFinalCriticalQuestions.length} of {finalCriticalQuestions.length} critical questions answered
+                      </span>
                     </div>
                   )}
 
-                  {answeredQuestions.length > 0 && (
+                  {/* Answered Final Critical Questions */}
+                  {answeredFinalCriticalQuestions.length > 0 && (
                     <div className="space-y-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Answer highlights</p>
-                      <ul className="space-y-2 text-sm text-muted-foreground">
-                        {answeredQuestions.slice(0, 3).map((q) => (
-                          <li key={`qa-highlight-${q.id}`} className="border border-muted/40 rounded-lg p-3 bg-muted/20">
-                            <p className="font-medium">{q.questionText}</p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {q.answer?.answerText ?? "No answer captured."}
-                            </p>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+                        Completed Critical Questions
+                      </p>
+                      <ul className="space-y-3">
+                        {answeredFinalCriticalQuestions.map((q, index) => (
+                          <li key={`final-qa-${q.id}`} className="border border-green-200 rounded-lg p-4 bg-green-50/50">
+                            <div className="flex items-start gap-3">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-medium flex items-center justify-center">
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 space-y-2">
+                                <p className="font-medium text-green-900">{q.questionText}</p>
+                                <p className="text-sm text-green-800 leading-relaxed">
+                                  {q.answer?.answerText ?? "No answer captured."}
+                                </p>
+                                {q.answer?.answeredAt && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Answered {new Date(q.answer.answeredAt).toLocaleDateString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </li>
                         ))}
                       </ul>
-                      {answeredQuestions.length > 3 ? (
-                        <p className="text-xs text-muted-foreground">
-                          There are {answeredQuestions.length - 3} additional answered questions in the Q&A tab.
-                        </p>
-                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Pending Final Critical Questions */}
+                  {pendingFinalCriticalQuestions.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs uppercase tracking-wide text-amber-600 font-semibold">
+                        Pending Critical Questions ({pendingFinalCriticalQuestions.length} remaining)
+                      </p>
+                      <ul className="space-y-2">
+                        {pendingFinalCriticalQuestions.map((q, index) => (
+                          <li key={`pending-final-${q.id}`} className="border border-amber-200 rounded-lg p-3 bg-amber-50/50">
+                            <div className="flex items-start gap-3">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-medium flex items-center justify-center">
+                                {answeredFinalCriticalQuestions.length + index + 1}
+                              </span>
+                              <p className="text-sm text-amber-800">{q.questionText}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-amber-600 italic">
+                        Answer these questions in the Q&A tab to complete Phase 1 investigation.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* No Final Critical Questions yet */}
+                  {finalCriticalQuestions.length === 0 && (
+                    <div className="text-sm text-muted-foreground italic py-4 text-center">
+                      Final critical questions will appear here once the initial gap analysis is complete.
                     </div>
                   )}
                 </CardContent>
@@ -1125,7 +1197,19 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
               )}
             </Card>
 
-            {/* Q&A content is now located in the dedicated Q&A tab below */}
+            {/* Documentation Score Section */}
+            {documentationScore && (
+              <DocumentationScore
+                completenessScore={documentationScore.completenessScore}
+                filledFields={documentationScore.filledFields}
+                missingFields={documentationScore.missingFields}
+                totalQuestions={documentationScore.totalQuestions}
+                answeredQuestions={documentationScore.answeredQuestions}
+                pendingCriticalQuestions={documentationScore.pendingCriticalQuestions}
+                incidentCategory={documentationScore.incidentCategory}
+                incidentSubtype={documentationScore.incidentSubtype || undefined}
+              />
+            )}
 
           </TabsContent>
 

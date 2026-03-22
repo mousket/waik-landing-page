@@ -184,8 +184,8 @@ export async function getUserByCredentials(username: string, password: string): 
   const user = await UserModel.findOne({ username }).lean().exec()
   if (!user) return null
 
-  const isValid = await bcrypt.compare(password, user.password)
-  if (!isValid) return null
+    const isValid = await bcrypt.compare(password, user.password)
+    if (!isValid) return null
 
   return serializeUser(user)
 }
@@ -231,7 +231,7 @@ export async function updateIncident(id: string, updates: Partial<Incident>): Pr
 
   if (updates.aiReport) {
     preparedUpdates.aiReport = prepareAIReport(updates.aiReport)
-  }
+}
 
   if (updates.investigation) {
     preparedUpdates.investigation = prepareInvestigation(updates.investigation)
@@ -551,10 +551,26 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
 
 interface QueueInvestigationQuestionsInput {
   incidentId: string
-  questions: Array<{ questionText: string; assignedTo?: string[] }>
+  questions: Array<{
+    questionText: string
+    assignedTo?: string[]
+    source?: "voice-report" | "ai-generated" | "manual"
+    generatedBy?: string
+    askedBy?: string
+    askedByName?: string
+    priority?: {
+      phase: "initial" | "follow-up" | "final-critical"
+      order: number
+      isCritical: boolean
+      goldStandardField?: string
+    }
+  }>
+  investigatorId?: string
+  investigatorName?: string
   generatedBy?: string
   askedById?: string
   askedByName?: string
+  phase?: "initial" | "follow-up" | "final-critical"
 }
 
 export async function queueInvestigationQuestions(
@@ -578,18 +594,23 @@ export async function queueInvestigationQuestions(
       id: questionId,
       incidentId: incident.id,
       questionText: item.questionText,
-      askedBy,
-      askedByName: input.askedByName,
+      askedBy: item.askedBy || askedBy,
+      askedByName: item.askedByName || input.askedByName,
       askedAt: timestamp,
       assignedTo: item.assignedTo,
-      source: "ai-generated" as const,
-      generatedBy,
+      source: item.source || ("ai-generated" as const),
+      generatedBy: item.generatedBy || generatedBy,
       metadata: {
         reporterId: incident.staffId,
         reporterName: incident.staffName,
         reporterRole,
         assignedStaffIds: item.assignedTo,
         createdVia: "system" as const,
+      },
+      priority: item.priority || {
+        phase: input.phase || "follow-up",
+        order: index,
+        isCritical: false,
       },
     }
   })
@@ -629,7 +650,7 @@ export async function queueInvestigationQuestions(
           },
         )
           .then(() => {
-            question.vectorizedAt = new Date().toISOString()
+            console.log("[DB] Vectorized question:", question.id)
           })
           .catch((error) => console.error("[DB] Failed to vectorize queued question", question.id, error)),
       ),

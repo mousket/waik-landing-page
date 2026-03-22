@@ -6,7 +6,7 @@ import { AuthGuard } from "@/components/auth-guard"
 import { useAuthStore } from "@/lib/auth-store"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { LogOut, Home, Menu, X, Bell, Plus, MessageSquare, Volume2 } from "lucide-react"
+import { LogOut, Home, Menu, X, Bell, Plus, MessageSquare, Volume2, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import {
@@ -185,6 +185,16 @@ export default function StaffLayout({
               >
                 <Volume2 className="mr-3 h-5 w-5" />
                 AI Companion
+              </Button>
+              <Button
+                className="w-full justify-start bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all"
+                onClick={() => {
+                  router.push("/incidents/beta/create")
+                  setIsMobileMenuOpen(false)
+                }}
+              >
+                <Sparkles className="mr-3 h-5 w-5" />
+                New Incident (Beta)
               </Button>
             </nav>
 

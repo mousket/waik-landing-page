@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import type { Incident, User as Staff } from "@/lib/types"
+import { DocumentationScore } from "@/components/documentation-score"
 import { format, isValid, parseISO } from "date-fns"
 import { useAuthStore } from "@/lib/auth-store"
 import {
@@ -142,6 +143,18 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const currentPendingQuestion = visiblePendingQuestions[currentPendingQuestionTab] ?? null
   const currentAnsweredQuestion = answeredQuestions[currentAnsweredQuestionTab] ?? null
 
+  // Documentation score state
+  const [documentationScore, setDocumentationScore] = useState<{
+    completenessScore: number
+    filledFields: string[]
+    missingFields: string[]
+    totalQuestions: number
+    answeredQuestions: number
+    pendingCriticalQuestions: number
+    incidentCategory: string
+    incidentSubtype: string | null
+  } | null>(null)
+
 useEffect(() => {
   fetchIncident()
   fetchStaffList()
@@ -157,11 +170,26 @@ useEffect(() => {
         setEditedDescription(getDisplayNarrative(data))
         setEditedResidentName(data.residentName)
         setEditedResidentRoom(data.residentRoom)
+        
+        // Fetch documentation score
+        fetchDocumentationScore()
       }
     } catch (error) {
       console.error("[v0] Error fetching incident:", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  const fetchDocumentationScore = async () => {
+    try {
+      const response = await fetch(`/api/incidents/${params.id}/score`)
+      if (response.ok) {
+        const data = await response.json()
+        setDocumentationScore(data)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching documentation score:", error)
     }
   }
 
@@ -880,6 +908,20 @@ useEffect(() => {
                   </Button>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Documentation Score Section */}
+            {documentationScore && (
+              <DocumentationScore
+                completenessScore={documentationScore.completenessScore}
+                filledFields={documentationScore.filledFields}
+                missingFields={documentationScore.missingFields}
+                totalQuestions={documentationScore.totalQuestions}
+                answeredQuestions={documentationScore.answeredQuestions}
+                pendingCriticalQuestions={documentationScore.pendingCriticalQuestions}
+                incidentCategory={documentationScore.incidentCategory}
+                incidentSubtype={documentationScore.incidentSubtype || undefined}
+              />
             )}
           </TabsContent>
 

@@ -17,6 +17,16 @@ export interface QuestionMetadata {
   createdVia?: "voice" | "text" | "system"
 }
 
+// Phase tracking for the conversational interview flow
+export type QuestionPhase = "initial" | "follow-up" | "final-critical"
+
+export interface QuestionPriority {
+  phase: QuestionPhase
+  order: number // Order within the phase (1, 2, 3...)
+  isCritical: boolean // Always-required questions that unlock final phase
+  goldStandardField?: string // Which gold standard field this question targets
+}
+
 export interface QuestionDocument extends Document {
   id: string
   incidentId?: string
@@ -30,6 +40,8 @@ export interface QuestionDocument extends Document {
   generatedBy?: string
   vectorizedAt?: Date
   metadata?: QuestionMetadata
+  // New fields for conversational interview flow
+  priority?: QuestionPriority
 }
 
 export const AnswerSchema = new Schema<AnswerSubdocument>(
@@ -63,6 +75,13 @@ export const QuestionSchema = new Schema<QuestionDocument>(
       reporterRole: { type: String, enum: ["staff", "admin"] },
       assignedStaffIds: { type: [String], default: undefined },
       createdVia: { type: String, enum: ["voice", "text", "system"] },
+    },
+    // Priority tracking for conversational interview flow
+    priority: {
+      phase: { type: String, enum: ["initial", "follow-up", "final-critical"], default: "initial" },
+      order: { type: Number, default: 0 },
+      isCritical: { type: Boolean, default: false },
+      goldStandardField: { type: String },
     },
   },
   { versionKey: false, timestamps: false },
