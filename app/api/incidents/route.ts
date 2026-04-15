@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { getIncidents, createIncidentFromReport, addQuestionToIncident, getUserById } from "@/lib/db"
 import { getQuestionEmbedding } from "@/lib/embeddings"
 import { isOpenAIConfigured } from "@/lib/openai"
 
 export async function GET() {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
-    const incidents = await getIncidents()
+    const facilityId = sessionUser.facilityId ?? ""
+    if (!facilityId && !sessionUser.isWaikSuperAdmin) {
+      return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
+    }
+    const incidents = await getIncidents(facilityId)
     return NextResponse.json(incidents)
   } catch (error) {
     console.error("[v0] Error fetching incidents:", error)
@@ -14,6 +21,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const body = await request.json()
     const {
@@ -27,6 +36,10 @@ export async function POST(request: Request) {
       questions = [], // Array of { questionText, answerText }
     } = body
 
+    if (staffId !== sessionUser.clerkUserId && !sessionUser.isWaikSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     // Validate required fields
     if (!title || !description || !residentName || !staffId) {
       return NextResponse.json(
@@ -38,7 +51,13 @@ export async function POST(request: Request) {
     // Create incident with questions and answers
     const reporter = (await getUserById(staffId)) || undefined
 
+    if (!sessionUser.facilityId) {
+      return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
+    }
+
     const incident = await createIncidentFromReport({
+      facilityId: sessionUser.facilityId,
+      organizationId: sessionUser.organizationId,
       title,
       narrative: description,
       residentName,
@@ -90,7 +109,7 @@ export async function POST(request: Request) {
             },
           }
 
-          await addQuestionToIncident(incident.id, question)
+          await addQuestionToIncident(incident.id, sessionUser.facilityId, question)
 
           if (isOpenAIConfigured()) {
             getQuestionEmbedding(

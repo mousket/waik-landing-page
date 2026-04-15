@@ -1,0 +1,82 @@
+import { NextResponse } from "next/server"
+import connectMongo from "@/backend/src/lib/mongodb"
+import FacilityModel from "@/backend/src/models/facility.model"
+import { inviteStaffMember } from "@/lib/admin-staff-invite"
+import { authErrorResponse, getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { requireCanInviteStaff } from "@/lib/permissions"
+
+type InputRow = {
+  first_name: string
+  last_name: string
+  email: string
+  role_slug: string
+  phone?: string
+  status: "valid" | "error" | "duplicate"
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorizedResponse()
+    requireCanInviteStaff(user)
+
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+    }
+
+    const rows = (body as { rows?: InputRow[] }).rows
+    if (!Array.isArray(rows)) {
+      return NextResponse.json({ error: "rows array required" }, { status: 400 })
+    }
+
+    const facilityId = user.facilityId
+    requireFacilityAccess(user, facilityId)
+
+    await connectMongo()
+    const facility = await FacilityModel.findOne({ id: facilityId }).lean().exec()
+    if (!facility || Array.isArray(facility)) {
+      return NextResponse.json({ error: "Facility not found" }, { status: 404 })
+    }
+
+    const orgId = String((facility as { organizationId?: string }).organizationId ?? user.organizationId ?? "")
+    const facilityName = String((facility as { name?: string }).name ?? "")
+
+    const inviterName = `${user.firstName} ${user.lastName}`.trim() || user.email
+    const inviterRole = user.role.name
+
+    const results: Array<{ email: string; status: "created" | "failed"; error?: string }> = []
+    let created = 0
+    let failed = 0
+
+    for (const row of rows) {
+      if (row.status !== "valid") continue
+      const r = await inviteStaffMember({
+        facilityId,
+        organizationId: orgId,
+        facilityName,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        email: row.email,
+        roleSlug: row.role_slug,
+        inviterName,
+        inviterRole,
+        sendWelcomeEmail: true,
+      })
+
+      if (r.ok) {
+        created++
+        results.push({ email: row.email, status: "created" })
+      } else {
+        failed++
+        results.push({ email: row.email, status: "failed", error: r.message })
+      }
+    }
+
+    return NextResponse.json({ created, failed, results })
+  } catch (err) {
+    return authErrorResponse(err)
+  }
+}

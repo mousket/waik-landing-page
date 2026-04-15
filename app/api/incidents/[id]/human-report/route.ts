@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server"
-import { getIncidentById, updateIncident } from "@/lib/db"
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { facilityIdForIncidentMutation, getIncidentForUser, updateIncident } from "@/lib/db"
 import type { HumanReport } from "@/lib/types"
 
 /**
  * Create or update human report for an incident
  */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const { id } = await params
     const body = await request.json()
@@ -15,10 +18,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "All report fields and userId are required" }, { status: 400 })
     }
 
-    // Get incident
-    const incident = await getIncidentById(id)  // ✅ Now async
-    if (!incident) {
+    const scope = await getIncidentForUser(id, sessionUser)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
+    }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
+    const facilityId = facilityIdForIncidentMutation(incident, sessionUser)
+    if (!facilityId) {
+      return NextResponse.json({ error: "Incident has no facility" }, { status: 400 })
     }
 
     // Create or update human report
@@ -45,7 +55,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         }
 
     // Save to database
-    await updateIncident(id, { humanReport })
+    await updateIncident(id, facilityId, { humanReport })
 
     console.log("[API] Human report saved for incident:", id)
     return NextResponse.json({ success: true, humanReport })
@@ -59,13 +69,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
  * Get human report for an incident
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const { id } = await params
-    const incident = await getIncidentById(id)  // ✅ Now async
-
-    if (!incident) {
+    const scope = await getIncidentForUser(id, user)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
 
     if (!incident.humanReport) {
       return NextResponse.json({ error: "No human report exists yet" }, { status: 404 })
@@ -82,16 +97,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
  * Delete human report
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const { id } = await params
-    const incident = await getIncidentById(id)  // ✅ Now async
-
-    if (!incident) {
+    const scope = await getIncidentForUser(id, user)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
+    }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
+    const facilityId = facilityIdForIncidentMutation(incident, user)
+    if (!facilityId) {
+      return NextResponse.json({ error: "Incident has no facility" }, { status: 400 })
     }
 
     // Remove human report
-    await updateIncident(id, { humanReport: undefined })
+    await updateIncident(id, facilityId, { humanReport: undefined })
 
     console.log("[API] Human report deleted for incident:", id)
     return NextResponse.json({ success: true })

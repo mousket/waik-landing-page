@@ -1,6 +1,12 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 import { Plus_Jakarta_Sans, Inter } from "next/font/google"
+
+import { ConditionalRootHeader } from "@/components/conditional-root-header"
+import { SignedOutHeaderSignIn } from "@/components/signed-out-header-sign-in"
+import { clerkAppearance } from "@/lib/clerk-appearance"
+import { getClerkAfterSignOutUrl, getClerkPostAuthUrl } from "@/lib/clerk-routes"
 import "./globals.css"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -48,6 +54,9 @@ const getSiteUrl = () => {
 
 const siteUrl = getSiteUrl()
 
+const clerkPostAuthUrl = getClerkPostAuthUrl()
+const clerkAfterSignOutUrl = getClerkAfterSignOutUrl()
+
 export const metadata: Metadata = {
   title: "WAiK - Voice-First Documentation and Reporting for Healthcare Incidents",
   description:
@@ -87,7 +96,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${plusJakartaSans.variable} ${inter.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${plusJakartaSans.variable} ${inter.variable} font-sans antialiased`}>
+        <ClerkProvider
+          appearance={clerkAppearance}
+          signInForceRedirectUrl={clerkPostAuthUrl}
+          signUpForceRedirectUrl={clerkPostAuthUrl}
+          afterSignOutUrl={clerkAfterSignOutUrl}
+        >
+          <ConditionalRootHeader>
+            <SignedOut>
+              <SignedOutHeaderSignIn />
+            </SignedOut>
+            <SignedIn>
+              <UserButton appearance={clerkAppearance} afterSignOutUrl={clerkAfterSignOutUrl} />
+            </SignedIn>
+          </ConditionalRootHeader>
+          {children}
+        </ClerkProvider>
+      </body>
     </html>
   )
 }

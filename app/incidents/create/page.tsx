@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -97,7 +97,7 @@ const extractTranscriptDelta = (full: string, baseline: string) => {
 
 export default function CreateIncidentPage() {
   const router = useRouter()
-  const { userId, role, name } = useAuthStore()
+  const { userId, role, name } = useWaikUser()
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)

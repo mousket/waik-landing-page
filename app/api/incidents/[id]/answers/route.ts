@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { answerQuestion } from "@/lib/db"
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { answerQuestion, getIncidentForUser } from "@/lib/db"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const { id } = await params
     const body = await request.json()
@@ -9,6 +12,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!questionId || !answerText || !answeredBy) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+
+    const scope = await getIncidentForUser(id, sessionUser)
+    if (scope.kind === "not_found") {
+      return NextResponse.json({ error: "Incident not found" }, { status: 404 })
+    }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const facilityId = scope.incident.facilityId ?? sessionUser.facilityId
+    if (!facilityId) {
+      return NextResponse.json({ error: "Incident has no facility" }, { status: 400 })
     }
 
     const answer = {
@@ -20,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       method,
     }
 
-    const updatedQuestion = await answerQuestion(id, questionId, answer)
+    const updatedQuestion = await answerQuestion(id, facilityId, questionId, answer)
 
     if (!updatedQuestion) {
       return NextResponse.json({ error: "Incident or question not found" }, { status: 404 })

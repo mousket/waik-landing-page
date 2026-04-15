@@ -1,12 +1,13 @@
 import type { Document } from "mongoose"
 import connectMongo from "../lib/mongodb"
 import IncidentModel, { type IncidentDocument } from "../models/incident.model"
-import { QuestionSchema, type QuestionDocument, type AnswerSubdocument } from "../models/question.model"
+import type { QuestionDocument, AnswerSubdocument } from "../models/question.model"
 import NotificationModel, { type NotificationDocument } from "../models/notification.model"
 
 export interface CreateIncidentInput {
   id?: string
   companyId?: string
+  facilityId?: string
   title: string
   description: string
   status?: "open" | "in-progress" | "pending-review" | "closed"
@@ -52,21 +53,29 @@ export interface AddQuestionInput {
 }
 
 export class IncidentService {
-  static async getIncidents(companyId?: string) {
+  static async getIncidents(companyId?: string, facilityId?: string) {
     await connectMongo()
 
-    const query = companyId ? { companyId } : {}
+    const query: Record<string, unknown> = {}
+    if (companyId) query.companyId = companyId
+    if (facilityId) query.facilityId = facilityId
     return IncidentModel.find(query).lean().exec()
   }
 
-  static async getIncidentById(id: string) {
+  static async getIncidentById(id: string, facilityId?: string) {
     await connectMongo()
-    return IncidentModel.findOne({ id }).lean().exec()
+    const q: Record<string, unknown> = { id }
+    if (facilityId) q.facilityId = facilityId
+    return IncidentModel.findOne(q).lean().exec()
   }
 
-  static async getIncidentsByStaffId(staffId: string) {
+  static async getIncidentsByStaffId(staffId: string, facilityId?: string) {
     await connectMongo()
-    return IncidentModel.find({ $or: [{ staffId }, { "questions.assignedTo": staffId }] }).lean().exec()
+    const q: Record<string, unknown> = {
+      $or: [{ staffId }, { "questions.assignedTo": staffId }],
+    }
+    if (facilityId) q.facilityId = facilityId
+    return IncidentModel.find(q).lean().exec()
   }
 
   static async createIncident(input: CreateIncidentInput) {
@@ -79,17 +88,20 @@ export class IncidentService {
       priority: input.priority ?? "medium",
       createdAt: new Date(),
       updatedAt: new Date(),
-      questions: (input.questions ?? []).map((question) => QuestionSchema.cast(question)),
+      questions: (input.questions ?? []) as IncidentDocument["questions"],
     })
 
     return incident.toJSON()
   }
 
-  static async updateIncident(id: string, updates: UpdateIncidentInput) {
+  static async updateIncident(id: string, updates: UpdateIncidentInput, facilityId?: string) {
     await connectMongo()
 
+    const filter: Record<string, unknown> = { id }
+    if (facilityId) filter.facilityId = facilityId
+
     const incident = await IncidentModel.findOneAndUpdate(
-      { id },
+      filter,
       { ...updates, updatedAt: new Date() },
       { new: true },
     )
@@ -97,7 +109,7 @@ export class IncidentService {
     return incident?.toJSON() ?? null
   }
 
-  static async addQuestionToIncident(incidentId: string, input: AddQuestionInput) {
+  static async addQuestionToIncident(incidentId: string, input: AddQuestionInput, facilityId?: string) {
     await connectMongo()
 
     const questionId = `q-${Date.now()}`
@@ -117,8 +129,11 @@ export class IncidentService {
       answer: input.answer,
     }
 
+    const filter: Record<string, unknown> = { id: incidentId }
+    if (facilityId) filter.facilityId = facilityId
+
     const incident = await IncidentModel.findOneAndUpdate(
-      { id: incidentId },
+      filter,
       {
         $push: { questions: question },
         $set: { updatedAt: now },
@@ -126,13 +141,14 @@ export class IncidentService {
       { new: true },
     )
 
-    return incident?.questions.find((q) => q.id === questionId)?.toJSON?.() ?? question
+    return incident?.questions.find((q: QuestionDocument) => q.id === questionId)?.toJSON?.() ?? question
   }
 
   static async answerQuestion(
     incidentId: string,
     questionId: string,
     answer: Omit<AnswerSubdocument, "id" | "questionId">,
+    facilityId?: string,
   ) {
     await connectMongo()
 
@@ -142,8 +158,11 @@ export class IncidentService {
       ...answer,
     }
 
+    const filter: Record<string, unknown> = { id: incidentId, "questions.id": questionId }
+    if (facilityId) filter.facilityId = facilityId
+
     const incident = await IncidentModel.findOneAndUpdate(
-      { id: incidentId, "questions.id": questionId },
+      filter,
       {
         $set: {
           "questions.$.answer": fullAnswer,
@@ -154,14 +173,17 @@ export class IncidentService {
       { new: true },
     )
 
-    return incident?.questions.find((q) => q.id === questionId)?.answer ?? null
+    return incident?.questions.find((q: QuestionDocument) => q.id === questionId)?.answer ?? null
   }
 
-  static async deleteQuestion(incidentId: string, questionId: string) {
+  static async deleteQuestion(incidentId: string, questionId: string, facilityId?: string) {
     await connectMongo()
 
+    const filter: Record<string, unknown> = { id: incidentId }
+    if (facilityId) filter.facilityId = facilityId
+
     const result = await IncidentModel.updateOne(
-      { id: incidentId },
+      filter,
       {
         $pull: { questions: { id: questionId, answer: { $exists: false } } },
         $set: { updatedAt: new Date() },
@@ -171,7 +193,12 @@ export class IncidentService {
     return result.modifiedCount > 0
   }
 
-  static async createNotification(input: Omit<NotificationDocument, keyof Document>) {
+  static async createNotification(
+    input: Pick<NotificationDocument, "incidentId" | "type" | "message" | "targetUserId"> & {
+      id?: string
+      createdAt?: Date
+    },
+  ) {
     await connectMongo()
 
     const notification = await NotificationModel.create({

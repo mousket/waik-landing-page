@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowRight, CheckCircle, AlertCircle } from "lucide-react"
-import { submitToGoogleSheets } from "@/lib/google-sheets"
+import { submitToGoogleSheets } from "@/lib/public-forms"
 import { DemoModal } from "@/components/demo-modal"
 
 export function FinalCTA() {

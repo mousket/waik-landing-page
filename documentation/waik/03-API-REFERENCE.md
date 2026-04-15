@@ -43,19 +43,21 @@ All successful responses return JSON. Errors follow a consistent format:
 
 ### Authentication Model
 
-Currently, authentication is handled client-side via Zustand state (`lib/auth-store.ts`). The user's ID, role, and name are passed in request bodies where needed.
-
-> **Note**: Production deployment should implement proper JWT or session-based authentication.
+API routes require a **Clerk session** (cookie-based in the browser). Unauthenticated requests receive **`401`** with `{ "error": "Unauthorized" }`. The server resolves the user via `getCurrentUser()` in `lib/auth.ts`, using Clerk **`publicMetadata`** for facility/org and WAiK role (`owner`, `administrator`, `rn`, etc.). Do not trust `userId` in request bodies for authorization.
 
 ---
 
 ## Authentication
 
-### POST `/api/auth/login`
+### Clerk session
 
-Authenticate a user with username and password.
+Sign in through the app at **`/sign-in`**. After sign-in, the browser sends the Clerk session cookie on same-origin API requests.
 
-#### Request Body
+### Legacy demo login (removed)
+
+The previous **`POST /api/auth/login`** route has been removed in favor of Clerk.
+
+#### Request Body (historical reference only)
 
 ```json
 {

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { detectIncidentCategory, detectFallSubtype } from "@/lib/agents/category_detector"
 import { analyzeNarrativeAndScore } from "@/lib/agents/expert_investigator/analyze"
 import { generateGapQuestions } from "@/lib/agents/expert_investigator/gap_questions"
 import { isOpenAIConfigured } from "@/lib/openai"
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const body = await request.json()
     const { residentName, roomNumber, narrative, reportedById, reportedByName } = body

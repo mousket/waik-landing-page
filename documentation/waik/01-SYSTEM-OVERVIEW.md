@@ -15,7 +15,8 @@
 5. [Key Components](#key-components)
 6. [Data Flow](#data-flow)
 7. [User Roles](#user-roles)
-8. [Directory Structure](#directory-structure)
+8. [Authentication (Clerk)](#authentication-clerk)
+9. [Directory Structure](#directory-structure)
 
 ---
 
@@ -307,6 +308,16 @@ Real-time notifications for:
 
 ---
 
+## Authentication (Clerk)
+
+Production auth uses **[Clerk](https://clerk.com)** (`@clerk/nextjs`):
+
+- **Sessions**: Cookie-based; `middleware.ts` protects app and API routes except an explicit public list.
+- **Roles**: Stored in Clerk **`publicMetadata`** (`role`, `facilityId`, `orgId`, `facilityName`, `isWaikSuperAdmin`). Admin-tier roles (`owner`, `administrator`, `director_of_nursing`, `head_nurse`) map to the existing UI `"admin"`; staff-tier roles map to `"staff"`.
+- **Code**: `lib/auth.ts` (`getCurrentUser`, `requireRole`, …), `lib/waik-roles.ts`, `hooks/use-waik-user.ts` for client UI.
+
+---
+
 ## Directory Structure
 
 ```
@@ -320,7 +331,6 @@ waik-landing-page/
 │   │   │   ├── report/           # Report agent API
 │   │   │   ├── investigate/      # Investigation agent API
 │   │   │   └── report-conversational/  # Expert investigator API
-│   │   ├── auth/                 # Authentication
 │   │   ├── incidents/            # Incident CRUD + AI features
 │   │   └── staff/                # Staff-specific endpoints
 │   ├── incidents/                # Incident creation flows
@@ -331,7 +341,10 @@ waik-landing-page/
 │   │   ├── dashboard/            # Staff dashboard
 │   │   ├── incidents/[id]/       # Staff incident detail
 │   │   └── report/               # Quick report page
-│   └── waik-demo-start/          # Demo login page
+│   ├── sign-in/                  # Clerk sign-in UI
+│   ├── sign-up/                  # Clerk sign-up UI
+│   ├── auth/after-sign-in/       # Role-based redirect after Clerk
+│   └── waik-demo-start/          # Legacy URL → redirects to /sign-in
 │
 ├── backend/                      # Backend utilities
 │   └── src/
@@ -350,7 +363,9 @@ waik-landing-page/
 │   │   ├── investigation_agent.ts # Investigation agent
 │   │   ├── incident-analyzer.ts  # AI report generator
 │   │   └── intelligence-qa.ts    # RAG Q&A agent
-│   ├── auth-store.ts             # Authentication state
+│   ├── auth.ts                   # Clerk server helpers (getCurrentUser, …)
+│   ├── waik-roles.ts             # WAiK role tiers + metadata types
+│   ├── public-forms.ts           # Public marketing form posts (Apps Script)
 │   ├── db.ts                     # Database operations
 │   ├── embeddings.ts             # Vector embedding utilities
 │   ├── gold_standards.ts         # Compliance standards types

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { getIncidentById, updateIncident } from "@/lib/db"
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { facilityIdForIncidentMutation, getIncidentForUser, updateIncident } from "@/lib/db"
 import { getIncidentAnalyzer } from "@/lib/agents/incident-analyzer"
 import { isOpenAIConfigured } from "@/lib/openai"
 
@@ -7,6 +8,8 @@ import { isOpenAIConfigured } from "@/lib/openai"
  * Generate AI report for an incident
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const { id } = await params
 
@@ -18,10 +21,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       )
     }
 
-    // Get incident
-    const incident = await getIncidentById(id)  // ✅ Now async
-    if (!incident) {
+    const scope = await getIncidentForUser(id, user)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
+    }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
+    const facilityId = facilityIdForIncidentMutation(incident, user)
+    if (!facilityId) {
+      return NextResponse.json({ error: "Incident has no facility" }, { status: 400 })
     }
 
     // Generate AI report
@@ -30,7 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const aiReport = await analyzer.generateReport(incident)
 
     // Save to database
-    await updateIncident(id, { aiReport })
+    await updateIncident(id, facilityId, { aiReport })
 
     console.log("[API] AI report generated and saved")
     return NextResponse.json({ success: true, aiReport })
@@ -47,13 +57,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
  * Get AI report for an incident (if it exists)
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const { id } = await params
-    const incident = await getIncidentById(id)  // ✅ Now async
-
-    if (!incident) {
+    const scope = await getIncidentForUser(id, user)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
 
     if (!incident.aiReport) {
       return NextResponse.json({ error: "No AI report generated yet" }, { status: 404 })

@@ -4,6 +4,7 @@ import type { MissingFieldDescriptor } from "./gap_questions"
 export interface InvestigatorSession {
   id: string
   incidentId: string
+  facilityId: string
   investigatorId: string
   investigatorName: string
   nurseName: string

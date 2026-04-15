@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import {
   answerInvestigatorQuestion,
   startInvestigatorConversation,
@@ -50,6 +51,8 @@ function validateRequestBody(body: AgentRequestBody): { valid: boolean; error?: 
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const body = (await request.json()) as AgentRequestBody
     const validation = validateRequestBody(body)
@@ -59,9 +62,13 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "start") {
+      if (!user.facilityId) {
+        return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
+      }
       const narrative = body.initialNarrative ?? body.narrative ?? ""
       const result = await startInvestigatorConversation({
         incidentId: body.incidentId,
+        facilityId: user.facilityId,
         narrative,
         investigatorId: body.investigatorId,
         investigatorName: body.investigatorName,

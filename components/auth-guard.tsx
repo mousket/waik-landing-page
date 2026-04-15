@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import type { UserRole } from "@/lib/types"
 
 interface AuthGuardProps {
@@ -14,20 +14,22 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const router = useRouter()
-  const { isAuthenticated, role } = useAuthStore()
+  const { isLoaded, isSignedIn, role } = useWaikUser()
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/waik-demo-start/login")
+    if (!isLoaded) return
+
+    if (!isSignedIn || !role) {
+      router.replace("/sign-in")
       return
     }
 
-    if (role && !allowedRoles.includes(role)) {
-      router.push("/waik-demo-start/login")
+    if (!allowedRoles.includes(role)) {
+      router.replace("/sign-in")
     }
-  }, [isAuthenticated, role, allowedRoles, router])
+  }, [isLoaded, isSignedIn, role, allowedRoles, router])
 
-  if (!isAuthenticated || (role && !allowedRoles.includes(role))) {
+  if (!isLoaded || !isSignedIn || !role || !allowedRoles.includes(role)) {
     return null
   }
 

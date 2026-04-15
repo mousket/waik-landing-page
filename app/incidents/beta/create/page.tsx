@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -97,7 +97,7 @@ const CAPTURE_PROMPTS: CapturePrompt[] = [
 
 export default function BetaCreateIncidentPage() {
   const router = useRouter()
-  const { userId, role, name } = useAuthStore()
+  const { userId, role, name } = useWaikUser()
 
   // Phase management
   const [phase, setPhase] = useState<Phase>("capture")

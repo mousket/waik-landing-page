@@ -61,6 +61,8 @@ export type ReportAgentEvent =
   | { type: "complete"; node: "node_exit_message"; incidentId: string }
 
 export interface ReportAgentInput {
+  facilityId: string
+  organizationId?: string
   residentName: string
   residentRoom: string
   narrative: string
@@ -76,6 +78,7 @@ export async function* runReportAgent(input: ReportAgentInput): AsyncGenerator<R
     yield { type: "log", node: "start_report", message: "Initializing reporter agent" }
 
     const requiredFields: Array<keyof ReportAgentInput> = [
+      "facilityId",
       "residentName",
       "residentRoom",
       "narrative",
@@ -148,6 +151,8 @@ export async function* runReportAgent(input: ReportAgentInput): AsyncGenerator<R
     }
 
     const incident = await createIncidentFromReport({
+      facilityId: input.facilityId,
+      organizationId: input.organizationId,
       title: `${input.residentName} Incident Report`,
       narrative: input.narrative,
       residentName: input.residentName,
@@ -200,7 +205,7 @@ export async function* runReportAgent(input: ReportAgentInput): AsyncGenerator<R
       message: "Running investigator agent to generate follow-up questions",
     }
 
-    for await (const event of runInvestigationAgent(incident.id)) {
+    for await (const event of runInvestigationAgent(incident.id, input.facilityId)) {
       switch (event.type) {
         case "log":
           yield {

@@ -54,7 +54,7 @@ interface IncidentInitialReport {
   enhancedNarrative?: string
   recordedById: string
   recordedByName: string
-  recordedByRole: "staff" | "admin"
+  recordedByRole: string
   
   // NEW: Phase 1 Critical Data
   immediateIntervention?: {
@@ -105,17 +105,125 @@ interface IncidentInvestigationMetadata {
   }
 }
 
+const PHASE2_SECTION_STATUS = ["not_started", "in_progress", "complete"] as const
+const INCIDENT_PHASES = [
+  "phase_1_in_progress",
+  "phase_1_complete",
+  "phase_2_in_progress",
+  "closed",
+] as const
+const AUDIT_ACTIONS = ["locked", "unlocked", "relocked", "phase_transitioned", "signed"] as const
+const DEPT_ENUM = ["nursing", "dietary", "therapy", "activities", "administration", "multiple"] as const
+const INTERVENTION_DEPT = DEPT_ENUM
+const INTERVENTION_KIND = ["temporary", "permanent"] as const
+
+const IdtTeamEntrySchema = new Schema(
+  {
+    userId: { type: String, required: true },
+    name: { type: String, required: true },
+    role: { type: String, required: true },
+    questionSent: { type: String },
+    questionSentAt: { type: Date },
+    response: { type: String },
+    respondedAt: { type: Date },
+    status: { type: String, enum: ["pending", "answered"], default: "pending" },
+  },
+  { _id: false },
+)
+
 // --- 4. UPDATED: Main Document Interface ---
 export interface IncidentDocument extends Document {
   id: string
   companyId?: string
-  facilityId?: string // NEW: Multi-tenant Facility Link
+  organizationId?: string
+  facilityId?: string
   subType?: string
   title: string
   description: string
+  incidentType?: string
+  location?: string
+  incidentDate?: Date
+  incidentTime?: string
+  witnessesPresent?: boolean
+  hasInjury?: boolean
+  injuryDescription?: string
+  residentId?: string
+  completenessScore?: number
+  investigatorId?: string
+  investigatorName?: string
+  idtTeam?: Array<{
+    userId: string
+    name: string
+    role: string
+    questionSent?: string
+    questionSentAt?: Date
+    response?: string
+    respondedAt?: Date
+    status?: "pending" | "answered"
+  }>
+
+  tier2QuestionsGenerated?: number
+  questionsAnswered?: number
+  questionsDeferred?: number
+  questionsMarkedUnknown?: number
+  activeDataCollectionSeconds?: number
+  completenessAtTier1Complete?: number
+  completenessAtSignoff?: number
+  dataPointsPerQuestion?: Array<{ questionId: string; dataPointsCovered: number }>
+  phaseTransitionTimestamps?: {
+    phase1Started?: Date
+    tier1Complete?: Date
+    tier2Started?: Date
+    phase1Signed?: Date
+    phase2Claimed?: Date
+    phase2Locked?: Date
+  }
+
+  phase2Sections?: {
+    contributingFactors: {
+      status: (typeof PHASE2_SECTION_STATUS)[number]
+      factors: string[]
+      notes?: string
+      completedAt?: Date
+      completedBy?: string
+    }
+    rootCause: {
+      status: (typeof PHASE2_SECTION_STATUS)[number]
+      description?: string
+      completedAt?: Date
+      completedBy?: string
+    }
+    interventionReview: {
+      status: (typeof PHASE2_SECTION_STATUS)[number]
+      reviewedInterventions: Array<{ interventionId: string; stillEffective: boolean; notes?: string }>
+      completedAt?: Date
+      completedBy?: string
+    }
+    newIntervention: {
+      status: (typeof PHASE2_SECTION_STATUS)[number]
+      interventions: Array<{
+        description?: string
+        department?: (typeof INTERVENTION_DEPT)[number]
+        type?: (typeof INTERVENTION_KIND)[number]
+        startDate?: Date
+        notes?: string
+      }>
+      completedAt?: Date
+      completedBy?: string
+    }
+  }
+
+  auditTrail?: Array<{
+    action: (typeof AUDIT_ACTIONS)[number]
+    performedBy: string
+    performedByName?: string
+    timestamp: Date
+    reason?: string
+    previousValue?: string
+    newValue?: string
+  }>
   
-  // NEW: The Regulatory State Machine
-  phase: "phase_1_immediate" | "phase_2_investigation" | "closed"
+  phase: (typeof INCIDENT_PHASES)[number]
   
   // NEW: The "Red Alert" 2-Hour Rule Engine
   redFlags?: {
@@ -182,7 +290,7 @@ const InitialReportSchema = new Schema<IncidentInitialReport>(
     enhancedNarrative: { type: String },
     recordedById: { type: String, required: true },
     recordedByName: { type: String, required: true },
-    recordedByRole: { type: String, required: true, enum: ["staff", "admin"] },
+    recordedByRole: { type: String, required: true },
     
     // NEW Phase 1 Fields
     immediateIntervention: {
@@ -237,21 +345,162 @@ const InvestigationSchema = new Schema<IncidentInvestigationMetadata>(
   { _id: false },
 )
 
+const DataPointRowSchema = new Schema(
+  {
+    questionId: { type: String, required: true },
+    dataPointsCovered: { type: Number, default: 0 },
+  },
+  { _id: false },
+)
+
+const PhaseTransitionTimestampsSchema = new Schema(
+  {
+    phase1Started: { type: Date },
+    tier1Complete: { type: Date },
+    tier2Started: { type: Date },
+    phase1Signed: { type: Date },
+    phase2Claimed: { type: Date },
+    phase2Locked: { type: Date },
+  },
+  { _id: false },
+)
+
+const ContributingFactorsBlockSchema = new Schema(
+  {
+    status: { type: String, enum: PHASE2_SECTION_STATUS, default: "not_started" },
+    factors: { type: [String], default: [] },
+    notes: { type: String },
+    completedAt: { type: Date },
+    completedBy: { type: String },
+  },
+  { _id: false },
+)
+
+const RootCauseBlockSchema = new Schema(
+  {
+    status: { type: String, enum: PHASE2_SECTION_STATUS, default: "not_started" },
+    description: { type: String },
+    completedAt: { type: Date },
+    completedBy: { type: String },
+  },
+  { _id: false },
+)
+
+const ReviewedInterventionRowSchema = new Schema(
+  {
+    interventionId: { type: String, required: true },
+    stillEffective: { type: Boolean, required: true },
+    notes: { type: String },
+  },
+  { _id: false },
+)
+
+const InterventionReviewBlockSchema = new Schema(
+  {
+    status: { type: String, enum: PHASE2_SECTION_STATUS, default: "not_started" },
+    reviewedInterventions: { type: [ReviewedInterventionRowSchema], default: [] },
+    completedAt: { type: Date },
+    completedBy: { type: String },
+  },
+  { _id: false },
+)
+
+const NewInterventionItemSchema = new Schema(
+  {
+    description: { type: String },
+    department: { type: String, enum: INTERVENTION_DEPT },
+    type: { type: String, enum: INTERVENTION_KIND },
+    startDate: { type: Date },
+    notes: { type: String },
+  },
+  { _id: false },
+)
+
+const NewInterventionBlockSchema = new Schema(
+  {
+    status: { type: String, enum: PHASE2_SECTION_STATUS, default: "not_started" },
+    interventions: { type: [NewInterventionItemSchema], default: [] },
+    completedAt: { type: Date },
+    completedBy: { type: String },
+  },
+  { _id: false },
+)
+
+const Phase2SectionsSchema = new Schema(
+  {
+    contributingFactors: {
+      type: ContributingFactorsBlockSchema,
+      default: () => ({ status: "not_started", factors: [] }),
+    },
+    rootCause: {
+      type: RootCauseBlockSchema,
+      default: () => ({ status: "not_started" }),
+    },
+    interventionReview: {
+      type: InterventionReviewBlockSchema,
+      default: () => ({ status: "not_started", reviewedInterventions: [] }),
+    },
+    newIntervention: {
+      type: NewInterventionBlockSchema,
+      default: () => ({ status: "not_started", interventions: [] }),
+    },
+  },
+  { _id: false },
+)
+
+const AuditTrailEntrySchema = new Schema(
+  {
+    action: { type: String, required: true, enum: AUDIT_ACTIONS },
+    performedBy: { type: String, required: true },
+    performedByName: { type: String },
+    timestamp: { type: Date, required: true, default: () => new Date() },
+    reason: { type: String },
+    previousValue: { type: String },
+    newValue: { type: String },
+  },
+  { _id: false },
+)
+
 const IncidentSchema = new Schema<IncidentDocument>(
   {
     id: { type: String, required: true, unique: true, index: true },
     companyId: { type: String, index: true },
-    facilityId: { type: String, index: true }, // New Facility Link
+    organizationId: { type: String, index: true },
+    facilityId: { type: String, index: true },
     title: { type: String, required: true },
     subType: { type: String },
     description: { type: String, required: true },
-    
-    // NEW State Machine
-    phase: { 
-      type: String, 
-      enum: ["phase_1_immediate", "phase_2_investigation", "closed"], 
-      default: "phase_1_immediate",
-      index: true
+    incidentType: { type: String },
+    location: { type: String },
+    incidentDate: { type: Date },
+    incidentTime: { type: String },
+    witnessesPresent: { type: Boolean },
+    hasInjury: { type: Boolean },
+    injuryDescription: { type: String },
+    residentId: { type: String, index: true },
+    completenessScore: { type: Number, default: 0 },
+    investigatorId: { type: String, index: true },
+    investigatorName: { type: String },
+    idtTeam: { type: [IdtTeamEntrySchema], default: [] },
+
+    tier2QuestionsGenerated: { type: Number, default: 0 },
+    questionsAnswered: { type: Number, default: 0 },
+    questionsDeferred: { type: Number, default: 0 },
+    questionsMarkedUnknown: { type: Number, default: 0 },
+    activeDataCollectionSeconds: { type: Number, default: 0 },
+    completenessAtTier1Complete: { type: Number, default: 0 },
+    completenessAtSignoff: { type: Number, default: 0 },
+    dataPointsPerQuestion: { type: [DataPointRowSchema], default: [] },
+    phaseTransitionTimestamps: { type: PhaseTransitionTimestampsSchema, default: undefined },
+
+    phase2Sections: { type: Phase2SectionsSchema, default: undefined },
+    auditTrail: { type: [AuditTrailEntrySchema], default: [] },
+
+    phase: {
+      type: String,
+      enum: [...INCIDENT_PHASES],
+      default: "phase_1_in_progress",
+      index: true,
     },
     
     // NEW Red Alert Logic
@@ -283,6 +532,11 @@ const IncidentSchema = new Schema<IncidentDocument>(
     timestamps: false,
   },
 )
+
+IncidentSchema.index({ facilityId: 1, createdAt: -1 })
+IncidentSchema.index({ facilityId: 1, phase: 1 })
+IncidentSchema.index({ facilityId: 1, staffId: 1 })
+IncidentSchema.index({ facilityId: 1, "phase2Sections.contributingFactors.status": 1 })
 
 IncidentSchema.set("toJSON", {
   virtuals: true,

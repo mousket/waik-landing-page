@@ -1,19 +1,25 @@
 import bcrypt from "bcryptjs"
 import connectMongo from "@/backend/src/lib/mongodb"
 import IncidentModel from "@/backend/src/models/incident.model"
+import type { IncidentDocument } from "@/backend/src/models/incident.model"
 import UserModel from "@/backend/src/models/user.model"
+import type { UserDocument } from "@/backend/src/models/user.model"
 import NotificationModel from "@/backend/src/models/notification.model"
+import { leanOne } from "@/lib/mongoose-lean"
 import type {
   Answer,
+  CurrentUser,
   Incident,
   IncidentInitialReport,
   IncidentInvestigationMetadata,
   IncidentNotification,
+  IncidentPhase2Sections,
   InvestigationStatus,
   Question,
   User,
   UserRole,
 } from "./types"
+import { toUiRole } from "@/lib/waik-roles"
 import { getQuestionEmbedding } from "./embeddings"
 import { isOpenAIConfigured } from "./openai"
 
@@ -106,17 +112,114 @@ const serializeIncident = (incident: any): Incident => ({
         generatedAt: toIsoString(incident.aiReport.generatedAt) ?? new Date().toISOString(),
       }
     : undefined,
+  facilityId: incident.facilityId,
+  organizationId: incident.organizationId,
+  incidentType: incident.incidentType,
+  location: incident.location,
+  incidentDate: toIsoString(incident.incidentDate),
+  incidentTime: incident.incidentTime,
+  witnessesPresent: incident.witnessesPresent,
+  hasInjury: incident.hasInjury,
+  injuryDescription: incident.injuryDescription,
+  residentId: incident.residentId,
+  completenessScore: incident.completenessScore,
+  investigatorId: incident.investigatorId,
+  investigatorName: incident.investigatorName,
+  idtTeam: (incident.idtTeam ?? []).map((m: any) => ({
+    userId: m.userId,
+    name: m.name,
+    role: m.role,
+    questionSent: m.questionSent,
+    questionSentAt: toIsoString(m.questionSentAt),
+    response: m.response,
+    respondedAt: toIsoString(m.respondedAt),
+    status: m.status,
+  })),
+  phase: incident.phase,
+  tier2QuestionsGenerated: incident.tier2QuestionsGenerated ?? 0,
+  questionsAnswered: incident.questionsAnswered ?? 0,
+  questionsDeferred: incident.questionsDeferred ?? 0,
+  questionsMarkedUnknown: incident.questionsMarkedUnknown ?? 0,
+  activeDataCollectionSeconds: incident.activeDataCollectionSeconds ?? 0,
+  completenessAtTier1Complete: incident.completenessAtTier1Complete ?? 0,
+  completenessAtSignoff: incident.completenessAtSignoff ?? 0,
+  dataPointsPerQuestion: incident.dataPointsPerQuestion,
+  phaseTransitionTimestamps: incident.phaseTransitionTimestamps
+    ? {
+        phase1Started: toIsoString(incident.phaseTransitionTimestamps.phase1Started),
+        tier1Complete: toIsoString(incident.phaseTransitionTimestamps.tier1Complete),
+        tier2Started: toIsoString(incident.phaseTransitionTimestamps.tier2Started),
+        phase1Signed: toIsoString(incident.phaseTransitionTimestamps.phase1Signed),
+        phase2Claimed: toIsoString(incident.phaseTransitionTimestamps.phase2Claimed),
+        phase2Locked: toIsoString(incident.phaseTransitionTimestamps.phase2Locked),
+      }
+    : undefined,
+  phase2Sections: incident.phase2Sections
+    ? (serializePhase2Sections(incident.phase2Sections) as IncidentPhase2Sections)
+    : undefined,
+  auditTrail: (incident.auditTrail ?? []).map((e: any) => ({
+    action: e.action,
+    performedBy: e.performedBy,
+    performedByName: e.performedByName,
+    timestamp: toIsoString(e.timestamp) ?? new Date().toISOString(),
+    reason: e.reason,
+    previousValue: e.previousValue,
+    newValue: e.newValue,
+  })),
 })
 
-const serializeUser = (user: any): User => ({
-  id: user.id,
-  username: user.username,
-  password: user.password,
-  role: user.role,
-  name: user.name,
-  email: user.email,
-  createdAt: toIsoString(user.createdAt) ?? new Date().toISOString(),
-})
+function serializePhase2Sections(p: any): Partial<IncidentPhase2Sections> {
+  if (!p) return {}
+  return {
+    contributingFactors: {
+      status: p.contributingFactors?.status ?? "not_started",
+      factors: p.contributingFactors?.factors ?? [],
+      notes: p.contributingFactors?.notes,
+      completedAt: toIsoString(p.contributingFactors?.completedAt),
+      completedBy: p.contributingFactors?.completedBy,
+    },
+    rootCause: {
+      status: p.rootCause?.status ?? "not_started",
+      description: p.rootCause?.description,
+      completedAt: toIsoString(p.rootCause?.completedAt),
+      completedBy: p.rootCause?.completedBy,
+    },
+    interventionReview: {
+      status: p.interventionReview?.status ?? "not_started",
+      reviewedInterventions: p.interventionReview?.reviewedInterventions ?? [],
+      completedAt: toIsoString(p.interventionReview?.completedAt),
+      completedBy: p.interventionReview?.completedBy,
+    },
+    newIntervention: {
+      status: p.newIntervention?.status ?? "not_started",
+      interventions: (p.newIntervention?.interventions ?? []).map((i: any) => ({
+        ...i,
+        startDate: toIsoString(i.startDate),
+      })),
+      completedAt: toIsoString(p.newIntervention?.completedAt),
+      completedBy: p.newIntervention?.completedBy,
+    },
+  }
+}
+
+const serializeUser = (user: any): User => {
+  const legacyRole = user.role as UserRole | undefined
+  const fromSlug = user.roleSlug ? toUiRole(String(user.roleSlug)) : null
+  const displayName =
+    [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
+    (typeof user.name === "string" ? user.name : "") ||
+    ""
+
+  return {
+    id: user.id,
+    username: user.username ?? "",
+    password: user.password ?? "",
+    role: fromSlug ?? legacyRole ?? "staff",
+    name: displayName,
+    email: user.email,
+    createdAt: toIsoString(user.createdAt) ?? new Date().toISOString(),
+  }
+}
 
 const serializeNotification = (notification: any): IncidentNotification => ({
   id: notification.id,
@@ -175,36 +278,68 @@ export async function getUsers(): Promise<User[]> {
 
 export async function getUserById(id: string): Promise<User | null> {
   await ensureDatabase()
-  const user = await UserModel.findOne({ id }).lean().exec()
+  const user = leanOne<UserDocument>(await UserModel.findOne({ id }).lean().exec())
   return user ? serializeUser(user) : null
 }
 
 export async function getUserByCredentials(username: string, password: string): Promise<User | null> {
   await ensureDatabase()
-  const user = await UserModel.findOne({ username }).lean().exec()
-  if (!user) return null
+  const user = leanOne<UserDocument>(await UserModel.findOne({ username }).lean().exec())
+  if (!user?.password) return null
 
-    const isValid = await bcrypt.compare(password, user.password)
-    if (!isValid) return null
+  const isValid = await bcrypt.compare(password, user.password)
+  if (!isValid) return null
 
   return serializeUser(user)
 }
 
-export async function getIncidents(): Promise<Incident[]> {
+export async function getIncidents(facilityId: string): Promise<Incident[]> {
   await ensureDatabase()
-  const incidents = await IncidentModel.find({}).lean().exec()
+  if (!facilityId) return []
+  const incidents = await IncidentModel.find({ facilityId }).lean().exec()
   return incidents.map(serializeIncident)
 }
 
-export async function getIncidentById(id: string): Promise<Incident | null> {
+export async function getIncidentById(id: string, facilityId: string): Promise<Incident | null> {
   await ensureDatabase()
-  const incident = await IncidentModel.findOne({ id }).lean().exec()
+  if (!facilityId) return null
+  const incident = leanOne<IncidentDocument>(
+    await IncidentModel.findOne({ id, facilityId }).lean().exec(),
+  )
   return incident ? serializeIncident(incident) : null
 }
 
-export async function getIncidentsByStaffId(staffId: string): Promise<Incident[]> {
+/**
+ * For API handlers: 404 if missing, 403 if incident belongs to another facility (or legacy doc without facility).
+ */
+export async function getIncidentForUser(
+  id: string,
+  user: CurrentUser,
+): Promise<
+  | { kind: "not_found" }
+  | { kind: "forbidden" }
+  | { kind: "ok"; incident: Incident }
+> {
   await ensureDatabase()
+  const raw = leanOne<IncidentDocument>(await IncidentModel.findOne({ id }).lean().exec())
+  if (!raw) return { kind: "not_found" }
+  if (user.isWaikSuperAdmin) return { kind: "ok", incident: serializeIncident(raw) }
+  if (!user.facilityId || !raw.facilityId || raw.facilityId !== user.facilityId) {
+    return { kind: "forbidden" }
+  }
+  return { kind: "ok", incident: serializeIncident(raw) }
+}
+
+/** Facility id for scoped updates (incident row may include facility even for super-admin reads). */
+export function facilityIdForIncidentMutation(incident: Incident, user: CurrentUser): string | null {
+  return incident.facilityId ?? user.facilityId ?? null
+}
+
+export async function getIncidentsByStaffId(staffId: string, facilityId: string): Promise<Incident[]> {
+  await ensureDatabase()
+  if (!facilityId) return []
   const incidents = await IncidentModel.find({
+    facilityId,
     $or: [
       { staffId },
       { "questions.assignedTo": staffId },
@@ -217,8 +352,13 @@ export async function getIncidentsByStaffId(staffId: string): Promise<Incident[]
   return incidents.map(serializeIncident)
 }
 
-export async function updateIncident(id: string, updates: Partial<Incident>): Promise<Incident | null> {
+export async function updateIncident(
+  id: string,
+  facilityId: string,
+  updates: Partial<Incident>,
+): Promise<Incident | null> {
   await ensureDatabase()
+  if (!facilityId) return null
 
   const preparedUpdates: any = {
     ...updates,
@@ -248,16 +388,19 @@ export async function updateIncident(id: string, updates: Partial<Incident>): Pr
     preparedUpdates.summary = null
   }
 
-  const incident = await IncidentModel.findOneAndUpdate({ id }, preparedUpdates, {
-    new: true,
-    lean: true,
-  })
+  const incident = leanOne<IncidentDocument>(
+    await IncidentModel.findOneAndUpdate({ id, facilityId }, preparedUpdates, {
+      new: true,
+      lean: true,
+    }),
+  )
 
   return incident ? serializeIncident(incident) : null
 }
 
 export async function addQuestionToIncident(
   incidentId: string,
+  facilityId: string,
   input: {
     questionText: string
     askedBy: string
@@ -270,6 +413,7 @@ export async function addQuestionToIncident(
   },
 ): Promise<Question | null> {
   await ensureDatabase()
+  if (!facilityId) return null
 
   const now = new Date()
   const questionId = `q-${Date.now()}`
@@ -293,13 +437,15 @@ export async function addQuestionToIncident(
       : undefined,
   }
 
-  const incident = await IncidentModel.findOneAndUpdate(
-    { id: incidentId },
-    {
-      $push: { questions: questionDoc },
-      $set: { updatedAt: now },
-    },
-    { new: true, lean: true },
+  const incident = leanOne<IncidentDocument>(
+    await IncidentModel.findOneAndUpdate(
+      { id: incidentId, facilityId },
+      {
+        $push: { questions: questionDoc },
+        $set: { updatedAt: now },
+      },
+      { new: true, lean: true },
+    ),
   )
 
   const question = incident?.questions?.find((q: any) => q.id === questionId)
@@ -340,26 +486,30 @@ export async function addQuestionToIncident(
 
 export async function answerQuestion(
   incidentId: string,
+  facilityId: string,
   questionId: string,
   answer: Answer,
 ): Promise<Question | null> {
   await ensureDatabase()
+  if (!facilityId) return null
 
   const answeredAt = toDateOrUndefined(answer.answeredAt) ?? new Date()
 
-  const incident = await IncidentModel.findOneAndUpdate(
-    { id: incidentId, "questions.id": questionId },
-    {
-      $set: {
-        "questions.$.answer": {
-          ...answer,
-          answeredAt,
+  const incident = leanOne<IncidentDocument>(
+    await IncidentModel.findOneAndUpdate(
+      { id: incidentId, facilityId, "questions.id": questionId },
+      {
+        $set: {
+          "questions.$.answer": {
+            ...answer,
+            answeredAt,
+          },
+          "questions.$.vectorizedAt": answeredAt,
+          updatedAt: new Date(),
         },
-        "questions.$.vectorizedAt": answeredAt,
-        updatedAt: new Date(),
       },
-    },
-    { new: true, lean: true },
+      { new: true, lean: true },
+    ),
   )
 
   const question = incident?.questions?.find((q: any) => q.id === questionId)
@@ -367,7 +517,7 @@ export async function answerQuestion(
     return null
   }
 
-  if (isOpenAIConfigured()) {
+  if (isOpenAIConfigured() && question.answer) {
     getQuestionEmbedding(
       incidentId,
       questionId,
@@ -396,10 +546,17 @@ export async function answerQuestion(
   return serializeQuestion(question)
 }
 
-export async function deleteQuestion(incidentId: string, questionId: string): Promise<boolean> {
+export async function deleteQuestion(
+  incidentId: string,
+  facilityId: string,
+  questionId: string,
+): Promise<boolean> {
   await ensureDatabase()
+  if (!facilityId) return false
 
-  const incident = await IncidentModel.findOne({ id: incidentId }).lean().exec()
+  const incident = leanOne<IncidentDocument>(
+    await IncidentModel.findOne({ id: incidentId, facilityId }).lean().exec(),
+  )
   if (!incident) {
     return false
   }
@@ -410,7 +567,7 @@ export async function deleteQuestion(incidentId: string, questionId: string): Pr
   }
 
   const result = await IncidentModel.updateOne(
-    { id: incidentId },
+    { id: incidentId, facilityId },
     {
       $pull: { questions: { id: questionId } },
       $set: { updatedAt: new Date() },
@@ -420,7 +577,9 @@ export async function deleteQuestion(incidentId: string, questionId: string): Pr
   return result.modifiedCount > 0
 }
 
-interface CreateIncidentFromReportInput {
+export interface CreateIncidentFromReportInput {
+  facilityId: string
+  organizationId?: string
   title?: string
   narrative: string
   residentName: string
@@ -434,8 +593,20 @@ interface CreateIncidentFromReportInput {
   enhancedNarrative?: string
 }
 
+function defaultPhase2SectionsForCreate() {
+  return {
+    contributingFactors: { status: "not_started" as const, factors: [] as string[] },
+    rootCause: { status: "not_started" as const },
+    interventionReview: { status: "not_started" as const, reviewedInterventions: [] as const },
+    newIntervention: { status: "not_started" as const, interventions: [] as const },
+  }
+}
+
 export async function createIncidentFromReport(input: CreateIncidentFromReportInput): Promise<Incident> {
   await ensureDatabase()
+  if (!input.facilityId) {
+    throw new Error("createIncidentFromReport: facilityId is required")
+  }
 
   const now = new Date()
   const incidentId = `inc-${Date.now()}`
@@ -492,6 +663,8 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
 
   const incidentDoc = await IncidentModel.create({
     id: incidentId,
+    facilityId: input.facilityId,
+    organizationId: input.organizationId,
     title: input.title || `${input.residentName} Incident`,
     description: input.narrative || "Incident reported via voice agent.",
     status: "open",
@@ -510,6 +683,16 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
     investigation: {
       status: "not-started",
     },
+    tier2QuestionsGenerated: 0,
+    questionsAnswered: 0,
+    questionsDeferred: 0,
+    questionsMarkedUnknown: 0,
+    activeDataCollectionSeconds: 0,
+    completenessAtTier1Complete: 0,
+    completenessAtSignoff: 0,
+    dataPointsPerQuestion: [],
+    phase2Sections: defaultPhase2SectionsForCreate(),
+    auditTrail: [],
   })
 
   const incident = serializeIncident(incidentDoc.toJSON())
@@ -549,7 +732,8 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
   return incident
 }
 
-interface QueueInvestigationQuestionsInput {
+export interface QueueInvestigationQuestionsInput {
+  facilityId: string
   incidentId: string
   questions: Array<{
     questionText: string
@@ -577,13 +761,21 @@ export async function queueInvestigationQuestions(
   input: QueueInvestigationQuestionsInput,
 ): Promise<Question[]> {
   await ensureDatabase()
+  if (!input.facilityId) {
+    throw new Error("queueInvestigationQuestions: facilityId is required")
+  }
 
-  const incident = await IncidentModel.findOne({ id: input.incidentId }).lean().exec()
+  const incident = leanOne<IncidentDocument>(
+    await IncidentModel.findOne({ id: input.incidentId, facilityId: input.facilityId }).lean().exec(),
+  )
   if (!incident) {
     throw new Error(`Incident ${input.incidentId} not found`)
   }
 
-  const reporterRole = incident.investigation?.reporterRole ?? (await getUserById(incident.staffId))?.role ?? "staff"
+  const reporterRole =
+    (incident.investigation as { reporterRole?: UserRole } | undefined)?.reporterRole ??
+    (await getUserById(incident.staffId))?.role ??
+    "staff"
   const timestamp = new Date()
   const generatedBy = input.generatedBy || "investigation-agent"
   const askedBy = input.askedById || "investigation-agent"
@@ -616,7 +808,7 @@ export async function queueInvestigationQuestions(
   })
 
   await IncidentModel.updateOne(
-    { id: input.incidentId },
+    { id: input.incidentId, facilityId: input.facilityId },
     {
       $push: { questions: { $each: newQuestions } },
       $set: {
@@ -662,23 +854,27 @@ export async function queueInvestigationQuestions(
 
 export async function markInvestigationComplete(
   incidentId: string,
+  facilityId: string,
   updates: Partial<Omit<IncidentInvestigationMetadata, "status">> = {},
 ): Promise<Incident | null> {
   await ensureDatabase()
+  if (!facilityId) return null
 
-  const incident = await IncidentModel.findOneAndUpdate(
-    { id: incidentId },
-    {
-      $set: {
-        investigation: {
-          ...(updates ?? {}),
-          status: "completed" as InvestigationStatus,
-          completedAt: toDateOrUndefined(updates.completedAt) ?? new Date(),
+  const incident = leanOne<IncidentDocument>(
+    await IncidentModel.findOneAndUpdate(
+      { id: incidentId, facilityId },
+      {
+        $set: {
+          investigation: {
+            ...(updates ?? {}),
+            status: "completed" as InvestigationStatus,
+            completedAt: toDateOrUndefined(updates.completedAt) ?? new Date(),
+          },
+          updatedAt: new Date(),
         },
-        updatedAt: new Date(),
       },
-    },
-    { new: true, lean: true },
+      { new: true, lean: true },
+    ),
   )
 
   return incident ? serializeIncident(incident) : null

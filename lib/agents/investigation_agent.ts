@@ -70,11 +70,14 @@ const SUBTYPE_OPTIONS = [
   "fall-unknown",
 ] as const
 
-export async function* runInvestigationAgent(incidentId: string): AsyncGenerator<InvestigationAgentEvent> {
+export async function* runInvestigationAgent(
+  incidentId: string,
+  facilityId: string,
+): AsyncGenerator<InvestigationAgentEvent> {
   try {
     yield { type: "log", node: "load_and_analyze", message: "Loading incident data" }
 
-    const incident = await getIncidentById(incidentId)
+    const incident = await getIncidentById(incidentId, facilityId)
 
     if (!incident) {
       yield {
@@ -101,7 +104,7 @@ export async function* runInvestigationAgent(incidentId: string): AsyncGenerator
 
     const now = new Date().toISOString()
 
-    await updateIncident(incident.id, {
+    await updateIncident(incident.id, facilityId, {
       investigation: {
         status: "in-progress",
         subtype,
@@ -157,6 +160,7 @@ export async function* runInvestigationAgent(incidentId: string): AsyncGenerator
     }
 
     await queueInvestigationQuestions({
+      facilityId,
       incidentId: incident.id,
       questions: dedupedQuestions.map((questionText) => ({
         questionText,

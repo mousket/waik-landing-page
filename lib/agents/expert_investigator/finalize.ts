@@ -3,6 +3,7 @@ import type { AgentState } from "@/lib/gold_standards"
 
 interface FinalizeInvestigationInput {
   incidentId: string
+  facilityId: string
   state: AgentState
   investigatorId?: string
   investigatorName?: string
@@ -12,7 +13,7 @@ interface FinalizeInvestigationInput {
 }
 
 export async function finalizeInvestigation(input: FinalizeInvestigationInput) {
-  const incident = await getIncidentById(input.incidentId)
+  const incident = await getIncidentById(input.incidentId, input.facilityId)
   if (!incident) {
     throw new Error(`Incident ${input.incidentId} not found when finalizing investigation`)
   }
@@ -23,7 +24,7 @@ export async function finalizeInvestigation(input: FinalizeInvestigationInput) {
 
   const now = new Date().toISOString()
 
-  await updateIncident(input.incidentId, {
+  await updateIncident(input.incidentId, input.facilityId, {
     investigation: {
       ...existingInvestigation,
       status: "completed",

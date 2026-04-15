@@ -8,7 +8,7 @@ import { CheckCircle2, ChevronDown, Loader2, Mic, MicOff, RotateCcw, Volume2, Vo
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import { useSpeechSynthesis } from "@/lib/hooks/useSpeechSynthesis"
 
 type BrowserSpeechRecognition =
@@ -165,7 +165,7 @@ function buildQuickCritique(reportCard: {
 
 export default function StaffReportPage() {
   const router = useRouter()
-  const { userId, name, role } = useAuthStore()
+  const { userId, name, role } = useWaikUser()
 
   const [phase, setPhase] = useState<"intro" | "collect" | "processing" | "agent" | "completed">("intro")
   const [messages, setMessages] = useState<ConversationMessage[]>([])

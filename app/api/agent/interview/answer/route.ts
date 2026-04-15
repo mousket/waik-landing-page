@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { analyzeNarrativeAndScore } from "@/lib/agents/expert_investigator/analyze"
 import { fillGapsWithAnswer } from "@/lib/agents/expert_investigator/fill_gaps"
 import { isOpenAIConfigured } from "@/lib/openai"
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const body = await request.json()
     const { questionId, answer, narrative, previousAnswers, category, subtype } = body

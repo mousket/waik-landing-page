@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-
-import { getIncidentById } from "@/lib/db"
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { getIncidentForUser } from "@/lib/db"
 import { analyzeNarrativeAndScore } from "@/lib/agents/expert_investigator/analyze"
 import { buildInitialNarrative } from "@/lib/utils/incident-narrative"
 
@@ -14,13 +14,19 @@ import { buildInitialNarrative } from "@/lib/utils/incident-narrative"
  * For the dynamic Documentation Score that improves with answers,
  * see /api/incidents/[id]/score endpoint.
  */
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
-    const incident = await getIncidentById(params.id)
-
-    if (!incident) {
+    const { id } = await params
+    const scope = await getIncidentForUser(id, user)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
 
     // Check if we have cached report card values in the investigation metadata
     const investigation = (incident as any).investigation

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Volume2, VolumeX, CheckCircle2, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
@@ -43,7 +43,7 @@ const AI_MESSAGES = {
 
 export default function CompanionCreatePage() {
   const router = useRouter()
-  const { userId, role, name } = useAuthStore()
+  const { userId, role, name } = useWaikUser()
   const [currentText, setCurrentText] = useState("")
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)

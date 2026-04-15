@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import type { Incident, User as Staff } from "@/lib/types"
 import { DocumentationScore } from "@/components/documentation-score"
 import { format, isValid, parseISO } from "date-fns"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import {
   ArrowLeft,
   Send,
@@ -65,7 +65,7 @@ type IntelligenceMessage = {
 
 export default function AdminIncidentDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const { userId, role } = useAuthStore()
+  const { userId, role } = useWaikUser()
   const [incident, setIncident] = useState<Incident | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [isLoading, setIsLoading] = useState(true)

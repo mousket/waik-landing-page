@@ -62,43 +62,37 @@ export const sendQuestionToStaffTool = new DynamicStructuredTool({
   description: "Send a follow-up question to one or more staff members. Use this when the user confirms they want to send a question. Requires the incident ID, question text, who's asking, and staff member ID(s).",
   schema: z.object({
     incidentId: z.string().describe("The incident ID (e.g., 'inc-1')"),
+    facilityId: z.string().describe("Facility ID for the incident (must match the incident's facility)"),
     questionText: z.string().describe("The question to send to staff"),
     askedBy: z.string().describe("User ID of who's asking the question"),
     staffIds: z.array(z.string()).describe("Array of staff user IDs to assign the question to"),
   }),
-  func: async ({ incidentId, questionText, askedBy, staffIds }) => {
+  func: async ({ incidentId, facilityId, questionText, askedBy, staffIds }) => {
     console.log("[Tool] Sending question to staff:", { incidentId, staffIds })
     
     try {
-      // Create the question object
-      const question = {
-        id: `q-${Date.now()}`,
-        incidentId,
+      const created = await addQuestionToIncident(incidentId, facilityId, {
         questionText,
         askedBy,
-        askedAt: new Date().toISOString(),
         assignedTo: staffIds,
-      }
-      
-      // Add to database
-      const success = await addQuestionToIncident(incidentId, question)
-      
-      if (!success) {
+      })
+
+      if (!created) {
         return JSON.stringify({
           success: false,
-          message: "Failed to send question. Incident not found."
+          message: "Failed to send question. Incident not found.",
         })
       }
-      
+
       // Get staff names for confirmation
       const users = await getUsers()
       const staffNames = staffIds
-        .map(id => users.find(u => u.id === id)?.name || id)
+        .map((id) => users.find((u) => u.id === id)?.name || id)
         .join(", ")
-      
+
       return JSON.stringify({
         success: true,
-        questionId: question.id,
+        questionId: created.id,
         assignedTo: staffNames,
         message: `✅ Question sent to ${staffNames}. They'll be notified and can respond in the Q&A section.`
       })
@@ -120,12 +114,13 @@ export const getAssignedStaffTool = new DynamicStructuredTool({
   description: "Get the staff member(s) assigned to a specific incident. Use this to find out who's handling an incident.",
   schema: z.object({
     incidentId: z.string().describe("The incident ID (e.g., 'inc-1')"),
+    facilityId: z.string().describe("Facility ID for the incident"),
   }),
-  func: async ({ incidentId }) => {
+  func: async ({ incidentId, facilityId }) => {
     console.log("[Tool] Getting assigned staff for:", incidentId)
-    
+
     const { getIncidentById } = await import("../db")
-    const incident = await getIncidentById(incidentId)
+    const incident = await getIncidentById(incidentId, facilityId)
     
     if (!incident) {
       return JSON.stringify({

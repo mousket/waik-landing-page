@@ -141,19 +141,17 @@ Answer:`)
       const questionText = `Follow-up question: Please provide additional details about this incident.`
       
       // Send the question
-      const questionData = {
-        id: `q-${Date.now()}`,
-        incidentId: incident.id,
+      const { addQuestionToIncident } = await import("../db")
+      if (!incident.facilityId) {
+        return null
+      }
+      const created = await addQuestionToIncident(incident.id, incident.facilityId, {
         questionText,
         askedBy: userId,
-        askedAt: new Date().toISOString(),
         assignedTo: [targetStaff],
-      }
-      
-      const { addQuestionToIncident } = await import("../db")
-      const success = await addQuestionToIncident(incident.id, questionData)
-      
-      if (success) {
+      })
+
+      if (created) {
         return `✅ Question sent to ${targetStaffName}! They'll be notified and can respond in the Q&A section. You can check back later for their answer.`
       }
       

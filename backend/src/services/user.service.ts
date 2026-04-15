@@ -1,7 +1,9 @@
 import bcrypt from "bcryptjs"
 import connectMongo from "../lib/mongodb"
 import UserModel from "../models/user.model"
-import type { User } from "../../lib/types"
+import type { UserDocument } from "../models/user.model"
+import type { User } from "../../../lib/types"
+import { leanOne } from "../../../lib/mongoose-lean"
 
 const toPlain = <T>(doc: any): T | null => {
   if (!doc) return null
@@ -23,8 +25,8 @@ export class UserService {
 
   static async findByCredentials(username: string, password: string) {
     await connectMongo()
-    const user = await UserModel.findOne({ username }).lean().exec()
-    if (!user) return null
+    const user = leanOne<UserDocument>(await UserModel.findOne({ username }).lean().exec())
+    if (!user?.password) return null
 
     const isValid = await bcrypt.compare(password, user.password)
     if (!isValid) return null

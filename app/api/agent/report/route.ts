@@ -1,12 +1,22 @@
+import { NextResponse } from "next/server"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { runReportAgent, type ReportAgentInput } from "@/lib/agents/report_agent"
 
 const encoder = new TextEncoder()
 
 export async function POST(request: Request) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const body = await request.json()
 
+    if (!sessionUser.facilityId) {
+      return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
+    }
+
     const agentInput: ReportAgentInput = {
+      facilityId: sessionUser.facilityId,
+      organizationId: sessionUser.organizationId,
       residentName: body.residentName,
       residentRoom: body.roomNumber || body.residentRoom,
       narrative: body.narrative,

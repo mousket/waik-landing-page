@@ -1,10 +1,27 @@
+import { unauthorizedResponse, getCurrentUser } from "@/lib/auth"
 import { runInvestigationAgent } from "@/lib/agents/investigation_agent"
 
 const encoder = new TextEncoder()
 
 export async function POST(request: Request) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const { incidentId } = await request.json()
+
+    if (!sessionUser.facilityId) {
+      return new Response(
+        JSON.stringify({
+          type: "error",
+          node: "investigation_agent",
+          error: "No facility assigned to user",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      )
+    }
 
     if (!incidentId || typeof incidentId !== "string") {
       return new Response(
@@ -27,7 +44,7 @@ export async function POST(request: Request) {
         }
 
         try {
-          for await (const event of runInvestigationAgent(incidentId)) {
+          for await (const event of runInvestigationAgent(incidentId, sessionUser.facilityId)) {
             send(event)
           }
         } catch (error) {

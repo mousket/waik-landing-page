@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import { escapeHtml } from "@/lib/utils"
 import { renderMarkdownOrHtml } from "@/lib/utils/markdown-to-html"
 import { buildIncidentCombinedNarrative } from "@/lib/utils/incident-narrative"
@@ -117,7 +117,7 @@ const formatDate = (dateString: string | undefined, formatString: string): strin
 
 export default function StaffIncidentDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const { userId, role } = useAuthStore()
+  const { userId, role } = useWaikUser()
   const [incident, setIncident] = useState<Incident | null>(null)
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState<Record<string, string>>({})

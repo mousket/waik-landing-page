@@ -2,8 +2,9 @@
 
 import type React from "react"
 import { useState } from "react"
+import { useClerk } from "@clerk/nextjs"
 import { AuthGuard } from "@/components/auth-guard"
-import { useAuthStore } from "@/lib/auth-store"
+import { useWaikUser } from "@/hooks/use-waik-user"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { LogOut, Home, LayoutDashboard, Menu, X, ArrowLeft } from "lucide-react"
@@ -15,12 +16,12 @@ export default function IncidentsLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { name, role, logout } = useAuthStore()
+  const { signOut } = useClerk()
+  const { name, role } = useWaikUser()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleLogout = () => {
-    logout()
-    router.push("/waik-demo-start/login")
+    void signOut({ redirectUrl: "/sign-in" })
   }
 
   const handleBackToDashboard = () => {

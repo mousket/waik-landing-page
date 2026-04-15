@@ -1,9 +1,14 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { DemoModal } from "@/components/demo-modal"
+
+import { clerkAppearance } from "@/lib/clerk-appearance"
+import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
+import { SignedOutHeaderSignIn } from "@/components/signed-out-header-sign-in"
 
 export function Header() {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
@@ -56,6 +61,12 @@ export function Header() {
             >
               Request a Demo
             </Button>
+            <SignedIn>
+              <UserButton appearance={clerkAppearance} afterSignOutUrl={getClerkAfterSignOutUrl()} />
+            </SignedIn>
+            <SignedOut>
+              <SignedOutHeaderSignIn />
+            </SignedOut>
           </div>
         </div>
       </header>

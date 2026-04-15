@@ -1,12 +1,27 @@
 import { NextResponse } from "next/server"
-import { addQuestionToIncident } from "@/lib/db"
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { addQuestionToIncident, getIncidentForUser } from "@/lib/db"
 import { getQuestionEmbedding } from "@/lib/embeddings"
 import { isOpenAIConfigured } from "@/lib/openai"
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const { id } = await params
     const body = await request.json()
+
+    const scope = await getIncidentForUser(id, user)
+    if (scope.kind === "not_found") {
+      return NextResponse.json({ error: "Incident not found" }, { status: 404 })
+    }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const facilityId = scope.incident.facilityId ?? user.facilityId
+    if (!facilityId) {
+      return NextResponse.json({ error: "Incident has no facility" }, { status: 400 })
+    }
 
     const question = {
       id: `q-${Date.now()}`,
@@ -19,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       generatedBy: body.generatedBy,
     }
 
-    const success = await addQuestionToIncident(id, question)
+    const success = await addQuestionToIncident(id, facilityId, question)
 
     if (!success) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
 import { Check, CheckCircle, AlertCircle } from "lucide-react"
-import { submitToGoogleSheets } from "@/lib/google-sheets"
+import { submitToGoogleSheets } from "@/lib/public-forms"
 
 export function VanguardProgram() {
   const [formData, setFormData] = useState({

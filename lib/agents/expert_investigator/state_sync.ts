@@ -20,6 +20,7 @@ export interface AgentAnswerState {
 
 export interface InvestigatorAgentContext {
   incidentId: string
+  facilityId: string
   agentState: AgentState
   questions: AgentQuestionState[]
 }
@@ -73,7 +74,7 @@ export async function recordAnswerAndSync({
     method,
   }
 
-  const updatedQuestion = await answerQuestion(context.incidentId, questionId, answer)
+  const updatedQuestion = await answerQuestion(context.incidentId, context.facilityId, questionId, answer)
   if (!updatedQuestion) {
     throw new Error(`Failed to persist answer for question ${questionId}`)
   }

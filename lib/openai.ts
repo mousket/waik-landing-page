@@ -5,6 +5,11 @@ export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
 })
 
+/** Same instance as `openai` — use either import style. */
+export function getOpenAI(): OpenAI {
+  return openai
+}
+
 // Model configuration from environment variables with smart defaults
 export const AI_CONFIG = {
   model: process.env.OPENAI_LLM_MODEL || "gpt-4o-mini",

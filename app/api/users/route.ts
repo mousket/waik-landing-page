@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { getUsers } from "@/lib/db"
 
 export async function GET(request: Request) {
+  const user = await getCurrentUser()
+  if (!user) return unauthorizedResponse()
   try {
     const { searchParams } = new URL(request.url)
     const role = searchParams.get("role")

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { getIncidentById } from "@/lib/db"
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { getIncidentForUser } from "@/lib/db"
 import { analyzeNarrativeAndScore } from "@/lib/agents/expert_investigator/analyze"
 import { isOpenAIConfigured } from "@/lib/openai"
 
@@ -7,13 +8,18 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const { id } = await params
-    const incident = await getIncidentById(id)
-
-    if (!incident) {
+    const scope = await getIncidentForUser(id, sessionUser)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
 
     // Calculate basic question stats
     const totalQuestions = incident.questions?.length || 0

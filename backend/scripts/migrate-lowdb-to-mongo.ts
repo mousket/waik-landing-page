@@ -134,6 +134,15 @@ async function migrate() {
     role: user.role,
     name: user.name,
     email: user.email,
+    roleSlug: user.role === "admin" ? "administrator" : "cna",
+    organizationId: "",
+    facilityId: "",
+    firstName: "",
+    lastName: "",
+    isWaikSuperAdmin: false,
+    deviceType: "personal" as const,
+    mustChangePassword: false,
+    isActive: true,
     createdAt: parseDate(user.createdAt) ?? new Date(),
   }))
 

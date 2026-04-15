@@ -18,6 +18,7 @@ import {
 
 interface StartConversationInput {
   incidentId: string
+  facilityId: string
   narrative?: string
   investigatorId: string
   investigatorName: string
@@ -84,6 +85,7 @@ function formatSubtypeLabel(subType?: string | null): string | undefined {
 
 async function upsertQuestionsForIncident(
   incidentId: string,
+  facilityId: string,
   questionTexts: string[],
   investigatorId: string,
   investigatorName: string,
@@ -93,7 +95,7 @@ async function upsertQuestionsForIncident(
   const pending: PendingQuestion[] = []
   const excludeSet = new Set((options.excludeTexts ?? []).map((text) => text.trim().toLowerCase()))
 
-  const existingIncident = await getIncidentById(incidentId)
+  const existingIncident = await getIncidentById(incidentId, facilityId)
   const existingQuestions = existingIncident?.questions ?? []
   const normalizedExisting = new Map<string, (typeof existingQuestions)[number]>()
 
@@ -123,7 +125,7 @@ async function upsertQuestionsForIncident(
       continue
     }
 
-    const question = await addQuestionToIncident(incidentId, {
+    const question = await addQuestionToIncident(incidentId, facilityId, {
       questionText: rawText,
       askedBy: investigatorId,
       askedByName: investigatorName,
@@ -209,7 +211,7 @@ function supplementQuestions(
 export async function startInvestigatorConversation(
   input: StartConversationInput,
 ): Promise<StartConversationResult> {
-  const incident = await getIncidentById(input.incidentId)
+  const incident = await getIncidentById(input.incidentId, input.facilityId)
   if (!incident) {
     throw new Error(`Incident ${input.incidentId} not found`)
   }
@@ -247,6 +249,7 @@ export async function startInvestigatorConversation(
 
   const pendingQuestions = await upsertQuestionsForIncident(
     input.incidentId,
+    input.facilityId,
     supplementedQuestions,
     input.investigatorId,
     input.investigatorName,
@@ -260,6 +263,7 @@ export async function startInvestigatorConversation(
   const session: InvestigatorSession = {
     id: sessionId,
     incidentId: input.incidentId,
+    facilityId: input.facilityId,
     investigatorId: input.investigatorId,
     investigatorName: input.investigatorName,
     nurseName: input.reporterName,
@@ -310,6 +314,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
 
   const contextState = {
     incidentId: session.incidentId,
+    facilityId: session.facilityId,
     agentState: session.state,
     questions: session.pendingQuestions.map((q) => ({
       id: q.id,
@@ -375,6 +380,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
 
       await finalizeInvestigation({
         incidentId: session.incidentId,
+        facilityId: session.facilityId,
         state: nextState,
         investigatorId: session.investigatorId,
         investigatorName: session.investigatorName,
@@ -407,6 +413,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
 
     const newQuestions = await upsertQuestionsForIncident(
       session.incidentId,
+      session.facilityId,
       supplementedNextQuestions,
       session.investigatorId,
       session.investigatorName,
@@ -467,6 +474,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
 
   await finalizeInvestigation({
     incidentId: session.incidentId,
+    facilityId: session.facilityId,
     state: nextState,
     investigatorId: session.investigatorId,
     investigatorName: session.investigatorName,

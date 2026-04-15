@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { createIncidentFromReport, queueInvestigationQuestions } from "@/lib/db"
 import { runInvestigationAgent } from "@/lib/agents/investigation_agent"
 import { FINAL_CRITICAL_QUESTIONS } from "@/lib/gold_standards_extended"
-import { isOpenAIConfigured, getOpenAI } from "@/lib/openai"
+import { isOpenAIConfigured, openai } from "@/lib/openai"
 
 // Interface for interview questions passed from the client
 interface InterviewQuestionInput {
@@ -23,6 +24,8 @@ interface InterviewAnswerInput {
 }
 
 export async function POST(request: Request) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const body = await request.json()
     const {
@@ -44,6 +47,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    if (!sessionUser.facilityId) {
+      return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
+    }
+
+    const facilityId = sessionUser.facilityId
+
     console.log("[Interview Complete] Creating incident for:", residentName)
 
     // Generate a proper AI summary (not just concatenation)
@@ -52,6 +61,8 @@ export async function POST(request: Request) {
     // Create the incident - enhanced narrative is now a proper AI summary
     // Q&A is saved separately as Question documents, not in the narrative
     const incident = await createIncidentFromReport({
+      facilityId,
+      organizationId: sessionUser.organizationId,
       title: `${residentName} Incident Report`,
       narrative: narrative, // Keep original narrative clean
       residentName,
@@ -66,7 +77,7 @@ export async function POST(request: Request) {
     
     // Store the static report card score in the investigation metadata
     if (initialReportCardScore !== undefined) {
-      await storeReportCardScore(incident.id, initialReportCardScore, category, subtype)
+      await storeReportCardScore(incident.id, facilityId, initialReportCardScore, category, subtype)
     }
 
     // ======================================================================
@@ -75,6 +86,7 @@ export async function POST(request: Request) {
     if (questions && questions.length > 0) {
       await saveInitialInterviewQuestions(
         incident.id,
+        facilityId,
         questions,
         answers,
         reportedById,
@@ -89,11 +101,11 @@ export async function POST(request: Request) {
       
       // Run investigation agent to generate follow-up questions
       // This runs in background - don't await
-      generateFollowUpQuestionsAsync(incident.id, reportedById, reportedByName, completenessScore)
+      generateFollowUpQuestionsAsync(incident.id, facilityId, reportedById, reportedByName, completenessScore)
     }
 
     // Queue final critical questions (these are always added)
-    await queueFinalCriticalQuestions(incident.id, reportedById, reportedByName)
+    await queueFinalCriticalQuestions(incident.id, facilityId, reportedById, reportedByName)
 
     return NextResponse.json({
       success: true,
@@ -128,8 +140,6 @@ async function generateAISummary(
   }
 
   try {
-    const openai = getOpenAI()
-    
     // Build context from Q&A
     const qaContext = answers
       .filter((a) => a.questionText)
@@ -185,6 +195,7 @@ SUMMARY:`
  */
 async function storeReportCardScore(
   incidentId: string,
+  facilityId: string,
   score: number,
   category: string,
   subtype: string | null
@@ -193,7 +204,7 @@ async function storeReportCardScore(
     const IncidentModel = (await import("@/backend/src/models/incident.model")).default
     
     await IncidentModel.updateOne(
-      { id: incidentId },
+      { id: incidentId, facilityId },
       {
         $set: {
           "investigation.score": score / 10, // Convert to 0-10 scale
@@ -217,6 +228,7 @@ async function storeReportCardScore(
 // ======================================================================
 async function saveInitialInterviewQuestions(
   incidentId: string,
+  facilityId: string,
   questions: InterviewQuestionInput[],
   answers: InterviewAnswerInput[] | undefined,
   reporterId: string,
@@ -264,6 +276,7 @@ async function saveInitialInterviewQuestions(
     // We'll save them and then update with answers
     
     await queueInvestigationQuestions({
+      facilityId,
       incidentId,
       askedById: reporterId,
       askedByName: reporterName,
@@ -284,7 +297,7 @@ async function saveInitialInterviewQuestions(
     const { getIncidentById, answerQuestion } = await import("@/lib/db")
     
     // Get the incident to find the questions we just created
-    const incident = await getIncidentById(incidentId)
+    const incident = await getIncidentById(incidentId, facilityId)
     if (!incident || !incident.questions) {
       console.error("[Interview Complete] Could not find incident to update answers")
       return
@@ -305,12 +318,13 @@ async function saveInitialInterviewQuestions(
 
       // Update the question with the answer using answerQuestion
       try {
-        await answerQuestion(incidentId, savedQuestion.id, {
+        await answerQuestion(incidentId, facilityId, savedQuestion.id, {
           id: `answer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          questionId: savedQuestion.id,
           answerText: answer.text,
           answeredBy: reporterId,
-          answeredByName: reporterName,
           answeredAt: answer.answeredAt,
+          method: "text",
         })
         console.log("[Interview Complete] Updated question with answer:", savedQuestion.id)
       } catch (err) {
@@ -327,6 +341,7 @@ async function saveInitialInterviewQuestions(
 
 async function generateFollowUpQuestionsAsync(
   incidentId: string,
+  facilityId: string,
   reporterId: string,
   reporterName: string,
   currentCompleteness: number
@@ -335,7 +350,7 @@ async function generateFollowUpQuestionsAsync(
     console.log("[Interview Complete] Starting background follow-up generation for:", incidentId)
     
     // Use existing investigation agent
-    for await (const event of runInvestigationAgent(incidentId)) {
+    for await (const event of runInvestigationAgent(incidentId, facilityId)) {
       if (event.type === "questions_generated") {
         console.log("[Interview Complete] Follow-up questions generated:", event.count)
       }
@@ -350,6 +365,7 @@ async function generateFollowUpQuestionsAsync(
 
 async function queueFinalCriticalQuestions(
   incidentId: string,
+  facilityId: string,
   reporterId: string,
   reporterName: string
 ) {
@@ -372,6 +388,7 @@ async function queueFinalCriticalQuestions(
     // Queue all final critical questions
     // Note: These won't be visible until other questions are answered
     await queueInvestigationQuestions({
+      facilityId,
       incidentId,
       askedById: reporterId,
       askedByName: reporterName,

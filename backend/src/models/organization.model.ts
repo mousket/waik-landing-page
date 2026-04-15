@@ -1,24 +1,60 @@
-// backend/src/models/organization.model.ts
+import { Schema, model, models, type Document } from "mongoose"
+
+const PrimaryContactSchema = new Schema(
+  {
+    name: { type: String, default: "" },
+    email: { type: String, default: "" },
+    phone: { type: String, default: "" },
+  },
+  { _id: false },
+)
+
 export interface OrganizationDocument extends Document {
-    id: string; // e.g., "org-prestige-care"
-    name: string; // "Prestige Care, LLC"
-    subscriptionTier: "pilot" | "enterprise";
-    features: {
-      voiceAgents: boolean;
-      multiLanguage: boolean;
-    };
+  id: string
+  name: string
+  type: "snf_chain" | "independent" | "government" | "nonprofit" | "other"
+  primaryContact: {
+    name: string
+    email: string
+    phone: string
   }
-  
-  // backend/src/models/facility.model.ts
-  export interface FacilityDocument extends Document {
-    id: string; // e.g., "fac-st-marys"
-    orgId: string; // Link to Parent Org
-    name: string; // "St. Mary's Rehabilitation Center"
-    state: string; // "MN" (Crucial for state-specific reporting rules) [cite: 478]
-    
-    // Configuration for State Portals
-    reportingConfig: {
-      statePortalUrl?: string; // e.g. TULIP or AIRS
-      mandatedReportingWindow: number; // e.g., 2 (hours) for injury 
-    };
-  }
+  plan: "pilot" | "enterprise"
+  createdBySuperId: string
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+const OrganizationSchema = new Schema<OrganizationDocument>(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    name: { type: String, required: true },
+    type: {
+      type: String,
+      required: true,
+      enum: ["snf_chain", "independent", "government", "nonprofit", "other"],
+    },
+    primaryContact: { type: PrimaryContactSchema, default: () => ({}) },
+    plan: { type: String, enum: ["pilot", "enterprise"], default: "pilot" },
+    createdBySuperId: { type: String, required: true },
+    isActive: { type: Boolean, default: true },
+  },
+  {
+    versionKey: false,
+    timestamps: true,
+  },
+)
+
+OrganizationSchema.set("toJSON", {
+  virtuals: true,
+  transform: (_, ret) => {
+    ret.id = ret.id ?? ret._id
+    delete ret._id
+    return ret
+  },
+})
+
+export const OrganizationModel =
+  models.Organization || model<OrganizationDocument>("Organization", OrganizationSchema)
+
+export default OrganizationModel

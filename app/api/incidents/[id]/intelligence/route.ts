@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { getIncidentById } from "@/lib/db"
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { getIncidentForUser } from "@/lib/db"
 import { getIntelligenceQA } from "@/lib/agents/intelligence-qa"
 import { isOpenAIConfigured } from "@/lib/openai"
 
@@ -7,6 +8,8 @@ import { isOpenAIConfigured } from "@/lib/openai"
  * Ask a question about an incident using AI intelligence (RAG)
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const sessionUser = await getCurrentUser()
+  if (!sessionUser) return unauthorizedResponse()
   try {
     const { id } = await params
     const body = await request.json()
@@ -24,11 +27,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       )
     }
 
-    // Get incident
-    const incident = await getIncidentById(id)
-    if (!incident) {
+    const scope = await getIncidentForUser(id, sessionUser)
+    if (scope.kind === "not_found") {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 })
     }
+    if (scope.kind === "forbidden") {
+      return forbiddenResponse()
+    }
+    const incident = scope.incident
 
     const qaAgent = getIntelligenceQA()
     let answer: string
