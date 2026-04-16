@@ -106,7 +106,8 @@ interface IncidentInvestigationMetadata {
 }
 
 const PHASE2_SECTION_STATUS = ["not_started", "in_progress", "complete"] as const
-const INCIDENT_PHASES = [
+/** Allowed incident workflow phases (task-00j pre-flight; admin/staff dashboards depend on all four). */
+export const INCIDENT_PHASES = [
   "phase_1_in_progress",
   "phase_1_complete",
   "phase_2_in_progress",
@@ -499,6 +500,7 @@ const IncidentSchema = new Schema<IncidentDocument>(
     phase: {
       type: String,
       enum: [...INCIDENT_PHASES],
+      required: true,
       default: "phase_1_in_progress",
       index: true,
     },

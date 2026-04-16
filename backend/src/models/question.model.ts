@@ -58,7 +58,8 @@ export const AnswerSchema = new Schema<AnswerSubdocument>(
 
 export const QuestionSchema = new Schema<QuestionDocument>(
   {
-    id: { type: String, required: true, unique: true, index: true },
+    // No unique: embedded in Incident — unique would index incidents.questions.id and break multiple empty arrays
+    id: { type: String, required: true, index: true },
     incidentId: { type: String, index: true },
     questionText: { type: String, required: true },
     askedBy: { type: String, required: true },

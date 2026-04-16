@@ -50,6 +50,12 @@ async function main() {
   console.log("══════════════════════════════")
 
   await connectMongo()
+  // Legacy index from when QuestionSchema had unique: true on id (invalid for embedded arrays).
+  try {
+    await mongoose.connection.collection("incidents").dropIndex("questions.id_1")
+  } catch {
+    // Index absent or already dropped
+  }
   const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
 
   const gerardDoc = await UserModel.findOne({ email: "gerard@waik.care" }).exec()

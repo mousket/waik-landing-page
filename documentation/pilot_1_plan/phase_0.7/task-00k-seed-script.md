@@ -54,19 +54,19 @@ SEED_CLERK_PASSWORD=WaiK@Seed2026!   (add this to .env.local)
 
 ## Success Criteria
 
-- [ ] `npm run build` passes
-- [ ] `npm run seed:dev` runs without error
-- [ ] Script output shows "✓" for each created document
-- [ ] After seed: 1 organization in MongoDB
-- [ ] After seed: 1 facility in MongoDB
-- [ ] After seed: 8 staff users in MongoDB + 8 corresponding Clerk users
-- [ ] After seed: 5 residents in MongoDB
-- [ ] After seed: 10 incidents in MongoDB across all 4 phase states
-- [ ] After seed: 5 interventions in MongoDB (4 active, 1 removed)
-- [ ] After seed: 3 assessments in MongoDB
-- [ ] Script is idempotent — running twice produces no duplicates
-- [ ] `npm run seed:reset` removes all seed documents
-- [ ] `npm run seed:reset && npm run seed:dev` restores everything cleanly
+- [x] `npm run build` passes
+- [x] `npm run seed:dev` runs without error
+- [x] Script output shows "✓" for each created document
+- [x] After seed: 1 organization in MongoDB
+- [x] After seed: 1 facility in MongoDB
+- [x] After seed: 8 staff users in MongoDB + 8 corresponding Clerk users
+- [x] After seed: 5 residents in MongoDB
+- [x] After seed: 10 incidents in MongoDB across all 4 phase states
+- [x] After seed: 5 interventions in MongoDB (4 active, 1 removed)
+- [x] After seed: 3 assessments in MongoDB
+- [x] Script is idempotent — running twice produces no duplicates
+- [x] `npm run seed:reset` removes all seed documents
+- [x] `npm run seed:reset && npm run seed:dev` restores everything cleanly
 - [ ] Signing in as m.torres@sunrisemn.com → staff dashboard shows her pending question
 - [ ] Signing in as s.kim@sunrisemn.com → admin dashboard shows red alerts
 - [ ] Signing in as gerard@waik.care → super admin shows 1 org, 1 facility
@@ -148,6 +148,22 @@ TEST 10 — Facility data isolation correct
   Expected: Only incidents for fac-sunrise-mpls-001 returned
   Pass/Fail: ___
 ```
+
+### Test run log — 2026-04-15
+
+Automated runs executed in dev (MongoDB reachable, `CLERK_SECRET_KEY` set). UI and authenticated API checks remain manual.
+
+| Item | Result |
+|------|--------|
+| Success criteria: build, seed, counts, idempotency, reset + re-seed | **Pass** (see below) |
+| Mongo `users` total | **8** seed users only — spec’s “+2 super admins” assumes `seed:super-admins` users exist; this DB had **no** extra super-admin rows, so total user count was 8, not 10 |
+| Clerk `@sunrisemn.com` users (API) | **8** accounts present |
+| TEST 1–2, 4–6 | **Pass** |
+| TEST 3 (Clerk) | **Pass** for count; **manual** for publicMetadata per user in Clerk Dashboard |
+| TEST 7–9 (dashboards after sign-in) | **Not run** here — requires browser session |
+| TEST 10 (`GET /api/incidents`) | **Not run** here — route requires an authenticated session |
+
+Verification helper used for counts: `scripts/verify-seed-counts.ts` (exit `VERIFY_COUNTS_OK`).
 
 ---
 
