@@ -41,7 +41,7 @@ export default function IncidentsLayout({
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10"
+              className="h-12 w-12 min-h-12 min-w-12"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -49,7 +49,7 @@ export default function IncidentsLayout({
             <div className="flex items-center">
               <Image src="/waik-logo.png" alt="WAiK" width={80} height={32} className="h-8 w-auto" />
             </div>
-            <div className="w-10" />
+            <div className="h-12 w-12 min-h-12 min-w-12" aria-hidden />
           </div>
         </div>
 

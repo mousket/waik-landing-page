@@ -4,7 +4,6 @@ import * as React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowLeft, Mic, Pause, Play, Square } from "lucide-react"
 
-import { brand } from "@/lib/design-tokens"
 import { cn } from "@/lib/utils"
 
 type SpeechRecognitionType = {
@@ -54,12 +53,9 @@ function CompletionRing({ percent }: { percent: number }) {
   const c = 2 * Math.PI * r
   const offset = c - (p / 100) * c
   return (
-    <div
-      className="relative flex h-10 w-10 shrink-0 items-center justify-center"
-      style={{ color: brand.teal }}
-    >
+    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center text-primary">
       <svg width="40" height="40" viewBox="0 0 40 40" className="block -rotate-90" aria-hidden>
-        <circle cx="20" cy="20" r={r} fill="none" stroke="#E0E0E0" strokeWidth="4" />
+        <circle cx="20" cy="20" r={r} fill="none" className="stroke-muted" strokeWidth="4" />
         <circle
           cx="20"
           cy="20"
@@ -72,7 +68,7 @@ function CompletionRing({ percent }: { percent: number }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute text-[10px] font-medium text-[#0A3D40]" aria-hidden>
+      <span className="absolute text-[10px] font-medium text-foreground" aria-hidden>
         {Math.round(p)}
       </span>
     </div>
@@ -266,6 +262,7 @@ export function VoiceInputScreen({
         /* ignore */
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keep stable; reads latest transcript when pausing without recreating on each keystroke
   }, [isPaused, startRecording])
 
   const handleTranscriptChange = (v: string) => {
@@ -344,21 +341,20 @@ export function VoiceInputScreen({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col bg-[#F5FAFA]"
-      style={{ minHeight: "100dvh" }}
+      className="flex min-h-0 min-h-[100dvh] flex-1 flex-col bg-gradient-to-br from-primary/5 via-background to-accent/5"
     >
       {/* Top bar */}
-      <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-4">
+      <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/30 bg-background/80 px-4 backdrop-blur-sm">
         <button
           type="button"
           onClick={handleBack}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#0A3D40] hover:bg-white/60"
+          className="inline-flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-full text-foreground hover:bg-muted/80"
           aria-label="Back"
         >
           <ArrowLeft className="h-6 w-6" />
         </button>
         {questionLabel ? (
-          <span className="line-clamp-1 flex-1 text-center text-sm font-medium text-[#5A7070]">
+          <span className="line-clamp-1 flex-1 text-center text-sm font-medium text-muted-foreground">
             {questionLabel}
           </span>
         ) : (
@@ -377,12 +373,10 @@ export function VoiceInputScreen({
 
       {/* Question */}
       <div className="shrink-0 px-4 py-6">
-        <h1 className="text-lg font-semibold text-[#0A3D40]">{question}</h1>
-        {areaHint ? (
-          <p className="mt-1 text-sm italic text-[#5A7070]">{areaHint}</p>
-        ) : null}
+        <h1 className="text-lg font-semibold text-foreground">{question}</h1>
+        {areaHint ? <p className="mt-1 text-sm italic text-muted-foreground">{areaHint}</p> : null}
         {showEncouragement ? (
-          <p className="mt-2 text-sm italic text-[#5A7070]">
+          <p className="mt-2 text-sm italic text-muted-foreground">
             Feel free to include any other details — the more you share, the fewer questions remain.
           </p>
         ) : null}
@@ -395,13 +389,12 @@ export function VoiceInputScreen({
           onChange={(e) => handleTranscriptChange(e.target.value)}
           placeholder="Your answer will appear here as you speak..."
           readOnly={!voiceUnavailable && isRecording && !isPaused}
-          className="min-h-[160px] w-full resize-none rounded-xl border border-gray-200 bg-white p-3 text-base text-[#1E2B2C] shadow-sm"
-          style={{ minHeight: 160 }}
+          className="min-h-[160px] w-full resize-none rounded-xl border border-border bg-card p-3 text-base text-foreground shadow-sm"
         />
       </div>
 
       {voiceUnavailable ? (
-        <p className="px-4 pb-2 text-sm text-[#5A7070]">
+        <p className="px-4 pb-2 text-sm text-muted-foreground">
           Voice input is not available on this device. Please type your answer.
         </p>
       ) : null}
@@ -413,12 +406,12 @@ export function VoiceInputScreen({
             type="button"
             onClick={toggleRecordPress}
             className={cn(
-              "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white shadow-md",
+              "inline-flex h-16 w-16 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-full text-primary-foreground shadow-md",
               isRecording
                 ? isPaused
                   ? "bg-rose-600"
                   : "animate-pulse bg-rose-600"
-                : "bg-[#0D7377] hover:opacity-95",
+                : "bg-primary hover:opacity-95",
             )}
             aria-pressed={isRecording}
             aria-label={isRecording ? "Stop recording" : "Start recording"}
@@ -429,7 +422,7 @@ export function VoiceInputScreen({
             <button
               type="button"
               onClick={togglePause}
-              className="inline-flex min-w-[4.5rem] items-center justify-center rounded-md border-2 border-[#0D7377] px-3 py-1.5 text-sm font-medium text-[#0D7377] hover:bg-[#EEF8F8]"
+              className="inline-flex min-h-10 min-w-[4.5rem] items-center justify-center rounded-md border-2 border-primary px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5"
             >
               {isPaused ? (
                 <>
@@ -448,7 +441,7 @@ export function VoiceInputScreen({
             <button
               type="button"
               onClick={handleClear}
-              className="inline-flex min-w-[4rem] items-center justify-center rounded-md border border-gray-300 px-3 py-1.5 text-sm text-[#5A7070] hover:bg-gray-100"
+              className="inline-flex min-h-10 min-w-[4rem] items-center justify-center rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/80"
             >
               Clear
             </button>
@@ -463,7 +456,7 @@ export function VoiceInputScreen({
         id={`append-fallback-${appendInputId}`}
       >
         {showTextFallbackPrompt ? (
-          <p className="text-sm text-[#0A3D40]">Having trouble with voice? Type your answer below.</p>
+          <p className="text-sm text-foreground">Having trouble with voice? Type your answer below.</p>
         ) : null}
         {!voiceUnavailable ? (
           <>
@@ -473,7 +466,7 @@ export function VoiceInputScreen({
             <textarea
               id={appendInputId}
               onInput={handleAppendInput as unknown as React.FormEventHandler<HTMLTextAreaElement>}
-              className="min-h-[64px] w-full rounded-md border border-gray-200 bg-white p-2 text-sm"
+              className="min-h-[64px] w-full rounded-md border border-border bg-card p-2 text-sm"
               placeholder="Or type your answer here..."
             />
           </>
@@ -487,10 +480,10 @@ export function VoiceInputScreen({
           onClick={handleDone}
           disabled={!isDoneActive}
           className={cn(
-            "w-full rounded-xl py-4 text-center text-base font-semibold text-white",
+            "w-full min-h-12 rounded-xl py-4 text-center text-base font-semibold text-primary-foreground",
             isDoneActive
-              ? "cursor-pointer bg-[#0D7377] hover:opacity-95"
-              : "cursor-not-allowed bg-gray-300",
+              ? "cursor-pointer bg-primary hover:opacity-95"
+              : "cursor-not-allowed bg-muted text-muted-foreground",
           )}
         >
           Done
@@ -507,7 +500,7 @@ export function VoiceInputScreen({
           <button
             type="button"
             onClick={() => onDefer()}
-            className="text-sm text-[#5A7070] underline decoration-[#5A7070] underline-offset-2 hover:text-[#0A3D40]"
+            className="text-sm text-muted-foreground underline decoration-muted-foreground underline-offset-2 hover:text-foreground"
           >
             I cannot answer this right now — save for later
           </button>

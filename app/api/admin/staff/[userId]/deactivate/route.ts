@@ -2,10 +2,11 @@ import { createClerkClient } from "@clerk/backend"
 import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import UserModel from "@/backend/src/models/user.model"
-import { authErrorResponse, getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 
-export async function PATCH(_request: Request, { params }: { params: { userId: string } }) {
+export async function PATCH(request: Request, { params }: { params: { userId: string } }) {
   try {
     const user = await getCurrentUser()
     if (!user) return unauthorizedResponse()
@@ -16,12 +17,15 @@ export async function PATCH(_request: Request, { params }: { params: { userId: s
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
     }
 
+    const resolved = await resolveEffectiveAdminFacility(request, user)
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const { facilityId } = resolved
+
     await connectMongo()
-    const target = await UserModel.findOne({ id: params.userId, facilityId: user.facilityId }).exec()
+    const target = await UserModel.findOne({ id: params.userId, facilityId }).exec()
     if (!target) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    requireFacilityAccess(user, String(target.facilityId ?? ""))
 
     target.isActive = false
     await target.save()

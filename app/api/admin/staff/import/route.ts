@@ -4,8 +4,9 @@ import RoleModel from "@/backend/src/models/role.model"
 import UserModel from "@/backend/src/models/user.model"
 import { isValidEmail } from "@/lib/admin-staff-invite"
 import { parseStaffCsv } from "@/lib/csv-staff"
-import { authErrorResponse, getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 
 type RowStatus = "valid" | "error" | "duplicate"
 
@@ -15,8 +16,9 @@ export async function POST(request: Request) {
     if (!user) return unauthorizedResponse()
     requireCanInviteStaff(user)
 
-    const facilityId = user.facilityId
-    requireFacilityAccess(user, facilityId)
+    const resolved = await resolveEffectiveAdminFacility(request, user)
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const { facilityId } = resolved
 
     const form = await request.formData()
     const file = form.get("file")

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import IncidentModel, { INCIDENT_PHASES } from "@/backend/src/models/incident.model"
 import { withAdminAuth } from "@/lib/api-handler"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { createIncidentFromReport, addQuestionToIncident, getUserById } from "@/lib/db"
 import { mapIncidentDocToSummary } from "@/lib/map-incident-summary"
@@ -23,26 +24,13 @@ function parsePhaseList(raw: string | null): IncidentPhase[] | null {
 export const GET = withAdminAuth(async (request, { currentUser }) => {
   try {
     const url = new URL(request.url)
-    const requestedFacility = url.searchParams.get("facilityId")
     const phaseRaw = url.searchParams.get("phase")
     const daysRaw = url.searchParams.get("days")
     const hasInjuryRaw = url.searchParams.get("hasInjury")
 
-    let effectiveFacilityId: string
-    if (currentUser.isWaikSuperAdmin) {
-      effectiveFacilityId = (requestedFacility || currentUser.facilityId || "").trim()
-      if (!effectiveFacilityId) {
-        return NextResponse.json({ error: "facilityId query required for super admin" }, { status: 400 })
-      }
-    } else {
-      effectiveFacilityId = (currentUser.facilityId || "").trim()
-      if (!effectiveFacilityId) {
-        return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
-      }
-      if (requestedFacility && requestedFacility !== effectiveFacilityId) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
-    }
+    const resolved = await resolveEffectiveAdminFacility(request, currentUser)
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const effectiveFacilityId = resolved.facilityId
 
     await connectMongo()
 

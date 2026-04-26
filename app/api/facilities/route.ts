@@ -9,12 +9,16 @@ type FacilityOption = {
   organizationId: string
 }
 
-export const GET = withAdminAuth(async (_request, { currentUser }) => {
+export const GET = withAdminAuth(async (request, { currentUser }) => {
   await connectMongo()
+  const url = new URL(request.url)
+  const orgFilter = (url.searchParams.get("organizationId") || "").trim()
 
   // Super admins: can pick any active facility.
   if (currentUser.isWaikSuperAdmin) {
-    const rows = await FacilityModel.find({ isActive: true })
+    const query: Record<string, unknown> = { isActive: true }
+    if (orgFilter) query.organizationId = orgFilter
+    const rows = await FacilityModel.find(query)
       .select({ id: 1, name: 1, organizationId: 1, _id: 0 })
       .sort({ name: 1 })
       .lean()
@@ -32,6 +36,7 @@ export const GET = withAdminAuth(async (_request, { currentUser }) => {
   // Admin-tier users: for now, allow selecting any facility in the same org (or fallback to their single facility).
   const orgId = (currentUser.organizationId || "").trim()
   if (orgId) {
+    // Ignore orgFilter for non-super-admins; it must match their org anyway.
     const rows = await FacilityModel.find({ organizationId: orgId, isActive: true })
       .select({ id: 1, name: 1, organizationId: 1, _id: 0 })
       .sort({ name: 1 })

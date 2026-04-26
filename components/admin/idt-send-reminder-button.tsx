@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
-import { brand } from "@/lib/design-tokens"
 import { Button } from "@/components/ui/button"
 
 type Status = "idle" | "loading" | "sent" | "error"
@@ -89,8 +88,7 @@ export function IdtSendReminderButton({
     <Button
       type="button"
       variant="outline"
-      className="mt-3 min-h-[48px] border-2 font-semibold text-brand-teal"
-      style={{ borderColor: brand.teal, color: brand.darkTeal }}
+      className="mt-3 min-h-[48px] border-2 border-primary font-semibold text-primary"
       disabled={status === "loading"}
       onClick={() => void send()}
     >

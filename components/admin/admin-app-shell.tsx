@@ -3,13 +3,16 @@
 import type React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useAdminScopeUrlSync, useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
 import { UserButton } from "@clerk/nextjs"
-import { Bell } from "lucide-react"
-import { brand } from "@/lib/design-tokens"
+import { Bell, Shield } from "lucide-react"
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
 import { cn } from "@/lib/utils"
+import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav"
+import { AdminFacilitySwitcher } from "@/components/admin/admin-facility-switcher"
+import { SuperAdminAdminEntryTelemetry } from "@/components/admin/super-admin-admin-entry-telemetry"
 import { WaikLogo } from "@/components/waik-logo"
 
 const NAV_LINKS = [
@@ -34,13 +37,33 @@ function navActive(pathname: string, href: string): boolean {
 export function AdminAppShell({
   firstName,
   lastName,
+  defaultFacilityId,
+  showFacilitySwitcher,
+  isWaikSuperAdmin = false,
   children,
 }: {
   firstName: string
   lastName: string
+  defaultFacilityId?: string
+  showFacilitySwitcher: boolean
+  isWaikSuperAdmin?: boolean
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const searchParams = useAdminUrlSearchParams()
+  useAdminScopeUrlSync()
+
+  const hideFacilitySwitcher =
+    pathname.startsWith("/admin/incidents/") ||
+    pathname.startsWith("/admin/residents/") ||
+    pathname.startsWith("/admin/assessments/")
+
+  const facilitySwitcher =
+    showFacilitySwitcher && !hideFacilitySwitcher ? (
+      <AdminFacilitySwitcher defaultFacilityId={defaultFacilityId} />
+    ) : null
+
+  const dashboardHref = buildAdminPathWithContext("/admin/dashboard", searchParams)
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-brand-shell-bg text-brand-body">
@@ -50,10 +73,10 @@ export function AdminAppShell({
         <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 md:gap-4">
           <div className="flex min-w-0 shrink-0 items-center">
             <span className="md:hidden">
-              <WaikLogo href="/admin/dashboard" size="md" />
+              <WaikLogo href={dashboardHref} size="md" />
             </span>
             <span className="hidden md:inline">
-              <WaikLogo href="/admin/dashboard" size="lg" />
+              <WaikLogo href={dashboardHref} size="lg" />
             </span>
           </div>
 
@@ -61,15 +84,16 @@ export function AdminAppShell({
             <ul className="flex flex-wrap items-center justify-center gap-6 lg:gap-8">
               {NAV_LINKS.map(({ label, href }) => {
                 const active = navActive(pathname, href)
+                const hrefWithContext = buildAdminPathWithContext(href, searchParams)
                 return (
                   <li key={href}>
                     <Link
-                      href={href}
+                      href={hrefWithContext}
                       className={cn(
-                        "inline-block border-b-2 pb-0.5 text-sm font-medium transition-colors",
+                        "inline-block min-h-10 border-b-2 pb-0.5 text-sm font-medium transition-colors md:min-h-0",
                         active
-                          ? "border-brand-teal text-brand-teal"
-                          : "border-transparent text-brand-muted hover:text-brand-dark-teal",
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {label}
@@ -80,11 +104,19 @@ export function AdminAppShell({
             </ul>
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-3">
+            {isWaikSuperAdmin ? (
+              <Link
+                href="/waik-admin"
+                className="flex min-h-10 min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground md:px-2.5 md:py-2 md:text-sm"
+              >
+                <Shield className="h-4 w-4 shrink-0 text-primary md:h-4 md:w-4" strokeWidth={2} aria-hidden />
+                <span className="max-w-[7rem] truncate sm:max-w-none">Platform admin</span>
+              </Link>
+            ) : null}
             <button
               type="button"
-              className="flex h-11 w-11 min-h-[48px] min-w-[48px] items-center justify-center md:h-12 md:w-12"
-              style={{ color: brand.muted }}
+              className="flex h-11 w-11 min-h-[48px] min-w-[48px] items-center justify-center text-muted-foreground md:h-12 md:w-12"
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5 md:h-[22px] md:w-[22px]" strokeWidth={1.75} />
@@ -101,6 +133,8 @@ export function AdminAppShell({
         className="flex flex-1 flex-col overflow-y-auto overscroll-contain pt-14 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6 md:pt-16"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
+        {isWaikSuperAdmin ? <SuperAdminAdminEntryTelemetry isWaikSuperAdmin /> : null}
+        {facilitySwitcher}
         {children}
       </div>
 

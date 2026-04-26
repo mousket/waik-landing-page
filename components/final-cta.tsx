@@ -41,7 +41,7 @@ export function FinalCTA() {
       } else {
         setSubmitStatus({ type: "error", message: result.message })
       }
-    } catch (error) {
+    } catch {
       setSubmitStatus({
         type: "error",
         message: "An error occurred. Please try again.",

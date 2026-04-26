@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
+import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
+import { CardDescription, CardTitle } from "@/components/ui/card"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -65,6 +68,7 @@ type IntelligenceMessage = {
 
 export default function AdminIncidentDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const searchParams = useAdminUrlSearchParams()
   const { userId, role } = useWaikUser()
   const [incident, setIncident] = useState<Incident | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
@@ -624,54 +628,61 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-white" />
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10" />
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: `radial-gradient(circle, hsl(var(--accent)) 1px, transparent 1px)`,
-            backgroundSize: "24px 24px",
-          }}
-        />
-      </div>
+    <div className="relative min-h-full flex-1 overflow-hidden p-4 sm:p-6 lg:p-8">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
 
-      <div className="space-y-6 relative max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.push("/admin/dashboard")} className="w-fit">
+      <div className="relative mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(buildAdminPathWithContext("/admin/dashboard", searchParams))}
+            className="h-12 w-fit"
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Button>
         </div>
 
         <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-2 bg-white/50 p-2">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-white">
-              <FileText className="h-4 w-4 mr-2" />
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-2xl border border-border bg-background/80 p-2 sm:grid-cols-4">
+            <TabsTrigger
+              value="overview"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <FileText className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
               <span className="sm:hidden">Info</span>
             </TabsTrigger>
-            <TabsTrigger value="qa" className="data-[state=active]:bg-white">
-              <MessageSquare className="h-4 w-4 mr-2" />
+            <TabsTrigger
+              value="qa"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Q&A</span>
               <span className="sm:hidden">Q&A</span>
             </TabsTrigger>
-            <TabsTrigger value="intelligence" className="data-[state=active]:bg-white">
-              <Mic className="h-4 w-4 mr-2" />
+            <TabsTrigger
+              value="intelligence"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <Mic className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Intelligence</span>
               <span className="sm:hidden">Intel</span>
             </TabsTrigger>
-            <TabsTrigger value="waik" className="data-[state=active]:bg-white">
-              <Brain className="h-4 w-4 mr-2" />
+            <TabsTrigger
+              value="waik"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <Brain className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">WAiK Agent</span>
               <span className="sm:hidden">WAiK</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader>
+            <WaikCard className="border-primary/20">
+              <div className="flex flex-col space-y-1.5 p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex-1 space-y-4">
                     {isEditingIncident ? (
@@ -771,9 +782,9 @@ useEffect(() => {
                     <p className="font-medium">{formatDate(incident.updatedAt, "MMM d, yyyy 'at' h:mm a")}</p>
                   </div>
                 </div>
-              </CardHeader>
+              </div>
               {!isEditingIncident && (
-                <CardContent className="pt-0">
+                <WaikCardContent className="pt-0">
                   <Separator className="mb-4" />
                   <div className="space-y-4">
                     <div>
@@ -837,16 +848,16 @@ useEffect(() => {
                       </div>
                     )}
                   </div>
-                </CardContent>
+                </WaikCardContent>
               )}
-            </Card>
+            </WaikCard>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
+              <WaikCard className="border-accent/20 shadow-md">
+                <div className="flex flex-col space-y-1.5 p-6">
                   <CardTitle className="text-base">Status</CardTitle>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <WaikCardContent>
                   <Select value={incident.status} onValueChange={updateStatus} disabled={incident.status === "closed"}>
                     <SelectTrigger>
                       <SelectValue />
@@ -858,14 +869,14 @@ useEffect(() => {
                       <SelectItem value="closed">Closed</SelectItem>
                     </SelectContent>
                   </Select>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
 
-              <Card className="border-accent/20 bg-white shadow-md">
-                <CardHeader>
+              <WaikCard className="border-accent/20 shadow-md">
+                <div className="flex flex-col space-y-1.5 p-6">
                   <CardTitle className="text-base">Priority</CardTitle>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <WaikCardContent>
                   <Select
                     value={incident.priority}
                     onValueChange={updatePriority}
@@ -881,13 +892,13 @@ useEffect(() => {
                       <SelectItem value="urgent">Urgent</SelectItem>
                     </SelectContent>
                   </Select>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             </div>
 
             {role === "admin" && incident.status !== "closed" && (
-              <Card className="border-destructive/20 bg-destructive/5">
-                <CardHeader>
+              <WaikCard className="border-destructive/20 bg-destructive/5">
+                <div className="flex flex-col space-y-1.5 p-6">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Lock className="h-5 w-5 text-destructive" />
                     Close Incident
@@ -895,8 +906,8 @@ useEffect(() => {
                   <CardDescription>
                     Closing this incident will finalize all details and prevent further edits. This action is permanent.
                   </CardDescription>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <WaikCardContent>
                   <Button
                     onClick={handleCloseIncident}
                     disabled={isClosingIncident}
@@ -906,8 +917,8 @@ useEffect(() => {
                     <CheckCircle className="mr-2 h-4 w-4" />
                     {isClosingIncident ? "Closing..." : "Close Incident"}
                   </Button>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             )}
 
             {/* Documentation Score Section */}
@@ -927,8 +938,8 @@ useEffect(() => {
 
           <TabsContent value="qa" className="space-y-6 mt-6">
             {currentPendingQuestion ? (
-              <Card className="bg-white shadow-lg border-accent/40">
-                <CardHeader>
+              <WaikCard className="shadow-lg border-accent/40">
+                <div className="flex flex-col space-y-1.5 p-6">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
                     <div>
                       <CardTitle className="text-lg text-accent">
@@ -945,8 +956,8 @@ useEffect(() => {
                       <Trash2 className="h-4 w-4 mr-1" /> Remove question
                     </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </div>
+                <WaikCardContent className="space-y-4">
                     <div className="flex gap-2 flex-wrap">
                     {visiblePendingQuestions.map((question, idx) => (
                       <button
@@ -1067,19 +1078,19 @@ useEffect(() => {
                       {selectedEmployees.length === 1 ? "" : "s"}
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             ) : null}
 
             {currentAnsweredQuestion ? (
-              <Card className="bg-white shadow-lg border-primary/20">
-                <CardHeader>
+              <WaikCard className="shadow-lg border-primary/20">
+                <div className="flex flex-col space-y-1.5 p-6">
                   <CardTitle className="text-lg text-primary">
                     Answered Questions ({answeredQuestions.length})
                   </CardTitle>
                   <CardDescription>Questions that have been answered by staff</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </div>
+                <WaikCardContent className="space-y-4">
                   <div className="flex gap-2 flex-wrap">
                     {answeredQuestions.map((question, idx) => (
                       <button
@@ -1177,30 +1188,30 @@ useEffect(() => {
                       Next <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             ) : null}
 
             {unansweredQuestions.length === 0 && answeredQuestions.length === 0 && (
-              <Card className="bg-white shadow-lg">
-                <CardContent className="py-12 text-center">
+              <WaikCard className="shadow-lg">
+                <WaikCardContent className="py-12 text-center">
                   <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <p className="font-medium mb-2">No questions for this incident</p>
                   <p className="text-sm text-muted-foreground">
                     You can send follow-up questions to staff using the form below.
                   </p>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             )}
 
             <Separator className="my-4" />
 
-            <Card className="border-accent/20 bg-white shadow-lg">
-              <CardHeader>
+            <WaikCard className="border-accent/20 shadow-lg">
+              <div className="flex flex-col space-y-1.5 p-6">
                 <CardTitle className="text-lg text-accent">Send New Question to Staff</CardTitle>
                 <CardDescription>Ask staff for additional information about this incident</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </div>
+              <WaikCardContent className="space-y-4">
                 <div>
                   <Label htmlFor="new-question">Question</Label>
                   <Textarea
@@ -1282,13 +1293,13 @@ useEffect(() => {
                   <Send className="mr-2 h-4 w-4" />
                   {isAddingQuestion ? "Sending..." : "Send Question"}
                 </Button>
-              </CardContent>
-            </Card>
+              </WaikCardContent>
+            </WaikCard>
           </TabsContent>
 
           <TabsContent value="intelligence" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg h-[600px] sm:h-[650px] lg:h-[calc(100vh-16rem)] flex flex-col">
-              <CardHeader className="flex-shrink-0 pb-3 sm:pb-4">
+            <WaikCard className="border-primary/20 shadow-lg h-[600px] sm:h-[650px] lg:h-[calc(100vh-16rem)] flex flex-col">
+              <div className="flex shrink-0 flex-col space-y-1.5 p-6 pb-3 sm:pb-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="relative flex-shrink-0">
@@ -1334,10 +1345,10 @@ useEffect(() => {
                 <CardDescription className="text-xs sm:text-sm mt-1">
                   Ask questions about this incident using voice or text
                 </CardDescription>
-              </CardHeader>
+              </div>
 
-              <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
-                <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 space-y-3 sm:space-y-4">
+              <WaikCardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:space-y-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
                   {intelligenceMessages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center space-y-3 sm:space-y-4 px-4">
                       <div className="relative">
@@ -1478,7 +1489,7 @@ useEffect(() => {
                       variant={isListening ? "destructive" : "outline"}
                       onClick={isListening ? stopVoiceRecording : startVoiceRecording}
                       disabled={isIntelligenceLoading}
-                      className="flex-shrink-0 h-10 w-10 sm:h-11 sm:w-11"
+                      className="h-12 w-12 min-h-12 min-w-12 flex-shrink-0 sm:h-11 sm:w-11 sm:min-h-11 sm:min-w-11"
                     >
                       <Mic className={`h-4 w-4 sm:h-5 sm:w-5 ${isListening ? "animate-pulse" : ""}`} />
                     </Button>
@@ -1486,7 +1497,7 @@ useEffect(() => {
                       size="icon"
                       onClick={handleIntelligenceSubmit}
                       disabled={!intelligenceInput.trim() || isIntelligenceLoading || isListening}
-                      className="flex-shrink-0 h-10 w-10 sm:h-11 sm:w-11"
+                      className="h-12 w-12 min-h-12 min-w-12 flex-shrink-0 sm:h-11 sm:w-11 sm:min-h-11 sm:min-w-11"
                     >
                       {isIntelligenceLoading ? (
                         <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
@@ -1499,8 +1510,8 @@ useEffect(() => {
                     Press Enter to send • Click mic for voice • {autoSpeak ? "Audio on" : "Audio off"}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </WaikCardContent>
+            </WaikCard>
           </TabsContent>
           <TabsContent value="waik" className="space-y-6 mt-6">
             <div className="flex flex-col gap-4">
@@ -1543,8 +1554,8 @@ useEffect(() => {
               </div>
 
             {isGeneratingAIReport && (
-              <Card className="border-purple-200 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 shadow-lg overflow-hidden">
-                <CardContent className="pt-8 pb-8">
+              <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 via-blue-50 to-cyan-50 shadow-lg overflow-hidden">
+                <WaikCardContent className="pt-8 pb-8">
                   <div className="flex flex-col items-center justify-center space-y-6">
                     <div className="relative">
                       {/* Animated gradient background */}
@@ -1578,13 +1589,13 @@ useEffect(() => {
                       <div className="h-full bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 animate-[scan_2s_ease-in-out_infinite]" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             )}
 
             {!canGenerateAIReport && !incident.aiReport && (
-              <Card className="border-yellow-200 bg-yellow-50">
-                <CardContent className="pt-6">
+              <WaikCard className="border-yellow-200 bg-yellow-50">
+                <WaikCardContent className="pt-6">
                   <div className="flex items-start gap-3">
                     <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
                       <Brain className="h-4 w-4 text-yellow-600" />
@@ -1596,20 +1607,20 @@ useEffect(() => {
                       </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             )}
 
             {incident.aiReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-purple-600" />
                       <CardTitle className="text-base">WAiK Summary</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     {aiSummaryHtml ? (
                       <div
                         className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
@@ -1618,17 +1629,17 @@ useEffect(() => {
                     ) : (
                       <p className="text-sm leading-relaxed text-muted-foreground">No summary available.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center gap-2">
                       <Brain className="h-5 w-5 text-purple-600" />
                       <CardTitle className="text-base">WAiK Insights</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     {aiInsightsHtml ? (
                       <div
                         className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
@@ -1637,17 +1648,17 @@ useEffect(() => {
                     ) : (
                       <p className="text-sm leading-relaxed text-muted-foreground">No insights available.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center gap-2">
                       <Lightbulb className="h-5 w-5 text-purple-600" />
                       <CardTitle className="text-base">WAiK Recommendations</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     {aiRecommendationsHtml ? (
                       <div
                         className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
@@ -1656,17 +1667,17 @@ useEffect(() => {
                     ) : (
                       <p className="text-sm leading-relaxed text-muted-foreground">No recommendations available.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-purple-600" />
                       <CardTitle className="text-base">WAiK Recommended Action Items</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     {aiActionsHtml ? (
                       <div
                         className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
@@ -1675,11 +1686,11 @@ useEffect(() => {
                     ) : (
                       <p className="text-sm leading-relaxed text-muted-foreground">No action items available.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-100 bg-purple-50/50 lg:col-span-2">
-                  <CardContent className="pt-6">
+                <WaikCard className="border-purple-100 bg-purple-50/50 lg:col-span-2">
+                  <WaikCardContent className="pt-6">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
                         Generated: {formatDate(incident.aiReport.generatedAt, "MMM d, yyyy 'at' h:mm a")}
@@ -1696,13 +1707,13 @@ useEffect(() => {
                         </span>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-purple-400" />
@@ -1712,17 +1723,17 @@ useEffect(() => {
                         Pending
                       </Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
                       <span>Awaiting WAiK generation</span>
                     </div>
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Brain className="h-5 w-5 text-purple-400" />
@@ -1732,17 +1743,17 @@ useEffect(() => {
                         Pending
                       </Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
                       <span>Awaiting WAiK generation</span>
                     </div>
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Lightbulb className="h-5 w-5 text-purple-400" />
@@ -1752,17 +1763,17 @@ useEffect(() => {
                         Pending
                       </Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
                       <span>Awaiting WAiK generation</span>
                     </div>
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50 shadow-md">
+                  <div className="flex flex-col space-y-1.5 p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="h-5 w-5 text-purple-400" />
@@ -1772,14 +1783,14 @@ useEffect(() => {
                         Pending
                       </Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <WaikCardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
                       <span>Awaiting WAiK generation</span>
                     </div>
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
               </div>
             )}
           </div>

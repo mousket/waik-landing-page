@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Question ID and answer are required" }, { status: 400 })
     }
 
-    let work = sessionId ? await getInterviewWorkSession(sessionId) : undefined
+    const work = sessionId ? await getInterviewWorkSession(sessionId) : undefined
     if (sessionId) {
       if (!work) {
         return NextResponse.json(

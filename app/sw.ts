@@ -1,6 +1,6 @@
 /// <reference types="@serwist/next/typings" />
 import { defaultCache } from "@serwist/next/worker"
-import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist"
+import type { PrecacheEntry, RouteMatchCallbackOptions, RuntimeCaching, SerwistGlobalConfig } from "serwist"
 import { CacheFirst, ExpirationPlugin, NetworkFirst, Serwist, StaleWhileRevalidate } from "serwist"
 
 declare global {
@@ -30,12 +30,12 @@ const apiMethods: Array<"GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "
 
 const customRuntimeCaching: RuntimeCaching[] = [
   {
-    matcher: ({ sameOrigin, url: { pathname } }) =>
+    matcher: ({ sameOrigin, url }: RouteMatchCallbackOptions) =>
       sameOrigin &&
-      (pathname === "/staff/dashboard" ||
-        pathname === "/admin/dashboard" ||
-        pathname.startsWith("/staff/dashboard/") ||
-        pathname.startsWith("/admin/dashboard/")),
+      (url.pathname === "/staff/dashboard" ||
+        url.pathname === "/admin/dashboard" ||
+        url.pathname.startsWith("/staff/dashboard/") ||
+        url.pathname.startsWith("/admin/dashboard/")),
     handler: new StaleWhileRevalidate({
       cacheName: "waik-dashboards",
       plugins: [exp(16)],
@@ -50,7 +50,7 @@ const customRuntimeCaching: RuntimeCaching[] = [
   },
   ...apiMethods.map((method) => ({
     method,
-    matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && pathname.startsWith("/api/"),
+    matcher: ({ sameOrigin, url }: RouteMatchCallbackOptions) => sameOrigin && url.pathname.startsWith("/api/"),
     handler: new NetworkFirst({
       cacheName: "waik-apis",
       networkTimeoutSeconds: 10,

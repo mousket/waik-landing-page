@@ -1,8 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
+import { getAdminContextQueryString } from "@/lib/admin-nav-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardDescription, CardTitle } from "@/components/ui/card"
+import { PageHeader } from "@/components/ui/page-header"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -39,6 +43,8 @@ const CARE_OPTIONS = [
 ]
 
 export default function AdminResidentsPage() {
+  const searchParams = useAdminUrlSearchParams()
+  const apiCtx = useMemo(() => getAdminContextQueryString(searchParams), [searchParams])
   const [residents, setResidents] = useState<Resident[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -53,7 +59,7 @@ export default function AdminResidentsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/residents")
+      const res = await fetch(`/api/residents${apiCtx}`)
       if (!res.ok) {
         setResidents([])
         return
@@ -63,7 +69,7 @@ export default function AdminResidentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [apiCtx])
 
   useEffect(() => {
     void load()
@@ -84,7 +90,7 @@ export default function AdminResidentsPage() {
     setError(null)
     setSaving(true)
     try {
-      const res = await fetch("/api/residents", {
+      const res = await fetch(`/api/residents${apiCtx}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firstName, lastName, roomNumber, careLevel }),
@@ -106,73 +112,76 @@ export default function AdminResidentsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Residents</h1>
-          <p className="text-muted-foreground mt-1">Residents at your facility.</p>
-        </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add resident
-        </Button>
-      </div>
+    <div className="relative flex w-full flex-1 flex-col">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-4 py-6 md:space-y-8 md:py-8">
+        <PageHeader
+          title="Residents"
+          description="Residents at your facility."
+          actions={
+            <Button className="min-h-12 shadow-lg shadow-primary/20" onClick={() => setOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add resident
+            </Button>
+          }
+        />
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Directory</CardTitle>
-              <CardDescription>Search by name or room.</CardDescription>
+        <WaikCard>
+          <WaikCardContent className="space-y-0 p-0">
+            <div className="flex flex-col gap-4 border-b border-border/50 p-6 sm:flex-row sm:items-end sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle>Directory</CardTitle>
+                <CardDescription>Search by name or room.</CardDescription>
+              </div>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-12 min-h-12 pl-9"
+                />
+              </div>
             </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Room</TableHead>
-                  <TableHead>Care level</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground py-10">
-                      No residents yet
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">
-                        {r.firstName} {r.lastName}
-                      </TableCell>
-                      <TableCell>{r.roomNumber || "—"}</TableCell>
-                      <TableCell className="capitalize">{r.careLevel.replace(/_/g, " ")}</TableCell>
+            <div className="p-0">
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border bg-muted/40 hover:bg-muted/40">
+                      <TableHead className="font-semibold">Name</TableHead>
+                      <TableHead className="font-semibold">Room</TableHead>
+                      <TableHead className="font-semibold">Care level</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
+                          No residents yet
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filtered.map((r) => (
+                        <TableRow key={r.id} className="border-border transition-colors hover:bg-muted/30">
+                          <TableCell className="font-medium">
+                            {r.firstName} {r.lastName}
+                          </TableCell>
+                          <TableCell>{r.roomNumber || "—"}</TableCell>
+                          <TableCell className="capitalize">{r.careLevel.replace(/_/g, " ")}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </WaikCardContent>
+        </WaikCard>
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

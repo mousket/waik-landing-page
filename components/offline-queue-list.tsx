@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 
 import { getQueue, type QueuedIncident } from "@/lib/offline-queue"
-import { brand } from "@/lib/design-tokens"
 
 export function OfflineQueueList() {
   const [items, setItems] = useState<QueuedIncident[] | null>(null)
@@ -15,22 +14,22 @@ export function OfflineQueueList() {
   }, [])
 
   if (items === null) {
-    return <p className="text-sm text-white/80">Loading saved reports…</p>
+    return <p className="text-sm text-muted-foreground">Loading saved reports…</p>
   }
   if (items.length === 0) {
     return null
   }
 
   return (
-    <div className="mt-6 rounded-lg border border-white/20 bg-black/20 p-4">
-      <p className="mb-2 text-sm font-medium text-white">Reports waiting to upload</p>
-      <ul className="space-y-2 text-sm text-white/90">
+    <div className="mt-6 rounded-2xl border border-border/50 bg-card p-4 text-left shadow-sm">
+      <p className="mb-2 text-sm font-medium text-foreground">Reports waiting to upload</p>
+      <ul className="space-y-2 text-sm text-foreground/90">
         {items.map((q) => (
-          <li key={q.id} className="rounded border border-white/10 bg-white/5 px-3 py-2">
-            <span className="text-white/60">Saved </span>
+          <li key={q.id} className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+            <span className="text-muted-foreground">Saved </span>
             {new Date(q.queuedAt).toLocaleString()}
             <br />
-            <span className="text-xs" style={{ color: brand.muted }}>
+            <span className="text-xs text-muted-foreground">
               {(() => {
                 const p = q.payload as { title?: string; description?: string }
                 return p.title ?? p.description ?? "Incident draft"

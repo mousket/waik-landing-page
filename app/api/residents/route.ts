@@ -2,7 +2,8 @@ import { randomInt } from "crypto"
 import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import ResidentModel from "@/backend/src/models/resident.model"
-import { authErrorResponse, getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 import type { ResidentCareLevel } from "@/backend/src/models/resident.model"
 
 function canManageResidents(user: Awaited<ReturnType<typeof getCurrentUser>>): boolean {
@@ -16,7 +17,7 @@ function generateResidentId(): string {
 
 const CARE: ResidentCareLevel[] = ["independent", "assisted", "memory_care", "skilled_nursing"]
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser()
     if (!user) return unauthorizedResponse()
@@ -24,8 +25,9 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const facilityId = user.facilityId
-    requireFacilityAccess(user, facilityId)
+    const resolved = await resolveEffectiveAdminFacility(request, user)
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const { facilityId } = resolved
 
     await connectMongo()
     const residents = await ResidentModel.find({ facilityId, status: "active" })
@@ -57,10 +59,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const facilityId = user.facilityId
-    const organizationId = user.organizationId
-    requireFacilityAccess(user, facilityId)
-
     let body: unknown
     try {
       body = await request.json()
@@ -69,6 +67,12 @@ export async function POST(request: Request) {
     }
 
     const b = body as Record<string, unknown>
+    const resolved = await resolveEffectiveAdminFacility(request, user, {
+      bodyFacilityId: typeof b.facilityId === "string" ? b.facilityId : undefined,
+      bodyOrganizationId: typeof b.organizationId === "string" ? b.organizationId : undefined,
+    })
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const { facilityId, organizationId } = resolved
     const firstName = typeof b.firstName === "string" ? b.firstName.trim() : ""
     const lastName = typeof b.lastName === "string" ? b.lastName.trim() : ""
     const roomNumber = typeof b.roomNumber === "string" ? b.roomNumber.trim() : ""

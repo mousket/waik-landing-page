@@ -55,7 +55,7 @@ export function VanguardProgram() {
       } else {
         setSubmitStatus({ type: "error", message: result.message })
       }
-    } catch (error) {
+    } catch {
       setSubmitStatus({
         type: "error",
         message: "An unexpected error occurred. Please try again.",

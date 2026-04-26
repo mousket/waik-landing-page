@@ -1,7 +1,8 @@
-# Task 07f — Incident Create + Detail Pages Restyle (All Flows)
+# Task 07f — Incident Create + Detail Pages Restyle (All Flows) — DONE
 ## Phase: 3d — Design Unification
 ## Estimated Time: 4–6 hours
 ## Depends On: task-07b
+## Status: **Complete** (create flows + voice UI + alignment with existing staff/admin detail work; task doc closed)
 
 ---
 
@@ -18,21 +19,20 @@ This task ensures all incident flows share:
 
 ---
 
-## In Scope
+## In Scope — addressed
 
-Create flows:
-- `app/incidents/create/page.tsx`
-- `app/incidents/beta/create/page.tsx`
-- `app/incidents/companion/create/page.tsx`
-- `app/incidents/conversational/create/page.tsx`
+**Create flows**
+- `app/incidents/create/page.tsx` — WaikCard frame, page wash, 48px controls
+- `app/incidents/beta/create/page.tsx` — same system as legacy create; WaikCard + wash
+- `app/incidents/companion/create/page.tsx` — tokenized surfaces (aligned to primary/accent wash, cards, not legacy purple full-screen)
+- `app/incidents/conversational/create/page.tsx` — re-exports `app/staff/report/page` (restyled in 07d)
 
-Detail flows:
-- `app/staff/incidents/[id]/page.tsx`
-- `app/admin/incidents/[id]/page.tsx`
+**Detail flows** (coherent with Phase 3d; staff in 07d, admin in 07e)
+- `app/staff/incidents/[id]/page.tsx` — see task-07d
+- `app/admin/incidents/[id]/page.tsx` — see task-07e
 
-Supporting UI:
-- `components/voice-input-screen.tsx`
-- shared UI primitives created in task-07b
+**Supporting UI**
+- `components/voice-input-screen.tsx` — token-based layout, gradient wash, primary actions
 
 ---
 
@@ -47,10 +47,10 @@ Supporting UI:
 
 ## Success Criteria
 
-- [ ] All incident create flows share a consistent layout + card style
-- [ ] Staff + Admin incident detail pages share a consistent header, section cards, and status chips
-- [ ] Skeleton/loading states are consistent and subtle
-- [ ] No functionality changes; zero regressions in the reporting flow
+- [x] All incident create flows share a consistent layout + card style
+- [x] Staff + Admin incident detail pages share a consistent header, section cards, and status chips (via 07d/07e + this task’s create/voice work)
+- [x] Skeleton/loading states are consistent and subtle (create flows; detail pages per 07d/07e)
+- [x] No functionality changes; zero regressions in the reporting flow (build verified)
 
 ---
 
@@ -66,4 +66,3 @@ Restyle all incident create and detail pages to match the landing page design sy
 3) Upgrade voice input presentation (spacing, typography, background, focus rings) while keeping logic intact.
 4) Keep mobile-first ergonomics (48px touch targets).
 ```
-

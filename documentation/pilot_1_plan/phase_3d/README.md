@@ -11,6 +11,14 @@ The landing page is the **standard**. Phase 3d brings the rest of the product up
 
 ---
 
+## Agent handoff (continue work here)
+
+If you are picking up this phase mid-flight, start with `documentation/pilot_1_plan/phase_3d/HANDOFF.md` for a full context dump: what is done, what is next, and how to avoid conflicting with parallel admin dashboard work.
+
+**After Phase 3d is done:** optional **tightening** (tokens, straggler pages, lint) is tracked in **`documentation/pilot_1_plan/phase_3e_2/`** (see `README.md` + `phase_3e_2_task_handoff.md`).
+
+---
+
 ## Design North Star (what “matching the landing page” means)
 
 **Visual language**
@@ -96,6 +104,10 @@ Every major page gets the same structure: title, subtitle, primary action, secon
 | 07f   | Incident create + detail pages “landing-grade” UI (all flows)        | 4–6 hrs   |
 | 07g   | Assessments UI polish (staff + admin) + delightful skeleton states   | 2–4 hrs   |
 | 07h   | Integration verification (visual regression checklist + cleanup)     | 1–2 hrs   |
+
+**Status: Phase 3d epic is complete** — tasks **07a–07h** (see `task-*-done.md` in this folder).
+
+Going forward: when a numbered task is finished, **rename** its task file to `task-07X-…-done.md` (keep the same slug, add `-done` before `.md`) so the folder reflects reality at a glance.
 
 ---
 

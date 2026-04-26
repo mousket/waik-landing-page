@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { AdminBreadcrumb } from "@/components/admin/breadcrumb"
-import { brand } from "@/lib/design-tokens"
+import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
+import { CardDescription, CardTitle } from "@/components/ui/card"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 
 type OrgRow = {
   id: string
@@ -93,105 +95,133 @@ export default function WaikAdminHomePage() {
   }, [])
 
   return (
-    <div className="space-y-6">
-      <AdminBreadcrumb items={[{ label: "Super Admin" }]} />
+    <div className="relative w-full min-h-[50vh]">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="space-y-6 py-1 md:space-y-8">
+        <AdminBreadcrumb items={[{ label: "Super Admin" }]} />
 
-      <section className="rounded-xl border border-brand-mid-gray bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-brand-dark-teal">WAiK Platform Overview</h2>
-        <p className="mt-1 text-sm text-brand-muted">
-          Counts are from the database. “Most active” is the org with the most incidents created this month (UTC), when
-          incidents have an organization id.
-        </p>
-        <div className="mt-6 grid gap-6 md:grid-cols-3">
-          <div className="rounded-lg bg-brand-light-bg/80 p-4 text-center">
-            <p className="text-3xl font-bold tabular-nums text-brand-teal">
-              {statsLoading ? "—" : stats?.totalOrganizations ?? 0}
-            </p>
-            <p className="mt-2 text-sm text-brand-muted">Total Communities</p>
-          </div>
-          <div className="rounded-lg bg-brand-light-bg/80 p-4 text-center">
-            <p className="text-3xl font-bold tabular-nums text-brand-teal">
-              {statsLoading ? "—" : stats?.incidentsThisMonth ?? 0}
-            </p>
-            <p className="mt-2 text-sm text-brand-muted">Incidents This Month</p>
-          </div>
-          <div className="rounded-lg bg-brand-light-bg/80 p-4 text-center">
-            <p className="text-base font-semibold leading-snug text-brand-teal">
-              {statsLoading
-                ? "—"
-                : stats?.mostActiveOrganizationName
-                  ? stats.mostActiveOrganizationName
-                  : "—"}
-            </p>
-            <p className="mt-2 text-sm text-brand-muted">Most Active (this month)</p>
-          </div>
-        </div>
-        {statsError ? <p className="mt-3 text-sm text-amber-800">{statsError}</p> : null}
-      </section>
+        <WaikCard>
+          <WaikCardContent className="space-y-6 p-6">
+            <div>
+              <CardTitle className="text-lg">Platform overview</CardTitle>
+              <CardDescription className="mt-1">
+                Counts are from the database. “Most active” is the org with the most incidents created this month
+                (UTC), when incidents have an organization id.
+              </CardDescription>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg bg-muted/40 p-4 text-center">
+                <p className="text-3xl font-bold tabular-nums text-primary">
+                  {statsLoading ? "—" : stats?.totalOrganizations ?? 0}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Total communities</p>
+              </div>
+              <div className="rounded-lg bg-muted/40 p-4 text-center">
+                <p className="text-3xl font-bold tabular-nums text-primary">
+                  {statsLoading ? "—" : stats?.incidentsThisMonth ?? 0}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Incidents this month</p>
+              </div>
+              <div className="rounded-lg bg-muted/40 p-4 text-center">
+                <p className="text-base font-semibold leading-snug text-primary">
+                  {statsLoading
+                    ? "—"
+                    : stats?.mostActiveOrganizationName
+                      ? stats.mostActiveOrganizationName
+                      : "—"}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Most active (this month)</p>
+              </div>
+            </div>
+            {statsError ? <p className="text-sm text-amber-800 dark:text-amber-200">{statsError}</p> : null}
+          </WaikCardContent>
+        </WaikCard>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-        <h1 className="text-xl font-semibold text-brand-dark-teal">Pilot Communities</h1>
-        <Button asChild className="min-h-[48px] font-semibold text-white" style={{ backgroundColor: brand.teal }}>
-          <Link href="/waik-admin/organizations/new">New Organization</Link>
-        </Button>
-      </div>
+        <PageHeader
+          title="Pilot communities"
+          description="Create and manage organizations and facilities."
+          actions={
+            <Button asChild className="min-h-12 font-semibold shadow-lg shadow-primary/20">
+              <Link href="/waik-admin/organizations/new">New organization</Link>
+            </Button>
+          }
+        />
 
-      {orgsError ? <p className="text-sm text-red-600">{orgsError}</p> : null}
+        {orgsError ? <p className="text-sm text-destructive">{orgsError}</p> : null}
 
-      <div className="overflow-hidden rounded-xl border border-brand-mid-gray bg-white shadow-sm">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="border-b border-brand-mid-gray bg-brand-light-bg/60 text-xs font-semibold uppercase text-brand-muted">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Facilities</th>
-              <th className="px-4 py-3">Staff Count</th>
-              <th className="px-4 py-3">Plan</th>
-              <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orgsLoading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-brand-muted">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {!orgsLoading && orgs.length === 0 && !orgsError && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-brand-muted">
-                  No communities yet. Create your first organization above. If you expected pilot data, confirm this
-                  deployment uses the same MongoDB database where you ran the seed (see <code className="text-xs">MONGODB_URI</code>).
-                </td>
-              </tr>
-            )}
-            {!orgsLoading &&
-              orgs.map((row) => (
-                <tr key={row.id} className="border-b border-brand-mid-gray/60 last:border-0">
-                  <td className="px-4 py-3 font-medium text-brand-body">{row.name}</td>
-                  <td className="px-4 py-3 text-brand-muted">{row.type}</td>
-                  <td className="px-4 py-3 tabular-nums">{row.facilityCount}</td>
-                  <td className="px-4 py-3 tabular-nums">{row.staffCount}</td>
-                  <td className="px-4 py-3">{row.plan}</td>
-                  <td className="px-4 py-3 text-brand-muted">
-                    {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button variant="outline" size="sm" className="min-h-[40px] border-brand-teal text-brand-teal" asChild>
-                        <Link href={`/waik-admin/organizations/${row.id}`}>View</Link>
-                      </Button>
-                      <Button variant="outline" size="sm" className="min-h-[40px] border-brand-teal text-brand-teal" asChild>
-                        <Link href={`/waik-admin/organizations/${row.id}/facilities/new`}>Add Facility</Link>
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
+        <WaikCard>
+          <WaikCardContent className="space-y-0 p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="border-b border-border/50 bg-muted/40 text-xs font-semibold uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Facilities</th>
+                    <th className="px-4 py-3">Staff count</th>
+                    <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3">Created</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orgsLoading && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                        Loading…
+                      </td>
+                    </tr>
+                  )}
+                  {!orgsLoading && orgs.length === 0 && !orgsError && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                        No communities yet. Create your first organization above. If you expected pilot data, confirm
+                        this deployment uses the same MongoDB database where you ran the seed (see{" "}
+                        <code className="text-xs">MONGODB_URI</code>).
+                      </td>
+                    </tr>
+                  )}
+                  {!orgsLoading &&
+                    orgs.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="border-b border-border/40 transition-colors last:border-0 hover:bg-muted/30"
+                      >
+                        <td className="px-4 py-3 font-medium">{row.name}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.type}</td>
+                        <td className="px-4 py-3 tabular-nums">{row.facilityCount}</td>
+                        <td className="px-4 py-3 tabular-nums">{row.staffCount}</td>
+                        <td className="px-4 py-3">{row.plan}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="min-h-10 border-primary text-primary hover:bg-primary/5"
+                              asChild
+                            >
+                              <Link href={`/waik-admin/organizations/${row.id}`}>View</Link>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="min-h-10 border-primary text-primary hover:bg-primary/5"
+                              asChild
+                            >
+                              <Link href={`/waik-admin/organizations/${row.id}/facilities/new`}>Add facility</Link>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </WaikCardContent>
+        </WaikCard>
       </div>
     </div>
   )

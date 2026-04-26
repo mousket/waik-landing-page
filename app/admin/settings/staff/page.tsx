@@ -1,8 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
+import { getAdminContextQueryString } from "@/lib/admin-nav-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardDescription, CardTitle } from "@/components/ui/card"
+import { PageHeader } from "@/components/ui/page-header"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -51,6 +55,8 @@ const ROLE_HELP =
   "owner, administrator, director_of_nursing, head_nurse, rn, lpn, cna, staff, physical_therapist, dietician"
 
 export default function AdminStaffSettingsPage() {
+  const searchParams = useAdminUrlSearchParams()
+  const apiCtx = useMemo(() => getAdminContextQueryString(searchParams), [searchParams])
   const [roles, setRoles] = useState<RoleOpt[]>([])
   const [pending, setPending] = useState<StaffMember[]>([])
   const [active, setActive] = useState<StaffMember[]>([])
@@ -80,7 +86,7 @@ export default function AdminStaffSettingsPage() {
     try {
       const [rRes, staffRes] = await Promise.all([
         fetch("/api/admin/roles"),
-        fetch("/api/admin/staff"),
+        fetch(`/api/admin/staff${apiCtx}`),
       ])
       if (rRes.ok) {
         const rj = (await rRes.json()) as { roles: RoleOpt[] }
@@ -101,7 +107,7 @@ export default function AdminStaffSettingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [apiCtx])
 
   useEffect(() => {
     void load()
@@ -124,7 +130,7 @@ export default function AdminStaffSettingsPage() {
     setInviteMsg(null)
     setInviteBusy(true)
     try {
-      const res = await fetch("/api/admin/staff/invite", {
+      const res = await fetch(`/api/admin/staff/invite${apiCtx}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,17 +158,17 @@ export default function AdminStaffSettingsPage() {
 
   async function patchDeactivate(id: string) {
     setDeactivateId(null)
-    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/deactivate`, { method: "PATCH" })
+    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/deactivate${apiCtx}`, { method: "PATCH" })
     await load()
   }
 
   async function patchReactivate(id: string) {
-    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/reactivate`, { method: "PATCH" })
+    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/reactivate${apiCtx}`, { method: "PATCH" })
     await load()
   }
 
   async function patchRole(id: string, roleSlug: string) {
-    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/role`, {
+    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/role${apiCtx}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roleSlug }),
@@ -171,7 +177,7 @@ export default function AdminStaffSettingsPage() {
   }
 
   async function resendInvite(id: string) {
-    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/resend-invite`, { method: "POST" })
+    await fetch(`/api/admin/staff/${encodeURIComponent(id)}/resend-invite${apiCtx}`, { method: "POST" })
     setInviteMsg("Invite email resent.")
     await load()
   }
@@ -194,7 +200,7 @@ export default function AdminStaffSettingsPage() {
     try {
       const fd = new FormData()
       fd.set("file", file)
-      const res = await fetch("/api/admin/staff/import", { method: "POST", body: fd })
+      const res = await fetch(`/api/admin/staff/import${apiCtx}`, { method: "POST", body: fd })
       const j = (await res.json()) as { rows?: ImportRow[]; error?: string }
       if (!res.ok) {
         setImportRows([])
@@ -216,7 +222,7 @@ export default function AdminStaffSettingsPage() {
     setImportProgress(0)
     setImportResults([])
     try {
-      const res = await fetch("/api/admin/staff/import/confirm", {
+      const res = await fetch(`/api/admin/staff/import/confirm${apiCtx}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: validImportRows }),
@@ -241,19 +247,23 @@ export default function AdminStaffSettingsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Staff</h1>
-          <p className="text-muted-foreground mt-1">Invite and manage staff for your facility.</p>
-        </div>
+    <div className="relative flex w-full flex-1 flex-col">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:space-y-8 md:py-8">
+        <PageHeader
+          title="Staff"
+          description="Invite and manage staff for your facility."
+        />
 
         {canInviteStaff ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Invite new staff</CardTitle>
-              <CardDescription>Send an email invitation with a temporary password.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <WaikCard>
+            <WaikCardContent>
+              <div className="space-y-1">
+                <CardTitle>Invite new staff</CardTitle>
+                <CardDescription>Send an email invitation with a temporary password.</CardDescription>
+              </div>
+            </WaikCardContent>
+            <WaikCardContent className="border-t border-border/50 pt-4">
               <form onSubmit={submitInvite} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2">
                   <Label htmlFor="fn">First name</Label>
@@ -301,51 +311,61 @@ export default function AdminStaffSettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-center gap-3">
-                  <Button type="submit" disabled={inviteBusy || !inviteRole}>
+                <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:flex-wrap sm:items-center lg:col-span-4">
+                  <Button
+                    type="submit"
+                    className="min-h-12 w-full sm:w-auto"
+                    disabled={inviteBusy || !inviteRole}
+                  >
                     {inviteBusy ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Sending…
                       </>
                     ) : (
                       "Send invitation"
                     )}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
-                    <Upload className="h-4 w-4 mr-2" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 w-full sm:w-auto"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
                     Import from CSV
                   </Button>
                   {inviteMsg ? <span className="text-sm text-muted-foreground">{inviteMsg}</span> : null}
                 </div>
               </form>
-            </CardContent>
-          </Card>
+            </WaikCardContent>
+          </WaikCard>
         ) : (
-          <Card className="border-dashed">
-            <CardContent className="py-8 text-center text-muted-foreground">
+          <WaikCard className="border-dashed border-border/60">
+            <WaikCardContent className="py-8 text-center text-muted-foreground">
               Contact your organization administrator to add staff members.
-            </CardContent>
-          </Card>
+            </WaikCardContent>
+          </WaikCard>
         )}
 
-        <Card>
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Active staff</CardTitle>
-              <CardDescription>Team members who have signed in at least once.</CardDescription>
+        <WaikCard>
+          <WaikCardContent className="space-y-0 p-0">
+            <div className="flex flex-col gap-4 border-b border-border/50 p-6 sm:flex-row sm:items-end sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle>Active staff</CardTitle>
+                <CardDescription>Team members who have signed in at least once.</CardDescription>
+              </div>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search name or email…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-12 min-h-12 pl-9"
+                />
+              </div>
             </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search name or email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10"
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
+            <div className="p-0">
             {loading ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -353,24 +373,24 @@ export default function AdminStaffSettingsPage() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Last login</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="border-border bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="font-semibold">Name</TableHead>
+                    <TableHead className="font-semibold">Role</TableHead>
+                    <TableHead className="font-semibold">Email</TableHead>
+                    <TableHead className="font-semibold">Last login</TableHead>
+                    <TableHead className="text-right font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredActive.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                         No active staff yet
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredActive.map((m) => (
-                      <TableRow key={m.id}>
+                      <TableRow key={m.id} className="hover:bg-muted/30">
                         <TableCell className="font-medium">
                           {m.firstName} {m.lastName}
                         </TableCell>
@@ -382,7 +402,7 @@ export default function AdminStaffSettingsPage() {
                                 void patchRole(m.id, v)
                               }}
                             >
-                              <SelectTrigger className="h-8 w-[180px]">
+                              <SelectTrigger className="h-10 w-[180px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -401,13 +421,23 @@ export default function AdminStaffSettingsPage() {
                         <TableCell className="text-sm text-muted-foreground">
                           {m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleString() : "Never"}
                         </TableCell>
-                        <TableCell className="text-right space-x-2">
+                        <TableCell className="space-x-2 text-right">
                           {canInviteStaff ? (
                             <>
-                              <Button variant="outline" size="sm" onClick={() => resendInvite(m.id)}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-h-10"
+                                onClick={() => resendInvite(m.id)}
+                              >
                                 Resend invite
                               </Button>
-                              <Button variant="destructive" size="sm" onClick={() => setDeactivateId(m.id)}>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="min-h-10"
+                                onClick={() => setDeactivateId(m.id)}
+                              >
                                 Deactivate
                               </Button>
                             </>
@@ -419,35 +449,38 @@ export default function AdminStaffSettingsPage() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
+            </div>
+          </WaikCardContent>
+        </WaikCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending invitations</CardTitle>
-            <CardDescription>Invited users who have not completed first sign-in yet.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <WaikCard>
+          <WaikCardContent>
+            <div className="space-y-1">
+              <CardTitle>Pending invitations</CardTitle>
+              <CardDescription>Invited users who have not completed first sign-in yet.</CardDescription>
+            </div>
+          </WaikCardContent>
+          <WaikCardContent className="border-t border-border/50 p-0 pt-0">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Last login</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="font-semibold">Name</TableHead>
+                  <TableHead className="font-semibold">Role</TableHead>
+                  <TableHead className="font-semibold">Email</TableHead>
+                  <TableHead className="font-semibold">Last login</TableHead>
+                  <TableHead className="text-right font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredPending.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                       No pending invitations
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredPending.map((m) => (
-                    <TableRow key={m.id}>
+                    <TableRow key={m.id} className="hover:bg-muted/30">
                       <TableCell className="font-medium">
                         {m.firstName} {m.lastName}
                       </TableCell>
@@ -456,7 +489,7 @@ export default function AdminStaffSettingsPage() {
                       <TableCell className="text-sm text-muted-foreground">Never</TableCell>
                       <TableCell className="text-right">
                         {canInviteStaff ? (
-                          <Button variant="outline" size="sm" onClick={() => resendInvite(m.id)}>
+                          <Button variant="outline" size="sm" className="min-h-10" onClick={() => resendInvite(m.id)}>
                             Resend invite
                           </Button>
                         ) : null}
@@ -466,34 +499,41 @@ export default function AdminStaffSettingsPage() {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </WaikCardContent>
+        </WaikCard>
 
         {deactivated.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Deactivated</CardTitle>
-              <CardDescription>Former team members who can no longer sign in.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <WaikCard>
+            <WaikCardContent>
+              <div className="space-y-1">
+                <CardTitle>Deactivated</CardTitle>
+                <CardDescription>Former team members who can no longer sign in.</CardDescription>
+              </div>
+            </WaikCardContent>
+            <WaikCardContent className="border-t border-border/50 p-0 pt-0">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="font-semibold">Name</TableHead>
+                    <TableHead className="font-semibold">Email</TableHead>
+                    <TableHead className="text-right font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredDeactivated.map((m) => (
-                    <TableRow key={m.id}>
+                    <TableRow key={m.id} className="hover:bg-muted/30">
                       <TableCell>
                         {m.firstName} {m.lastName}
                       </TableCell>
                       <TableCell>{m.email}</TableCell>
                       <TableCell className="text-right">
                         {canInviteStaff ? (
-                          <Button variant="outline" size="sm" onClick={() => void patchReactivate(m.id)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-h-10"
+                            onClick={() => void patchReactivate(m.id)}
+                          >
                             Reactivate
                           </Button>
                         ) : null}
@@ -502,8 +542,8 @@ export default function AdminStaffSettingsPage() {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </WaikCardContent>
+          </WaikCard>
         ) : null}
 
         <Dialog open={Boolean(deactivateId)} onOpenChange={() => setDeactivateId(null)}>
@@ -645,5 +685,6 @@ export default function AdminStaffSettingsPage() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
   )
 }

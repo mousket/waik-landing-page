@@ -3,10 +3,11 @@
 import type { Dispatch, SetStateAction } from "react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
+import { buildAdminIncidentsApiPath, buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import { formatDistanceToNow } from "date-fns"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { brand } from "@/lib/design-tokens"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { IdtSendReminderButton } from "@/components/admin/idt-send-reminder-button"
@@ -14,14 +15,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type { IdtTeamMember, IncidentSummary } from "@/lib/types/incident-summary"
 import { classifyIncident, isIdtOverdue } from "@/lib/utils/incident-classification"
-
-const RED = "#C0392B"
-const RED_BG = "#FDE8E8"
-const YELLOW_BORDER = "#E8A838"
-const IDT_OVERDUE_BG = "#FBF0D9"
-
-const ATTENTION_PHASES_QUERY =
-  "/api/incidents?phase=phase_1_in_progress,phase_1_complete,phase_2_in_progress"
 
 function formatIncidentType(t: string) {
   return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
@@ -52,6 +45,7 @@ export function NeedsAttentionTab({
   sharedLoading?: boolean
   setSharedIncidents?: Dispatch<SetStateAction<IncidentSummary[]>>
 }) {
+  const searchParams = useAdminUrlSearchParams()
   const [localIncidents, setLocalIncidents] = useState<IncidentSummary[]>([])
   const [localLoading, setLocalLoading] = useState(true)
   const [claimingId, setClaimingId] = useState<string | null>(null)
@@ -62,10 +56,18 @@ export function NeedsAttentionTab({
   const setIncidents = parentMode ? setSharedIncidents! : setLocalIncidents
   const loading = parentMode ? Boolean(sharedLoading) : localLoading
 
+  const attentionApiUrl = useMemo(
+    () =>
+      buildAdminIncidentsApiPath(searchParams, {
+        phase: "phase_1_in_progress,phase_1_complete,phase_2_in_progress",
+      }),
+    [searchParams],
+  )
+
   const load = useCallback(async () => {
     setLocalLoading(true)
     try {
-      const res = await fetch(ATTENTION_PHASES_QUERY, { credentials: "include" })
+      const res = await fetch(attentionApiUrl, { credentials: "include" })
       if (!res.ok) {
         toast.error("Could not load incidents")
         setLocalIncidents([])
@@ -79,7 +81,7 @@ export function NeedsAttentionTab({
     } finally {
       setLocalLoading(false)
     }
-  }, [])
+  }, [attentionApiUrl])
 
   useEffect(() => {
     if (parentMode) return
@@ -165,13 +167,10 @@ export function NeedsAttentionTab({
 
   if (empty) {
     return (
-      <div
-        className="rounded-xl border-l-4 bg-brand-light-bg p-6 shadow-sm"
-        style={{ borderLeftColor: brand.teal }}
-      >
+      <div className="rounded-xl border-l-4 border-l-primary bg-primary/5 p-6 shadow-sm">
         <div className="flex items-start gap-3">
           <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
-          <p className="text-sm font-medium text-brand-body">
+          <p className="text-sm font-medium text-foreground">
             No immediate action needed. Your community is on track.
           </p>
         </div>
@@ -183,7 +182,7 @@ export function NeedsAttentionTab({
     <div className="space-y-8">
       {redAlerts.length > 0 ? (
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#C0392B]">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-red-700">
             Immediate Action Required
           </h2>
           <div className="space-y-3">
@@ -191,31 +190,27 @@ export function NeedsAttentionTab({
               <div
                 key={inc.id}
                 className={cn(
-                  "rounded-xl border-l-4 p-4 transition-opacity duration-300",
+                  "rounded-xl border-l-4 border-l-red-600 bg-red-50 p-4 transition-opacity duration-300",
                   fadingOutId === inc.id && "opacity-0",
                 )}
-                style={{ borderLeftColor: RED, backgroundColor: RED_BG }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-semibold text-brand-body">
+                  <p className="font-semibold text-foreground">
                     Room {inc.residentRoom} — {formatIncidentType(inc.incidentType)}
                   </p>
-                  <Badge className="shrink-0" style={{ backgroundColor: RED, color: "#fff" }}>
+                  <Badge className="shrink-0 bg-red-700 text-white hover:bg-red-700">
                     {formatDistanceToNow(new Date(inc.startedAt), { addSuffix: true })}
                   </Badge>
                 </div>
                 {inc.hasInjury ? (
-                  <p className="mt-2 text-sm" style={{ color: brand.accent }}>
-                    Injury reported — state notification may be required
-                  </p>
+                  <p className="mt-2 text-sm text-amber-800">Injury reported — state notification may be required</p>
                 ) : null}
-                <p className="mt-2 text-sm text-brand-muted">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Reported by: {inc.reportedByName}, {inc.reportedByRole}
                 </p>
                 {inc.phase === "phase_1_complete" && canAccessPhase2 ? (
                   <Button
-                    className="mt-4 h-auto min-h-[48px] w-full font-semibold text-white sm:w-auto sm:min-w-[200px]"
-                    style={{ backgroundColor: brand.teal }}
+                    className="mt-4 h-auto min-h-[48px] w-full bg-primary font-semibold text-primary-foreground sm:w-auto sm:min-w-[200px]"
                     type="button"
                     disabled={claimingId === inc.id}
                     onClick={() => void claimInvestigation(inc)}
@@ -232,20 +227,22 @@ export function NeedsAttentionTab({
                 ) : inc.phase === "phase_1_in_progress" ? (
                   <Button
                     asChild
-                    className="mt-4 h-auto min-h-[48px] w-full font-semibold sm:w-auto sm:min-w-[200px]"
+                    className="mt-4 h-auto min-h-[48px] w-full border-primary font-semibold text-primary sm:w-auto sm:min-w-[200px]"
                     variant="outline"
-                    style={{ borderColor: brand.teal, color: brand.darkTeal }}
                   >
-                    <Link href={`/admin/incidents/${inc.id}`}>Continue Phase 1 report</Link>
+                    <Link href={buildAdminPathWithContext(`/admin/incidents/${inc.id}`, searchParams)}>
+                            Continue Phase 1 report
+                          </Link>
                   </Button>
                 ) : (
                   <Button
                     asChild
-                    className="mt-4 h-auto min-h-[48px] w-full font-semibold sm:w-auto sm:min-w-[200px]"
+                    className="mt-4 h-auto min-h-[48px] w-full border-primary font-semibold text-primary sm:w-auto sm:min-w-[200px]"
                     variant="outline"
-                    style={{ borderColor: brand.teal, color: brand.darkTeal }}
                   >
-                    <Link href={`/admin/incidents/${inc.id}`}>View investigation</Link>
+                    <Link href={buildAdminPathWithContext(`/admin/incidents/${inc.id}`, searchParams)}>
+                            View investigation
+                          </Link>
                   </Button>
                 )}
               </div>
@@ -256,7 +253,7 @@ export function NeedsAttentionTab({
 
       {yellowAwaiting.length > 0 ? (
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-brand-dark-teal">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary">
             Awaiting Investigation Claim
           </h2>
           <div className="space-y-3">
@@ -264,27 +261,25 @@ export function NeedsAttentionTab({
               <div
                 key={inc.id}
                 className={cn(
-                  "rounded-xl border-l-4 p-4 transition-opacity duration-300",
+                  "rounded-xl border-l-4 border-l-amber-500 bg-amber-50/90 p-4 transition-opacity duration-300",
                   fadingOutId === inc.id && "opacity-0",
                 )}
-                style={{ borderLeftColor: YELLOW_BORDER, backgroundColor: brand.warnBg }}
               >
                 <div className="flex flex-wrap justify-between gap-2">
-                  <p className="font-semibold text-brand-body">
+                  <p className="font-semibold text-foreground">
                     Room {inc.residentRoom} — {formatIncidentType(inc.incidentType)}
                   </p>
-                  <span className="text-sm text-brand-muted">
+                  <span className="text-sm text-muted-foreground">
                     {formatDistanceToNow(new Date(inc.startedAt), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="mt-1 text-sm font-medium text-brand-body">
+                <p className="mt-1 text-sm font-medium text-foreground">
                   {Math.round(inc.completenessAtSignoff || inc.completenessScore)}% complete
                 </p>
                 {canAccessPhase2 ? (
                   <Button
                     variant="outline"
-                    className="mt-3 min-h-[48px] border-2 font-semibold"
-                    style={{ borderColor: brand.accent, color: brand.darkTeal }}
+                    className="mt-3 min-h-[48px] border-2 border-amber-600 font-semibold text-primary"
                     type="button"
                     disabled={claimingId === inc.id}
                     onClick={() => void claimInvestigation(inc)}
@@ -299,7 +294,7 @@ export function NeedsAttentionTab({
                     )}
                   </Button>
                 ) : (
-                  <p className="mt-2 text-xs text-brand-muted">Only the DON or administrator can claim Phase 2.</p>
+                  <p className="mt-2 text-xs text-muted-foreground">Only the DON or administrator can claim Phase 2.</p>
                 )}
               </div>
             ))}
@@ -309,30 +304,28 @@ export function NeedsAttentionTab({
 
       {overdueIdtTasks.length > 0 ? (
         <section>
-          <h2 className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-brand-muted">
+          <h2 className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Overdue IDT Tasks
           </h2>
           <div className="space-y-2">
             {overdueIdtTasks.map(({ incident: inc, member: m, hoursOverdue }) => (
               <div
                 key={`${inc.id}-${m.userId}`}
-                className="rounded-xl border-l-4 p-4"
-                style={{ borderLeftColor: YELLOW_BORDER, backgroundColor: IDT_OVERDUE_BG }}
+                className="rounded-xl border-l-4 border-l-amber-500 bg-amber-50/80 p-4"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-brand-body">{m.name}</p>
+                  <p className="font-semibold text-foreground">{m.name}</p>
                   <Badge
                     variant="secondary"
-                    className="shrink-0 rounded-full border-0 px-2 py-0 text-xs font-medium text-white"
-                    style={{ backgroundColor: brand.teal }}
+                    className="shrink-0 rounded-full border-0 bg-primary px-2 py-0 text-xs font-medium text-primary-foreground"
                   >
                     {formatRole(m.role)}
                   </Badge>
                 </div>
-                <p className="mt-2 text-sm text-brand-body">
+                <p className="mt-2 text-sm text-foreground">
                   Room {inc.residentRoom} — {formatIncidentType(inc.incidentType)}
                 </p>
-                <p className="mt-1 text-sm font-medium" style={{ color: YELLOW_BORDER }}>
+                <p className="mt-1 text-sm font-medium text-amber-700">
                   {hoursOverdue} hour{hoursOverdue === 1 ? "" : "s"} overdue
                 </p>
                 <IdtSendReminderButton

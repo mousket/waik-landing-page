@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardDescription, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -34,6 +34,8 @@ import type { Incident, User as Staff } from "@/lib/types"
 import { DocumentationScore } from "@/components/documentation-score"
 import { format } from "date-fns"
 import { Textarea } from "@/components/ui/textarea"
+import { EmptyState } from "@/components/ui/empty-state"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 
 type MessageRole = "ai" | "nurse" | "system"
 
@@ -824,46 +826,53 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
   }, [setShowDetailedReport])
 
   return (
-    <div className="min-h-screen relative overflow-hidden p-4 sm:p-6 lg:p-8">
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-white" />
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10" />
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: `radial-gradient(circle, hsl(var(--accent)) 1px, transparent 1px)`,
-            backgroundSize: "24px 24px",
-          }}
-        />
-      </div>
+    <div className="relative min-h-full flex-1 overflow-hidden p-4 sm:p-6 lg:p-8">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
 
-      <div className="space-y-6 relative max-w-7xl mx-auto">
+      <div className="relative mx-auto max-w-7xl space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.push("/staff/dashboard")} className="w-fit">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/staff/dashboard")}
+            className="h-12 w-fit min-w-0"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
             Back to Dashboard
           </Button>
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-2 bg-white/50 p-2">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-white">
-              <FileText className="h-4 w-4 mr-2" />
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-2xl border border-border bg-background/80 p-2 sm:grid-cols-4">
+            <TabsTrigger
+              value="overview"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <FileText className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
               <span className="sm:hidden">Info</span>
             </TabsTrigger>
-            <TabsTrigger value="qa" className="data-[state=active]:bg-white">
-              <MessageSquare className="h-4 w-4 mr-2" />
+            <TabsTrigger
+              value="qa"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Q&A</span>
               <span className="sm:hidden">Q&A</span>
             </TabsTrigger>
-            <TabsTrigger value="intelligence" className="data-[state=active]:bg-white">
-              <Brain className="h-4 w-4 mr-2" />
+            <TabsTrigger
+              value="intelligence"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <Brain className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Intelligence</span>
               <span className="sm:hidden">Intel</span>
             </TabsTrigger>
-            <TabsTrigger value="waik" className="data-[state=active]:bg-white">
-              <Target className="h-4 w-4 mr-2" />
+            <TabsTrigger
+              value="waik"
+              className="min-h-12 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+            >
+              <Target className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">WAiK Agent</span>
               <span className="sm:hidden">WAiK</span>
             </TabsTrigger>
@@ -871,8 +880,8 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
           {/* Overview tab - Show enhanced narrative in overview (like admin page) */}
           <TabsContent value="overview" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader>
+            <WaikCard className="border-primary/20">
+              <WaikCardContent>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex-1 space-y-4">
                     <CardTitle className="text-xl sm:text-2xl bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
@@ -939,11 +948,11 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     <p className="font-medium">{formatDate(incident?.updatedAt, "MMM d, yyyy 'at' h:mm a")}</p>
                   </div>
                 </div>
-              </CardHeader>
-            </Card>
+              </WaikCardContent>
+            </WaikCard>
 
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <WaikCard className="border-primary/20">
+              <WaikCardContent className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <CardTitle className="text-lg text-primary">Investigative Highlights</CardTitle>
                   <CardDescription>
@@ -953,14 +962,14 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-auto px-0 text-xs text-primary hover:text-primary"
+                  className="h-auto min-h-12 px-0 text-xs text-primary hover:text-primary sm:min-h-0"
                   onClick={() => setShowInvestigativeHighlights((prev) => !prev)}
                 >
                   {showInvestigativeHighlights ? "Hide" : "Show"}
                 </Button>
-              </CardHeader>
+              </WaikCardContent>
               {showInvestigativeHighlights && (
-                <CardContent className="space-y-4">
+                <WaikCardContent className="space-y-4 border-t border-border/50 pt-4">
                   {/* Progress indicator for Final Critical Questions */}
                   {finalCriticalQuestions.length > 0 && (
                     <div className="flex items-center gap-2 text-sm">
@@ -1036,12 +1045,12 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       Final critical questions will appear here once the initial gap analysis is complete.
                     </div>
                   )}
-                </CardContent>
+                </WaikCardContent>
               )}
-            </Card>
+            </WaikCard>
 
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <WaikCard className="border-primary/20">
+              <WaikCardContent className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-3">
                   <CardTitle className="text-lg sm:text-xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                     Report Card
@@ -1053,14 +1062,14 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-auto px-0 text-xs text-primary hover:text-primary"
+                  className="h-auto min-h-12 px-0 text-xs text-primary hover:text-primary sm:min-h-0"
                   onClick={handleToggleReportCard}
                 >
                   {showReportCard ? "Hide" : "Show"}
                 </Button>
-              </CardHeader>
+              </WaikCardContent>
               {showReportCard && (
-                <CardContent className="space-y-5">
+                <WaikCardContent className="space-y-5 border-t border-border/50 pt-4">
                   {reportCardLoading ? (
                     <div className="flex items-center justify-center py-8 text-muted-foreground">
                       <div className="flex items-center gap-2">
@@ -1193,9 +1202,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   ) : (
                     <div className="text-sm text-muted-foreground">No narrative captured yet.</div>
                   )}
-                </CardContent>
+                </WaikCardContent>
               )}
-            </Card>
+            </WaikCard>
 
             {/* Documentation Score Section */}
             {documentationScore && (
@@ -1215,9 +1224,9 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
 
           <TabsContent value="qa" className="space-y-6 mt-6">
             {unansweredQuestions.length > 0 && (
-              <Card className="bg-white shadow-lg border-accent/40">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
+              <WaikCard className="border-accent/40">
+                <WaikCardContent>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle className="text-lg text-accent">
                         Pending Questions ({unansweredQuestions.length})
@@ -1225,13 +1234,19 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       <CardDescription>Answer questions assigned to you using text or voice</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant={qaMode === "text" ? "default" : "outline"} size="sm" onClick={() => setQaMode("text")}>
+                      <Button
+                        variant={qaMode === "text" ? "default" : "outline"}
+                        size="sm"
+                        className="min-h-12 sm:min-h-9"
+                        onClick={() => setQaMode("text")}
+                      >
                         <Type className="h-4 w-4 mr-2" />
                         Text
                       </Button>
                       <Button
                         variant={qaMode === "voice" ? "default" : "outline"}
                         size="sm"
+                        className="min-h-12 sm:min-h-9"
                         onClick={() => {
                           setQaMode("voice")
                           handleStartVoiceMode()
@@ -1242,16 +1257,17 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       </Button>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </WaikCardContent>
+                <WaikCardContent className="space-y-4 border-t border-border/50 pt-4">
                   {qaMode === "text" ? (
                     <>
                       <div className="flex gap-2 flex-wrap">
                         {visibleUnansweredQuestions.map((q, idx) => (
                           <button
                             key={q.id}
+                            type="button"
                             onClick={() => setCurrentTextQuestionIndex(idx)}
-                            className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                            className={`flex min-h-12 min-w-[3rem] items-center gap-1 rounded-full px-4 py-2 text-sm transition-all ${
                               idx === currentTextQuestionIndex
                                 ? "bg-accent text-accent-foreground shadow-md"
                                 : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -1268,7 +1284,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </p>
                       )}
 
-                      <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                      <div className="rounded-2xl border-2 border-accent/20 bg-accent/5 p-6">
                         <div className="flex items-start gap-3">
                           <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
                           <div className="flex-1">
@@ -1304,7 +1320,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         />
                       </div>
 
-                      <Button onClick={handleSaveProgress} disabled={saving} className="w-full">
+                      <Button onClick={handleSaveProgress} disabled={saving} className="min-h-12 w-full">
                         {saving ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1323,7 +1339,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           onClick={() => setCurrentTextQuestionIndex(Math.max(0, currentTextQuestionIndex - 1))}
                           disabled={currentTextQuestionIndex === 0}
                           variant="outline"
-                          className="flex-1"
+                          className="min-h-12 flex-1"
                         >
                           <ArrowLeft className="mr-2 h-4 w-4" />
                           Previous
@@ -1342,7 +1358,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                             currentTextQuestionIndex === visibleUnansweredQuestions.length - 1
                           }
                           variant="outline"
-                          className="flex-1"
+                          className="min-h-12 flex-1"
                         >
                           Next
                           <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
@@ -1355,13 +1371,14 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         {visibleUnansweredQuestions.map((q, idx) => (
                           <button
                             key={q.id}
+                            type="button"
                             onClick={() => {
                               setCurrentQuestionIndex(idx)
                               setCurrentTranscript("")
                               setIsEditingTranscript(false)
                               setTimeout(() => speakQuestion(q.questionText), 300)
                             }}
-                            className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                            className={`flex min-h-12 min-w-[3rem] items-center gap-1 rounded-full px-4 py-2 text-sm transition-all ${
                               idx === currentQuestionIndex
                                 ? "bg-accent text-accent-foreground shadow-md"
                                 : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -1378,7 +1395,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </p>
                       )}
 
-                      <div className="p-6 border-2 border-accent/20 rounded-lg bg-accent/5">
+                      <div className="rounded-2xl border-2 border-accent/20 bg-accent/5 p-6">
                         <div className="flex items-start gap-3">
                           <MessageSquare className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
                           <div className="flex-1">
@@ -1423,8 +1440,8 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </div>
 
                         {isEditingTranscript && (
-                          <Card className="border-primary/20">
-                            <CardContent className="pt-6">
+                          <WaikCard className="border-primary/20">
+                            <WaikCardContent>
                               <Label htmlFor="transcript-edit">Review and edit your answer</Label>
                               <Textarea
                                 id="transcript-edit"
@@ -1433,8 +1450,12 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                                 rows={5}
                                 className="mt-2"
                               />
-                              <div className="flex gap-2 mt-4">
-                                <Button onClick={handleSaveCurrentAnswer} disabled={saving} className="flex-1">
+                              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                                <Button
+                                  onClick={handleSaveCurrentAnswer}
+                                  disabled={saving}
+                                  className="min-h-12 flex-1"
+                                >
                                   {saving ? (
                                     <>
                                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1459,28 +1480,44 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                                     }, 300)
                                   }}
                                   variant="outline"
+                                  className="min-h-12"
                                 >
                                   Re-record
                                 </Button>
                               </div>
-                            </CardContent>
-                          </Card>
+                            </WaikCardContent>
+                          </WaikCard>
                         )}
 
                         {!isEditingTranscript && (
-                          <div className="flex gap-2 justify-center">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
                             {isRecording ? (
-                              <Button onClick={stopRecording} variant="destructive" size="lg">
+                              <Button
+                                onClick={stopRecording}
+                                variant="destructive"
+                                size="lg"
+                                className="min-h-12 w-full sm:w-auto"
+                              >
                                 <MicOff className="mr-2 h-5 w-5" />
                                 Stop Recording
                               </Button>
                             ) : (
-                              <Button onClick={startRecording} size="lg" disabled={isSpeaking}>
+                              <Button
+                                onClick={startRecording}
+                                size="lg"
+                                disabled={isSpeaking}
+                                className="min-h-12 w-full sm:w-auto"
+                              >
                                 <Mic className="mr-2 h-5 w-5" />
                                 Start Recording
                               </Button>
                             )}
-                            <Button onClick={() => setQaMode("text")} variant="outline" size="lg">
+                            <Button
+                              onClick={() => setQaMode("text")}
+                              variant="outline"
+                              size="lg"
+                              className="min-h-12 w-full sm:w-auto"
+                            >
                               Switch to Text
                             </Button>
                           </div>
@@ -1488,25 +1525,26 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       </div>
                     </>
                   )}
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             )}
 
             {answeredQuestions.length > 0 && (
-              <Card className="bg-white shadow-lg border-primary/20">
-                <CardHeader>
+              <WaikCard className="border-primary/20">
+                <WaikCardContent>
                   <CardTitle className="text-lg text-primary">
                     Answered Questions ({answeredQuestions.length})
                   </CardTitle>
                   <CardDescription>Questions that have been responded to - Navigate using tabs below</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </WaikCardContent>
+                <WaikCardContent className="space-y-4 border-t border-border/50 pt-4">
                   <div className="flex gap-2 flex-wrap">
                     {answeredQuestions.map((q, idx) => (
                       <button
                         key={q.id}
+                        type="button"
                         onClick={() => setCurrentAnsweredQuestionTab(idx)}
-                        className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm transition-all ${
+                        className={`flex min-h-12 min-w-[3rem] items-center gap-1 rounded-full px-4 py-2 text-sm transition-all ${
                           idx === currentAnsweredQuestionTab
                             ? "bg-primary text-primary-foreground shadow-md"
                             : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -1519,7 +1557,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   </div>
 
                   <div className="space-y-4">
-                    <div className="p-6 border-2 border-primary/20 rounded-lg bg-primary/5">
+                    <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-6">
                       <div className="flex items-start gap-3">
                         <Badge variant="outline" className="mt-1">
                           Q
@@ -1544,7 +1582,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       </div>
                     </div>
 
-                    <div className="p-6 border-2 border-green-200 rounded-lg bg-green-50">
+                    <div className="rounded-2xl border-2 border-green-200 bg-green-50 p-6">
                       <div className="flex items-start gap-3">
                         <Badge className="bg-primary mt-1">A</Badge>
                         <div className="flex-1">
@@ -1584,7 +1622,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       onClick={() => setCurrentAnsweredQuestionTab(Math.max(0, currentAnsweredQuestionTab - 1))}
                       disabled={currentAnsweredQuestionTab === 0}
                       variant="outline"
-                      className="flex-1"
+                      className="min-h-12 flex-1"
                     >
                       <ArrowLeft className="mr-2 h-4 w-4" />
                       Previous
@@ -1597,40 +1635,35 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       }
                       disabled={currentAnsweredQuestionTab === answeredQuestions.length - 1}
                       variant="outline"
-                      className="flex-1"
+                      className="min-h-12 flex-1"
                     >
                       Next
                       <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             )}
 
             {unansweredQuestions.length === 0 && answeredQuestions.length === 0 && (
-              <Card className="bg-white shadow-lg">
-                <CardContent className="py-12 text-center">
-                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="font-medium mb-2">No questions for this incident</p>
-                  <p className="text-sm text-muted-foreground">
-                    Questions will appear here when an admin sends follow-up questions.
-                  </p>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={<MessageSquare className="h-6 w-6" />}
+                title="No questions for this incident"
+                description="Questions will appear here when an admin sends follow-up questions."
+              />
             )}
           </TabsContent>
 
-          {/* Intelligence tab - unchanged */}
-          <TabsContent value="intelligence" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg h-[600px] sm:h-[650px] lg:h-[calc(100vh-16rem)] flex flex-col">
-              <CardHeader className="flex-shrink-0 pb-3 sm:pb-4">
+          <TabsContent value="intelligence" className="mt-6 space-y-6">
+            <WaikCard className="flex h-[600px] flex-col border-primary/20 sm:h-[650px] lg:h-[calc(100vh-16rem)]">
+              <WaikCardContent className="shrink-0 space-y-1 !pb-3 sm:!pb-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="relative flex-shrink-0">
-                      <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                      <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="relative shrink-0">
+                      <Brain className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
+                      <div className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-primary" />
                     </div>
-                    <CardTitle className="text-base sm:text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent truncate">
+                    <CardTitle className="truncate bg-gradient-to-r from-accent to-primary bg-clip-text text-base text-transparent sm:text-lg">
                       Incident Intelligence
                     </CardTitle>
                   </div>
@@ -1640,7 +1673,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         variant="destructive"
                         size="sm"
                         onClick={stopSpeaking}
-                        className="flex items-center gap-1.5 flex-shrink-0 h-9 px-3 animate-pulse"
+                        className="h-auto min-h-12 shrink-0 animate-pulse px-3 sm:min-h-9"
                       >
                         <MicOff className="h-4 w-4" />
                         <span className="hidden sm:inline text-xs">Stop</span>
@@ -1650,7 +1683,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       variant="outline"
                       size="sm"
                       onClick={() => setAutoSpeak(!autoSpeak)}
-                      className="flex items-center gap-1.5 flex-shrink-0 h-9 px-3"
+                      className="h-auto min-h-12 shrink-0 px-3 sm:min-h-9"
                     >
                       {autoSpeak ? (
                         <>
@@ -1666,13 +1699,13 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                     </Button>
                   </div>
                 </div>
-                <CardDescription className="text-xs sm:text-sm mt-1">
+                <CardDescription className="mt-1 text-xs sm:text-sm">
                   Ask questions about this incident using voice or text
                 </CardDescription>
-              </CardHeader>
+              </WaikCardContent>
 
-              <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
-                <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 space-y-3 sm:space-y-4">
+              <WaikCardContent className="flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:space-y-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
                   {intelligenceMessages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center space-y-3 sm:space-y-4 px-4">
                       <div className="relative">
@@ -1703,7 +1736,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                               setIntelligenceInput(suggestion)
                               setTimeout(() => handleIntelligenceSubmit(), 100)
                             }}
-                            className="text-xs h-8 px-3"
+                            className="h-auto min-h-12 px-3 text-xs sm:min-h-9"
                           >
                             {suggestion}
                           </Button>
@@ -1778,15 +1811,15 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="flex-shrink-0 border-t bg-background p-3 sm:p-4">
+                <div className="shrink-0 border-t border-border bg-background p-3 sm:p-4">
                   {isSpeaking && (
-                    <div className="mb-2 sm:mb-3 flex items-center gap-2 text-xs sm:text-sm text-primary">
-                      <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
+                    <div className="mb-2 flex items-center gap-2 text-xs text-primary sm:mb-3 sm:text-sm">
+                      <Volume2 className="h-3.5 w-3.5 animate-pulse sm:h-4 sm:w-4" />
                       <span>Speaking response...</span>
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <div className="flex-1 relative min-w-0">
+                    <div className="relative min-w-0 flex-1">
                       <Input
                         placeholder="Ask a question..."
                         value={intelligenceInput}
@@ -1798,7 +1831,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                           }
                         }}
                         disabled={isIntelligenceLoading || isIntelligenceRecording}
-                        className="pr-10 h-10 sm:h-11 text-sm sm:text-base"
+                        className="min-h-12 pr-10 text-sm sm:text-base"
                       />
                       {isIntelligenceRecording && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1817,7 +1850,7 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         isIntelligenceRecording ? stopIntelligenceVoiceRecording : startIntelligenceVoiceRecording
                       }
                       disabled={isIntelligenceLoading}
-                      className="flex-shrink-0 h-10 w-10 sm:h-11 sm:w-11"
+                      className="h-12 w-12 min-h-12 min-w-12 shrink-0 sm:h-11 sm:w-11 sm:min-h-11 sm:min-w-11"
                     >
                       <Mic className={`h-4 w-4 sm:h-5 sm:w-5 ${isIntelligenceRecording ? "animate-pulse" : ""}`} />
                     </Button>
@@ -1825,106 +1858,99 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                       size="icon"
                       onClick={handleIntelligenceSubmit}
                       disabled={!intelligenceInput.trim() || isIntelligenceLoading || isIntelligenceRecording}
-                      className="flex-shrink-0 h-10 w-10 sm:h-11 sm:w-11"
+                      className="h-12 w-12 min-h-12 min-w-12 shrink-0 sm:h-11 sm:w-11 sm:min-h-11 sm:min-w-11"
                     >
                       {isIntelligenceLoading ? (
-                        <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin sm:h-5 sm:w-5" />
                       ) : (
                         <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                       )}
                     </Button>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 leading-relaxed">
+                  <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground sm:text-xs">
                     Press Enter to send • Click mic for voice • {autoSpeak ? "Audio on" : "Audio off"}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </WaikCardContent>
+            </WaikCard>
           </TabsContent>
 
-          {/* WAiK Agent Tab */}
-          <TabsContent value="waik" className="space-y-6 mt-6">
-            <Card className="border-primary/20 bg-white shadow-lg">
-              <CardHeader className="space-y-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="relative flex-shrink-0">
+          <TabsContent value="waik" className="mt-6 space-y-6">
+            <WaikCard className="border-primary/20">
+              <WaikCardContent className="space-y-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="relative shrink-0">
                     <Target className="h-5 w-5 text-primary" />
-                    <div className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full animate-pulse" />
+                    <div className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-primary" />
                   </div>
-                  <CardTitle className="text-base sm:text-lg bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent truncate">
+                  <CardTitle className="truncate bg-gradient-to-r from-accent to-primary bg-clip-text text-base text-transparent sm:text-lg">
                     WAiK Intelligence
                   </CardTitle>
                 </div>
                 <CardDescription className="text-xs sm:text-sm">
                   WAiK summaries, insights, recommendations, and action items
                 </CardDescription>
-              </CardHeader>
-            </Card>
+              </WaikCardContent>
+            </WaikCard>
 
             {incident?.aiReport ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <WaikCardContent className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-purple-600" />
+                      <Sparkles className="h-5 w-5 shrink-0 text-purple-600" />
                       <CardTitle className="text-base">WAiK Summary</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
                     <div
-                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                      className="incident-enhanced-html space-y-2 text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.summary || "") || "" }}
                     />
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 lg:col-span-2 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md lg:col-span-2">
+                  <WaikCardContent className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Brain className="h-5 w-5 text-purple-600" />
+                      <Brain className="h-5 w-5 shrink-0 text-purple-600" />
                       <CardTitle className="text-base">WAiK Insights</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
                     <div
-                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                      className="incident-enhanced-html space-y-2 text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.insights || "") || "" }}
                     />
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <WaikCardContent className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Lightbulb className="h-5 w-5 text-purple-600" />
+                      <Lightbulb className="h-5 w-5 shrink-0 text-purple-600" />
                       <CardTitle className="text-base">WAiK Recommendations</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
                     <div
-                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.recommendations || "") || "" }}
+                      className="incident-enhanced-html space-y-2 text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{
+                        __html: renderMarkdownOrHtml(incident.aiReport.recommendations || "") || "",
+                      }}
                     />
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
-                  <CardHeader>
+                <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-md">
+                  <WaikCardContent className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Target className="h-5 w-5 text-purple-600" />
+                      <Target className="h-5 w-5 shrink-0 text-purple-600" />
                       <CardTitle className="text-base">WAiK Recommended Action Items</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent>
                     <div
-                      className="text-sm leading-relaxed space-y-2 incident-enhanced-html"
+                      className="incident-enhanced-html space-y-2 text-sm leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: renderMarkdownOrHtml(incident.aiReport.actions || "") || "" }}
                     />
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
 
-                <Card className="border-purple-100 bg-purple-50/50 lg:col-span-2">
-                  <CardContent className="pt-6">
+                <WaikCard className="border-purple-100/80 bg-purple-50/50 lg:col-span-2">
+                  <WaikCardContent>
                     <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Brain className="h-3.5 w-3.5 text-purple-600" />
@@ -1945,19 +1971,21 @@ export default function StaffIncidentDetailsPage({ params }: { params: { id: str
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </WaikCardContent>
+                </WaikCard>
               </div>
             ) : (
-              <Card className="border-purple-200 bg-gradient-to-br from-purple-50/30 to-blue-50/30">
-                <CardContent className="py-12 text-center">
-                  <Brain className="h-16 w-16 text-purple-400 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium mb-2 text-purple-900">WAiK Analysis Pending</p>
-                  <p className="text-sm text-purple-700/70">
+              <WaikCard className="border-purple-200 bg-gradient-to-br from-purple-50/30 to-blue-50/30">
+                <WaikCardContent className="py-12 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Brain className="h-8 w-8 opacity-80" aria-hidden />
+                  </div>
+                  <p className="mb-2 font-semibold text-foreground">WAiK Analysis Pending</p>
+                  <p className="text-sm text-muted-foreground">
                     The WAiK AI analysis will be available once generated by an administrator.
                   </p>
-                </CardContent>
-              </Card>
+                </WaikCardContent>
+              </WaikCard>
             )}
           </TabsContent>
         </Tabs>

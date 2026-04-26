@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { format, formatDistanceToNow, isToday } from "date-fns"
 import type { StaffIncidentSummary } from "@/lib/types/staff-incident-summary"
-import { brand } from "@/lib/design-tokens"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CompletionRing } from "@/components/ui/completion-ring"
@@ -103,10 +102,10 @@ export default function StaffDashboardPage() {
     }
   }, [])
 
-  function scoreColor(score: number): string {
-    if (score >= 85) return "#0D7377"
-    if (score >= 60) return "#E8A838"
-    return "#C0392B"
+  function scoreClassName(score: number): string {
+    if (score >= 85) return "text-primary"
+    if (score >= 60) return "text-amber-600"
+    return "text-destructive"
   }
 
   const unfinished = useMemo(() => incidents.find(hasUnfinishedReport), [incidents])
@@ -318,7 +317,6 @@ export default function StaffDashboardPage() {
               <h2 className="mb-3 text-base font-semibold text-foreground">Assessments due this week</h2>
               {assessments.map((a) => {
                 const d = Number(a.daysUntilDue ?? 0)
-                const badgeBg = d <= 1 ? "#16A34A" : d <= 3 ? "#E8A838" : "#9CA3AF"
                 const badgeText =
                   d <= 0 ? "Today" : `${d} day${d === 1 ? "" : "s"}`
 
@@ -326,6 +324,13 @@ export default function StaffDashboardPage() {
                   a.assessmentType
                     ? `${a.assessmentType.charAt(0).toUpperCase()}${a.assessmentType.slice(1)}`
                     : "Assessment"
+
+                const dueBadgeClass =
+                  d <= 1
+                    ? "bg-emerald-600 text-white"
+                    : d <= 3
+                      ? "bg-amber-500 text-white"
+                      : "bg-muted text-muted-foreground"
 
                 return (
                   <WaikCard key={a.id} variant="base" hover="lift" className="mb-2">
@@ -337,8 +342,7 @@ export default function StaffDashboardPage() {
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <span
-                            className="rounded-full px-2 py-1 text-[11px] font-semibold text-white"
-                            style={{ backgroundColor: badgeBg }}
+                            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${dueBadgeClass}`}
                           >
                             {badgeText}
                           </span>
@@ -369,7 +373,7 @@ export default function StaffDashboardPage() {
         {perfLoading ? (
           <Skeleton className="h-20 w-full rounded-xl" />
         ) : perf ? (
-          <div className="rounded-xl bg-white p-4 shadow-sm" style={{ color: brand.body }}>
+          <div className="rounded-xl border border-border/50 bg-card p-4 text-foreground shadow-sm">
             <button
               type="button"
               onClick={() => setPerfExpanded((v) => !v)}
@@ -377,36 +381,36 @@ export default function StaffDashboardPage() {
               aria-expanded={perfExpanded}
             >
               <div className="flex flex-col items-center pr-8">
-                <p className="text-5xl font-bold" style={{ color: scoreColor(perf.averageCompleteness30d) }}>
+                <p className={`text-5xl font-bold ${scoreClassName(perf.averageCompleteness30d)}`}>
                   {perf.averageCompleteness30d}%
                 </p>
-                <p className="mt-1 text-center text-sm" style={{ color: brand.muted }}>
+                <p className="mt-1 text-center text-sm text-muted-foreground">
                   Your average completeness (30 days)
                 </p>
               </div>
-              <span className="absolute bottom-0 right-0 flex h-12 w-12 min-h-[48px] min-w-[48px] items-center justify-center text-brand-muted">
+              <span className="absolute bottom-0 right-0 flex h-12 w-12 min-h-[48px] min-w-[48px] items-center justify-center text-muted-foreground">
                 {perfExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
               </span>
             </button>
 
             {perfExpanded ? (
-              <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: `${brand.midGray}99` }}>
+              <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
                 <MonthComparisonRow
                   current={perf.averageCompleteness30d}
                   prev={perf.averageCompleteness30dPrev}
                 />
                 {perf.currentStreak >= 3 ? (
-                  <div className="rounded-lg px-3 py-2 text-sm font-medium" style={{ backgroundColor: brand.warnBg, color: brand.darkTeal }}>
+                  <div className="rounded-lg bg-amber-100/80 px-3 py-2 text-sm font-medium text-primary">
                     🔥 {perf.currentStreak}-report streak — above 85%
                   </div>
                 ) : null}
                 {perf.bestStreak > 0 ? (
-                  <p className="text-center text-sm" style={{ color: brand.muted }}>
+                  <p className="text-center text-sm text-muted-foreground">
                     Best streak: {perf.bestStreak} report{perf.bestStreak === 1 ? "" : "s"}
                   </p>
                 ) : null}
                 <div className="text-center">
-                  <Link href="/staff/intelligence" className="text-sm font-semibold" style={{ color: brand.teal }}>
+                  <Link href="/staff/intelligence" className="text-sm font-semibold text-primary">
                     View full analysis →
                   </Link>
                 </div>
@@ -414,10 +418,8 @@ export default function StaffDashboardPage() {
             ) : null}
           </div>
         ) : (
-          <div className="rounded-xl bg-white p-4 shadow-sm">
-            <p className="text-sm" style={{ color: brand.muted }}>
-              Performance data unavailable.
-            </p>
+          <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm">
+            <p className="text-sm text-muted-foreground">Performance data unavailable.</p>
           </div>
         )}
       </section>
@@ -429,12 +431,13 @@ function MonthComparisonRow({ current, prev }: { current: number; prev: number }
   const hasPrev = prev > 0
   const direction = !hasPrev ? "flat" : current > prev ? "up" : current < prev ? "down" : "flat"
   const arrow = direction === "up" ? "↑" : direction === "down" ? "↓" : "→"
-  const color = direction === "up" ? "#16A34A" : direction === "down" ? "#E8A838" : "#6B7280"
+  const arrowClass =
+    direction === "up" ? "text-emerald-600" : direction === "down" ? "text-amber-600" : "text-muted-foreground"
 
   return (
-    <p className="text-center text-sm text-brand-body">
+    <p className="text-center text-sm text-foreground">
       This month: {current}% | Last month: {hasPrev ? `${prev}%` : "—%"}{" "}
-      <span className="font-medium" style={{ color }} aria-hidden>
+      <span className={`font-medium ${arrowClass}`} aria-hidden>
         {arrow}
       </span>
     </p>

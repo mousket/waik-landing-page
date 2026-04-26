@@ -3,8 +3,9 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import RoleModel from "@/backend/src/models/role.model"
 import UserModel from "@/backend/src/models/user.model"
-import { authErrorResponse, getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 import type { WaikRoleSlug } from "@/lib/waik-roles"
 
 export async function PATCH(request: Request, { params }: { params: { userId: string } }) {
@@ -33,17 +34,20 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
     }
 
+    const resolved = await resolveEffectiveAdminFacility(request, user)
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const { facilityId } = resolved
+
     await connectMongo()
     const roleDoc = await RoleModel.findOne({ slug: roleSlug }).lean().exec()
     if (!roleDoc || Array.isArray(roleDoc)) {
       return NextResponse.json({ error: "Unknown role" }, { status: 400 })
     }
 
-    const target = await UserModel.findOne({ id: params.userId, facilityId: user.facilityId }).exec()
+    const target = await UserModel.findOne({ id: params.userId, facilityId }).exec()
     if (!target) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    requireFacilityAccess(user, String(target.facilityId ?? ""))
 
     target.roleSlug = roleSlug
     await target.save()

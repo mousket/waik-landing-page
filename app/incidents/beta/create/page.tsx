@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useWaikUser } from "@/hooks/use-waik-user"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardDescription, CardTitle } from "@/components/ui/card"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -568,90 +569,89 @@ export default function BetaCreateIncidentPage() {
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl shadow-2xl border-2">
-        <CardHeader className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  Report Incident
-                </CardTitle>
-                <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300">
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  Beta
-                </Badge>
+    <div className="relative min-h-screen w-full">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="flex min-h-screen w-full items-center justify-center p-4">
+        <WaikCard className="w-full max-w-2xl overflow-hidden p-0">
+          <div className="space-y-4 border-b border-border/50 p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                    Report incident
+                  </CardTitle>
+                  <Badge variant="secondary" className="border-amber-300 bg-amber-100 text-amber-800">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    Beta
+                  </Badge>
+                </div>
+                <CardDescription className="text-base">
+                  {phase === "capture" && `Step ${captureStep} of 3 — basic information`}
+                  {phase === "analyzing" && "Analyzing your narrative…"}
+                  {phase === "interview" &&
+                    (isEditingAnswer
+                      ? `Editing question ${currentQuestionIndex + 1} of ${questions.length}`
+                      : `Question ${currentQuestionIndex + 1} of ${questions.length} — interview`)}
+                  {phase === "review" && "Review your responses"}
+                  {phase === "processing" && "Creating your incident report…"}
+                  {phase === "complete" && "Report submitted successfully!"}
+                </CardDescription>
               </div>
-              <CardDescription className="text-base">
-                {phase === "capture" && `Step ${captureStep} of 3 - Basic Information`}
-                {phase === "analyzing" && "Analyzing your narrative..."}
-                {phase === "interview" && (
-                  isEditingAnswer 
-                    ? `Editing Question ${currentQuestionIndex + 1} of ${questions.length}`
-                    : `Question ${currentQuestionIndex + 1} of ${questions.length} - Interview`
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  setAutoSpeak(!autoSpeak)
+                  if (!autoSpeak && phase === "capture" && currentCapturePrompt) {
+                    speakPrompt(currentCapturePrompt.question)
+                  } else if (!autoSpeak && phase === "interview" && currentQuestion) {
+                    speakPrompt(currentQuestion.text)
+                  } else {
+                    stopTTS()
+                    setIsSpeaking(false)
+                  }
+                }}
+                className="h-12 w-12 min-h-12 shrink-0"
+              >
+                {autoSpeak ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {phase === "capture" && "Gathering information"}
+                  {phase === "analyzing" && "AI analysis"}
+                  {phase === "interview" && `${answeredCount} of ${totalQuestions} answered`}
+                  {phase === "review" && "Ready to submit"}
+                  {phase === "processing" && "Creating report"}
+                  {phase === "complete" && "Complete"}
+                </span>
+                {phase === "review" && !isCalculatingScore && (
+                  <span className="font-medium text-primary">{completenessScore}% complete</span>
                 )}
-                {phase === "review" && "Review Your Responses"}
-                {phase === "processing" && "Creating your incident report..."}
-                {phase === "complete" && "Report submitted successfully!"}
-              </CardDescription>
+              </div>
+              <Progress value={progressPercent} className="h-2" />
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setAutoSpeak(!autoSpeak)
-                if (!autoSpeak && phase === "capture" && currentCapturePrompt) {
-                  speakPrompt(currentCapturePrompt.question)
-                } else if (!autoSpeak && phase === "interview" && currentQuestion) {
-                  speakPrompt(currentQuestion.text)
-                } else {
-                  stopTTS()
-                  setIsSpeaking(false)
-                }
-              }}
-              className="h-10 w-10"
-            >
-              {autoSpeak ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-            </Button>
-          </div>
 
-          {/* Progress bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                {phase === "capture" && "Gathering Information"}
-                {phase === "analyzing" && "AI Analysis"}
-                {phase === "interview" && `${answeredCount} of ${totalQuestions} answered`}
-                {phase === "review" && "Ready to Submit"}
-                {phase === "processing" && "Creating Report"}
-                {phase === "complete" && "Complete"}
-              </span>
-              {phase === "review" && !isCalculatingScore && (
-                <span className="font-medium text-primary">{completenessScore}% Complete</span>
-              )}
-            </div>
-            <Progress value={progressPercent} className="h-2" />
-          </div>
-
-          {/* Category badge (shown after analysis) */}
-          {(phase === "interview" || phase === "review") && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="capitalize">
-                <Brain className="h-3 w-3 mr-1" />
-                {incidentCategory}
-                {incidentSubtype && ` - ${incidentSubtype.replace("fall-", "")}`}
-              </Badge>
-              {isEditingAnswer && (
-                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                  <Pencil className="h-3 w-3 mr-1" />
-                  Editing
+            {(phase === "interview" || phase === "review") && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="capitalize">
+                  <Brain className="mr-1 h-3 w-3" />
+                  {incidentCategory}
+                  {incidentSubtype && ` - ${incidentSubtype.replace("fall-", "")}`}
                 </Badge>
-              )}
-            </div>
-          )}
-        </CardHeader>
+                {isEditingAnswer && (
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                    <Pencil className="mr-1 h-3 w-3" />
+                    Editing
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
 
-        <CardContent className="space-y-6">
+          <WaikCardContent className="space-y-6">
           {/* ================================================================ */}
           {/* CAPTURE PHASE */}
           {/* ================================================================ */}
@@ -665,15 +665,15 @@ export default function BetaCreateIncidentPage() {
                     setIsSpeaking(false)
                   }}
                   variant="destructive"
-                  className="w-full animate-pulse"
+                  className="min-h-12 w-full animate-pulse"
                 >
                   <VolumeX className="mr-2 h-5 w-5" />
-                  Stop Speaking
+                  Stop speaking
                 </Button>
               )}
 
               {/* Voice Prompt */}
-              <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-6 rounded-lg border-2 border-primary/20">
+              <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 to-accent/10 p-6">
                 <p className="text-lg font-medium text-foreground leading-relaxed">
                   {currentCapturePrompt.question}
                 </p>
@@ -795,11 +795,13 @@ export default function BetaCreateIncidentPage() {
               )}
 
               {/* Question Prompt - Same style as capture phase */}
-              <div className={`p-6 rounded-lg border-2 ${
-                isEditingAnswer 
-                  ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20"
-                  : "bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20"
-              }`}>
+              <div
+                className={`rounded-2xl border border-border/50 p-6 ${
+                  isEditingAnswer
+                    ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10"
+                    : "bg-gradient-to-r from-primary/10 to-accent/10"
+                }`}
+              >
                 <div className="flex items-start gap-3">
                   <div className={`rounded-full p-2 flex-shrink-0 ${
                     isEditingAnswer ? "bg-amber-500/20" : "bg-primary/20"
@@ -927,12 +929,12 @@ export default function BetaCreateIncidentPage() {
           {/* ================================================================ */}
           {phase === "review" && (
             <>
-              <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 p-6 rounded-lg border-2 border-green-500/20">
+              <div className="rounded-2xl border border-border/50 bg-gradient-to-r from-primary/10 to-accent/10 p-6">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-8 w-8 text-green-600" />
+                  <CheckCircle2 className="h-8 w-8 text-primary" />
                   <div>
-                    <p className="text-lg font-semibold text-green-700">Ready to Submit</p>
-                    <p className="text-sm text-green-600">
+                    <p className="text-lg font-semibold text-foreground">Ready to Submit</p>
+                    <p className="text-sm text-muted-foreground">
                       {isCalculatingScore 
                         ? "Calculating documentation score..." 
                         : `Documentation completeness: ${completenessScore}%`
@@ -1130,8 +1132,9 @@ export default function BetaCreateIncidentPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </WaikCardContent>
+        </WaikCard>
+      </div>
     </div>
   )
 }

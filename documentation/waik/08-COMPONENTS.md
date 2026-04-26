@@ -31,6 +31,19 @@
 - **Reduced motion**: any ambient animation should be disabled/simplified when `prefers-reduced-motion`
 - **No hard-coded colors** unless Tailwind JIT requires it (tokens first)
 
+### Phase 3e.2 — UI “definition of done” (checklist)
+
+Use this before merging staff/admin/incident surface changes.
+
+- **Layout:** Major pages use a soft **background wash** (`from-primary/5 via-background to-accent/5` or the recipes above) and **`PageHeader`** (title, optional description, primary actions on the right on larger breakpoints).
+- **Surfaces:** Prefer **`WaikCard`** (or shadcn `Card` only where the file already standardizes on it). Cards use `border-border`, `shadow-xl`, and consistent radius—no one-off heavy chrome unless documented.
+- **Actions:** Primary actions use the shared **`Button`** styles; **focus** uses the default ring (do not remove `focus-visible` treatment). **No new** `import { brand } from "@/lib/design-tokens"` in **`app/**`** code—use `bg-primary`, `text-primary`, `text-muted-foreground`, `border-border`, etc.
+- **Touch:** **48px** minimum height/width for **primary** row and nav controls on small viewports (icon-only menu, bottom nav, “Report incident”–class CTAs).
+- **Semantics:** Muted copy is `text-muted-foreground`; borders use `border-border` / `divide-border`. Charts or SVG may use `currentColor` or theme colors where a literal is unavoidable.
+- **Motion:** Ambient or decorative motion respects **`prefers-reduced-motion`** (see `components/login-wave-animation.tsx` pattern).
+
+**Exceptions** must be called out in PR description (e.g. a deliberately dark `/offline` screen); avoid silent one-off hex.
+
 ---
 
 ## Copy-pastable recipes (Tailwind)

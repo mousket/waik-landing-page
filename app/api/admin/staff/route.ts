@@ -3,9 +3,10 @@ import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import RoleModel from "@/backend/src/models/role.model"
 import UserModel from "@/backend/src/models/user.model"
-import { getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireAdminTier } from "@/lib/permissions"
 import { authErrorResponse } from "@/lib/auth"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 
 export async function GET(request: Request) {
   try {
@@ -13,9 +14,9 @@ export async function GET(request: Request) {
     if (!user) return unauthorizedResponse()
     requireAdminTier(user)
 
-    const { searchParams } = new URL(request.url)
-    const qFacility = searchParams.get("facilityId") || user.facilityId
-    requireFacilityAccess(user, qFacility)
+    const resolved = await resolveEffectiveAdminFacility(request, user)
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const qFacility = resolved.facilityId
 
     await connectMongo()
 

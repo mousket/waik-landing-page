@@ -1,7 +1,8 @@
-# Task 07e — Admin/Back-Office UI Restyle (Command Center, Landing-Grade)
+# Task 07e — Admin/Back-Office UI Restyle (Command Center, Landing-Grade) — DONE
 ## Phase: 3d — Design Unification
 ## Estimated Time: 4–6 hours
 ## Depends On: task-07b
+## Status: **Complete** (admin + waik super-admin in scope; task doc closed)
 
 ---
 
@@ -13,17 +14,11 @@ feels like WAiK (landing page DNA).
 
 ---
 
-## In Scope (admin/back-office)
+## In Scope (admin/back-office) — addressed
 
-- Admin shell: `components/admin/admin-app-shell.tsx`
-- Admin pages:
-  - `app/admin/dashboard/page.tsx`
-  - `app/admin/incidents/page.tsx` + `app/admin/incidents/[id]/page.tsx`
-  - `app/admin/assessments/page.tsx`
-  - `app/admin/residents/page.tsx`
-  - `app/admin/settings/*`
-- Waik super-admin (`app/waik-admin/*`) should be aligned at least for:
-  - global layout, cards, tables, headers (not feature work)
+- Admin shell: `components/admin/admin-app-shell.tsx` (glass header, token nav, facility switcher)
+- Admin pages: dashboard, incidents list + detail, assessments, residents, intelligence, settings (including staff management)
+- Waik super-admin: `app/waik-admin/*` (shell + org/facility CRUD, tables, forms aligned with the same system)
 
 ---
 
@@ -38,10 +33,10 @@ feels like WAiK (landing page DNA).
 
 ## Success Criteria
 
-- [ ] Admin shell uses the same elevated/glass header treatment as staff (appropriately restrained)
-- [ ] Admin pages share one consistent PageHeader + Card layout pattern
-- [ ] Tables and CSV/export UI feel cohesive and polished
-- [ ] Empty states and skeletons look intentional and branded
+- [x] Admin shell uses the same elevated/glass header treatment as staff (appropriately restrained)
+- [x] Admin pages share one consistent PageHeader + Card layout pattern
+- [x] Tables and CSV/export UI feel cohesive and polished
+- [x] Empty states and skeletons look intentional and branded (where those surfaces exist in-scope)
 
 ---
 
@@ -58,4 +53,3 @@ Restyle admin/back-office surfaces to match the landing page design system.
 3) Standardize action bars (filters, export buttons, facility picker) so they look designed.
 4) Keep behavior unchanged; styling only.
 ```
-

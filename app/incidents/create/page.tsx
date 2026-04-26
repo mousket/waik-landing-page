@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from 
 import { useRouter } from "next/navigation"
 import { useWaikUser } from "@/hooks/use-waik-user"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardDescription, CardTitle } from "@/components/ui/card"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -547,56 +548,57 @@ useEffect(() => {
   }, [narrative, residentState, environmentNotes, isListening])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-      <Card className="w-full max-w-3xl shadow-2xl border-2">
-        <CardHeader className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <CardTitle className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Report New Incident
-              </CardTitle>
-              <CardDescription className="text-base">
-                Step {currentStep} of 6 - Voice-guided incident reporting
-              </CardDescription>
+    <div className="relative min-h-screen w-full">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="flex min-h-screen w-full items-center justify-center p-4">
+        <WaikCard className="w-full max-w-3xl overflow-hidden p-0">
+          <div className="space-y-4 border-b border-border/50 p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 space-y-2">
+                <CardTitle className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  Report new incident
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Step {currentStep} of 6 — voice-guided incident reporting
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  setAutoSpeak(!autoSpeak)
+                  if (!autoSpeak) {
+                    speakPrompt(currentPrompt.question)
+                  } else {
+                    stopSpeaking()
+                  }
+                }}
+                className="h-12 w-12 min-h-12 shrink-0"
+              >
+                {autoSpeak ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setAutoSpeak(!autoSpeak)
-                if (!autoSpeak) {
-                  speakPrompt(currentPrompt.question)
-                } else {
-                  stopSpeaking()
-                }
-              }}
-              className="h-10 w-10"
-            >
-              {autoSpeak ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-            </Button>
+
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+                style={{ width: `${(currentStep / 6) * 100}%` }}
+              />
+            </div>
           </div>
 
-          {/* Progress bar */}
-          <div className="w-full bg-muted rounded-full h-2">
-            <div
-              className="bg-gradient-to-r from-primary to-accent h-2 rounded-full transition-all duration-500"
-              style={{ width: `${(currentStep / 6) * 100}%` }}
-            />
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
+          <WaikCardContent className="space-y-6">
           {/* Stop Speaking Button */}
           {isSpeaking && (
-            <Button onClick={stopSpeaking} variant="destructive" className="w-full animate-pulse">
+            <Button onClick={stopSpeaking} variant="destructive" className="min-h-12 w-full animate-pulse">
               <VolumeX className="mr-2 h-5 w-5" />
-              Stop Speaking
+              Stop speaking
             </Button>
           )}
 
           {/* Voice Prompt */}
-          <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-6 rounded-lg border-2 border-primary/20">
-            <p className="text-lg font-medium text-foreground leading-relaxed">{currentPrompt.question}</p>
+          <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 to-accent/10 p-6">
+            <p className="text-lg font-medium leading-relaxed text-foreground">{currentPrompt.question}</p>
           </div>
 
           {currentStep < 6 ? (
@@ -623,7 +625,7 @@ useEffect(() => {
                     value={getCurrentValue()}
                     onChange={(e) => setCurrentValue(e.target.value)}
                     placeholder="Type or use voice input..."
-                    className="text-base h-12"
+                    className="h-12 min-h-12 text-base"
                   />
                 )}
               </div>
@@ -652,10 +654,10 @@ useEffect(() => {
 
                   <Button
                     onClick={handleNext}
-                    className="flex-1 h-14 text-base bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                    className="h-14 min-h-12 flex-1 bg-gradient-to-r from-primary to-accent text-base hover:opacity-90"
                     disabled={isProcessing || isListening}
                   >
-                    {currentStep === 5 ? "Submit Report" : "Next"}
+                    {currentStep === 5 ? "Submit report" : "Next"}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </div>
@@ -664,11 +666,11 @@ useEffect(() => {
                   <Button
                     onClick={addMoreDetails}
                     variant="secondary"
-                    className="w-full h-12 text-base"
+                    className="h-12 min-h-12 w-full text-base"
                     disabled={isProcessing || isListening}
                   >
                     <Plus className="mr-2 h-5 w-5" />
-                    Add More Details
+                    Add more details
                   </Button>
                 )}
               </div>
@@ -708,8 +710,9 @@ useEffect(() => {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+          </WaikCardContent>
+        </WaikCard>
+      </div>
     </div>
   )
 }

@@ -1,105 +1,136 @@
-import { brand } from "@/lib/design-tokens"
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
+import { buildAdminPathWithContext, getAdminContextQueryString } from "@/lib/admin-nav-context"
+import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
+import type { IncidentPhase, IncidentSummary } from "@/lib/types/incident-summary"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/page-header"
+import { Loader2 } from "lucide-react"
 
 function RingPct({ pct }: { pct: string }) {
   return (
-    <div
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold"
-      style={{ borderColor: brand.teal, color: brand.teal }}
-    >
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-primary text-xs font-semibold text-primary">
       {pct}
     </div>
   )
 }
 
-export default function AdminIncidentsPlaceholderPage() {
-  return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-semibold text-brand-dark-teal">All Incidents</h1>
-        <p className="mt-2 text-sm text-brand-muted">The complete incident pipeline for your community.</p>
-      </div>
+function phaseLabel(p: IncidentPhase): string {
+  switch (p) {
+    case "phase_1_in_progress":
+      return "Phase 1 in progress"
+    case "phase_1_complete":
+      return "Phase 1 complete"
+    case "phase_2_in_progress":
+      return "Phase 2"
+    case "closed":
+      return "Closed"
+    default:
+      return p
+  }
+}
 
-      <div className="overflow-x-auto rounded-xl border border-brand-mid-gray bg-white shadow-sm">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-brand-mid-gray bg-brand-light-bg/50">
-              <th className="p-3 font-semibold">Room</th>
-              <th className="p-3 font-semibold">Type</th>
-              <th className="p-3 font-semibold">Phase</th>
-              <th className="p-3 font-semibold">Completeness</th>
-              <th className="p-3 font-semibold">48hr Clock</th>
-              <th className="p-3 font-semibold">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-brand-mid-gray/80">
-              <td className="p-3">204</td>
-              <td className="p-3">Fall</td>
-              <td className="p-3">
-                <Badge className="bg-sky-600 text-white">Phase 2</Badge>
-              </td>
-              <td className="p-3">
-                <RingPct pct="82%" />
-              </td>
-              <td className="p-3 text-sm font-medium text-[#E8A838]">28h remaining</td>
-              <td className="p-3">
-                <Button size="sm" variant="outline" className="min-h-[40px] border-brand-teal text-brand-teal">
-                  View
-                </Button>
-              </td>
-            </tr>
-            <tr className="border-b border-brand-mid-gray/80">
-              <td className="p-3">306</td>
-              <td className="p-3">Medication</td>
-              <td className="p-3">
-                <Badge className="bg-sky-600 text-white">Phase 2</Badge>
-              </td>
-              <td className="p-3">
-                <RingPct pct="76%" />
-              </td>
-              <td className="p-3 text-sm font-bold text-[#C0392B]">5h remaining</td>
-              <td className="p-3">
-                <Button size="sm" variant="outline" className="min-h-[40px] border-brand-teal text-brand-teal">
-                  View
-                </Button>
-              </td>
-            </tr>
-            <tr className="border-b border-brand-mid-gray/80">
-              <td className="p-3">411</td>
-              <td className="p-3">Conflict</td>
-              <td className="p-3">
-                <Badge className="bg-amber-400 text-brand-dark-teal">Phase 1 Complete</Badge>
-              </td>
-              <td className="p-3">
-                <RingPct pct="91%" />
-              </td>
-              <td className="p-3 text-sm text-brand-muted">44h remaining</td>
-              <td className="p-3">
-                <Button size="sm" variant="outline" className="min-h-[40px] border-brand-teal text-brand-teal">
-                  View
-                </Button>
-              </td>
-            </tr>
-            <tr>
-              <td className="p-3">102</td>
-              <td className="p-3">Fall</td>
-              <td className="p-3">
-                <Badge className="bg-amber-500/90 text-white">Phase 1 In Progress</Badge>
-              </td>
-              <td className="p-3">
-                <RingPct pct="45%" />
-              </td>
-              <td className="p-3 text-sm text-brand-muted">47h remaining</td>
-              <td className="p-3">
-                <Button size="sm" variant="outline" className="min-h-[40px] border-brand-teal text-brand-teal">
-                  View
-                </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+export default function AdminIncidentsListPage() {
+  const searchParams = useAdminUrlSearchParams()
+  const [incidents, setIncidents] = useState<IncidentSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const suffix = getAdminContextQueryString(searchParams)
+    try {
+      const res = await fetch(`/api/incidents${suffix}`, { credentials: "include" })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(j.error ?? "Could not load incidents")
+        setIncidents([])
+        return
+      }
+      const j = (await res.json()) as { incidents?: IncidentSummary[] }
+      setIncidents(j.incidents ?? [])
+    } catch {
+      setError("Could not load incidents")
+      setIncidents([])
+    } finally {
+      setLoading(false)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  return (
+    <div className="relative flex w-full flex-1 flex-col">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:py-8">
+        <PageHeader
+          className="mb-6"
+          title="All incidents"
+          description="The complete incident pipeline for your community."
+        />
+        {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
+
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-3xl border border-border bg-background shadow-xl">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-sm font-semibold">
+                  <th className="px-4 py-3">Room</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Phase</th>
+                  <th className="px-4 py-3">Completeness</th>
+                  <th className="px-4 py-3">48hr clock</th>
+                  <th className="px-4 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incidents.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                      No incidents for this facility.
+                    </td>
+                  </tr>
+                ) : (
+                  incidents.map((inc) => {
+                    const detailPath = buildAdminPathWithContext(`/admin/incidents/${inc.id}`, searchParams)
+                    const comp = Math.round(inc.completenessScore ?? 0)
+                    return (
+                      <tr
+                        key={inc.id}
+                        className="border-b border-border transition-colors last:border-0 hover:bg-muted/30"
+                      >
+                        <td className="px-4 py-3">{inc.residentRoom || "—"}</td>
+                        <td className="px-4 py-3">{inc.incidentType || "—"}</td>
+                        <td className="px-4 py-3">
+                          <Badge className="bg-primary text-primary-foreground">{phaseLabel(inc.phase)}</Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <RingPct pct={`${comp}%`} />
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">—</td>
+                        <td className="px-4 py-3">
+                          <Button size="sm" variant="outline" asChild className="min-h-12 border-primary/30 sm:min-h-10">
+                            <Link href={detailPath}>View</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

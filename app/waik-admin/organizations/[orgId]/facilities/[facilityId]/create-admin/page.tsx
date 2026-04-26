@@ -4,9 +4,11 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { AdminBreadcrumb } from "@/components/admin/breadcrumb"
+import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 
 export default function CreateAdminPage() {
   const params = useParams()
@@ -81,62 +83,93 @@ export default function CreateAdminPage() {
 
   if (success) {
     return (
-      <div className="mx-auto max-w-lg space-y-6">
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-emerald-950">
-          <h2 className="text-lg font-semibold">Administrator created successfully.</h2>
-          <p className="mt-2 text-sm">
-            {success.name} ({success.email})
-          </p>
-          <p className="mt-2 text-sm">A welcome email was sent to {success.email} with their temporary password.</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button type="button" variant="secondary" onClick={createAnother}>
-            Create Another Administrator
-          </Button>
-          <Button type="button" asChild>
-            <Link href="/waik-admin">Go to Super Admin Dashboard</Link>
-          </Button>
+      <div className="relative mx-auto w-full max-w-lg">
+        <div className="absolute inset-0 -z-10 min-h-full bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+        <div className="space-y-6 py-1">
+          <div className="rounded-lg border border-emerald-200/80 bg-emerald-50 p-6 text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100">
+            <h2 className="text-lg font-semibold">Administrator created successfully.</h2>
+            <p className="mt-2 text-sm">
+              {success.name} ({success.email})
+            </p>
+            <p className="mt-2 text-sm">A welcome email was sent to {success.email} with their temporary password.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" className="min-h-12" variant="secondary" onClick={createAnother}>
+              Create another administrator
+            </Button>
+            <Button type="button" className="min-h-12" asChild>
+              <Link href="/waik-admin">Go to super admin</Link>
+            </Button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
-      <AdminBreadcrumb
-        items={[
-          { label: "Super Admin", href: "/waik-admin" },
-          { label: orgName || "Organization", href: `/waik-admin/organizations/${orgId}` },
-          { label: facilityName || "Facility", href: `/waik-admin/organizations/${orgId}/facilities/${facilityId}` },
-          { label: "Create Administrator" },
-        ]}
-      />
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Create First Administrator</h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          This person will have full control of <strong>{facilityName || "this facility"}</strong>. They will receive a
-          welcome email with their temporary credentials.
-        </p>
-      </div>
+    <div className="relative mx-auto w-full max-w-lg">
+      <div className="absolute inset-0 -z-10 min-h-full bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="space-y-6 py-1">
+        <AdminBreadcrumb
+          items={[
+            { label: "Super Admin", href: "/waik-admin" },
+            { label: orgName || "Organization", href: `/waik-admin/organizations/${orgId}` },
+            { label: facilityName || "Facility", href: `/waik-admin/organizations/${orgId}/facilities/${facilityId}` },
+            { label: "Create administrator" },
+          ]}
+        />
+        <PageHeader
+          title="Create first administrator"
+          description={
+            <>
+              This person will have full control of <strong>{facilityName || "this facility"}</strong>. They will
+              receive a welcome email with their temporary credentials.
+            </>
+          }
+        />
 
-      <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="space-y-2">
-          <Label htmlFor="firstName">First name *</Label>
-          <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="lastName">Last name *</Label>
-          <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email *</Label>
-          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </div>
-        <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
-          {submitting ? "Creating account and sending email…" : "Create Administrator & Send Welcome Email"}
-        </Button>
-      </form>
+        <WaikCard>
+          <WaikCardContent className="p-6">
+            <form onSubmit={onSubmit} className="space-y-4">
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First name *</Label>
+                <Input
+                  id="firstName"
+                  className="h-12 min-h-12"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last name *</Label>
+                <Input
+                  id="lastName"
+                  className="h-12 min-h-12"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  className="h-12 min-h-12"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={submitting} className="w-full min-h-12 sm:w-auto">
+                {submitting ? "Creating account and sending email…" : "Create administrator & send welcome email"}
+              </Button>
+            </form>
+          </WaikCardContent>
+        </WaikCard>
+      </div>
     </div>
   )
 }

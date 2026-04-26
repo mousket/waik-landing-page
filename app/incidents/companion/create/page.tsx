@@ -588,17 +588,17 @@ export default function CompanionCreatePage() {
         }
         const postResult = await postIncidentOrQueue(incidentPayload)
 
-        if (postResult.ok === false && postResult.queued) {
-          setIsProcessing(false)
-          toast.success("Saved offline. Your report will send when you reconnect.", {
-            duration: 5_000,
-          })
-          setCurrentStep("greeting")
-          currentStepRef.current = "greeting"
-          return
-        }
-        if (postResult.ok === false) {
-          throw new Error(postResult.error ?? "Failed to create incident.")
+        if (!postResult.ok) {
+          if ("queued" in postResult && postResult.queued) {
+            setIsProcessing(false)
+            toast.success("Saved offline. Your report will send when you reconnect.", {
+              duration: 5_000,
+            })
+            setCurrentStep("greeting")
+            currentStepRef.current = "greeting"
+            return
+          }
+          throw new Error("error" in postResult ? postResult.error : "Failed to create incident.")
         }
 
         const incident = (await postResult.response.json()) as { id: string }
@@ -878,21 +878,22 @@ export default function CompanionCreatePage() {
   }
 
   return (
-    <div className="fixed inset-0 lg:left-72 bg-gradient-to-br from-blue-500/20 via-indigo-500/20 to-purple-500/20 flex flex-col overflow-hidden">
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 animate-pulse" />
-      </div>
-
-      <div className="relative z-10 border-b border-white/20 bg-white/10 backdrop-blur-xl px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <Button variant="ghost" size="sm" onClick={handleFinish} className="gap-2 -ml-2 text-white hover:bg-white/20">
+    <div className="fixed inset-0 z-0 flex flex-col overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/5 lg:left-72">
+      <div className="relative z-10 border-b border-border/20 bg-background/80 px-4 py-3 backdrop-blur-xl sm:px-6 sm:py-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleFinish}
+            className="min-h-12 gap-2 text-foreground -ml-2 hover:bg-muted/80"
+          >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
 
-          <div className="text-center absolute left-1/2 -translate-x-1/2">
-            <h1 className="text-lg sm:text-xl font-bold text-white">AI Companion</h1>
-            <p className="text-xs sm:text-sm text-white/80 hidden sm:block">Voice-first reporting</p>
+          <div className="absolute left-1/2 -translate-x-1/2 text-center">
+            <h1 className="text-lg font-bold text-foreground sm:text-xl">AI companion</h1>
+            <p className="hidden text-xs text-muted-foreground sm:block sm:text-sm">Voice-first reporting</p>
           </div>
 
           <Button
@@ -904,19 +905,19 @@ export default function CompanionCreatePage() {
                 stopSpeaking()
               }
             }}
-            className="h-9 w-9 sm:h-10 sm:w-10 text-white hover:bg-white/20"
+            className="h-12 w-12 min-h-12 min-w-12 text-foreground hover:bg-muted/80"
           >
-            {autoSpeak ? <Volume2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <VolumeX className="h-4 w-4 sm:h-5 sm:w-5" />}
+            {autoSpeak ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
           </Button>
         </div>
       </div>
 
       {awaitingStart ? (
-        <div className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6">
-          <div className="max-w-md w-full p-8 text-center space-y-6 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl">
+        <div className="relative z-10 flex flex-1 items-center justify-center p-4 sm:p-6">
+          <div className="w-full max-w-md space-y-6 rounded-3xl border border-border/50 bg-card/95 p-8 text-center shadow-xl backdrop-blur-sm">
             <div className="space-y-2">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white">Ready to Start?</h2>
-              <p className="text-sm sm:text-base text-white/80 leading-relaxed">
+              <h2 className="text-2xl font-bold text-foreground sm:text-3xl">Ready to start?</h2>
+              <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
                 I'll guide you through reporting an incident using natural conversation. Just speak naturally, and I'll
                 listen.
               </p>
@@ -924,12 +925,12 @@ export default function CompanionCreatePage() {
             <Button
               onClick={handleStartConversation}
               size="lg"
-              className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
+              className="h-12 min-h-12 w-full font-semibold shadow-lg shadow-primary/20"
               disabled={!voicesLoaded}
             >
-              {voicesLoaded ? "Start Conversation" : "Loading Voice System..."}
+              {voicesLoaded ? "Start conversation" : "Loading voice system…"}
             </Button>
-            <p className="text-xs text-white/60">Make sure your volume is up and you're in a quiet space.</p>
+            <p className="text-xs text-muted-foreground">Make sure your volume is up and you're in a quiet space.</p>
           </div>
         </div>
       ) : (
@@ -941,54 +942,54 @@ export default function CompanionCreatePage() {
                   <CompanionWaveAnimation isListening={isListening} isSpeaking={isSpeaking} />
                 </div>
 
-                <div className="max-w-2xl w-full p-6 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl">
-                  <p className="text-lg sm:text-xl text-center text-white leading-relaxed">{getCurrentMessage()}</p>
+                <div className="w-full max-w-2xl rounded-3xl border border-border/50 bg-card/95 p-6 text-center shadow-lg backdrop-blur-sm">
+                  <p className="text-lg leading-relaxed text-foreground sm:text-xl">{getCurrentMessage()}</p>
                 </div>
 
                 {(currentText || interimTranscript) && (
-                  <div className="max-w-2xl w-full p-4 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl">
-                    <p className="text-sm text-white/90">
+                  <div className="w-full max-w-2xl rounded-2xl border border-border/50 bg-muted/40 p-4">
+                    <p className="text-sm text-foreground/90">
                       <span className="font-semibold">You:</span> {currentText}
-                      <span className="text-white/60 italic">{interimTranscript}</span>
+                      <span className="italic text-muted-foreground">{interimTranscript}</span>
                     </p>
                   </div>
                 )}
 
                 {currentText.trim() && !isProcessing && (
-                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                  <Button
-                    onClick={handleSubmit}
-                    size="lg"
-                      className="bg-white text-indigo-600 hover:bg-white/90 font-semibold px-8 flex-1"
-                  >
-                    Submit Response
-                  </Button>
+                  <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                    <Button
+                      onClick={handleSubmit}
+                      size="lg"
+                      className="h-12 min-h-12 flex-1 px-8 font-semibold shadow-lg shadow-primary/20"
+                    >
+                      Submit response
+                    </Button>
                     {awaitingSubmission ? (
                       <Button
                         onClick={handleRetake}
                         size="lg"
                         variant="outline"
-                        className="bg-white/20 border-white/40 text-white hover:bg-white/30 flex-1"
+                        className="h-12 min-h-12 flex-1 border-border"
                       >
-                        Retake Response
+                        Retake response
                       </Button>
                     ) : null}
                   </div>
                 )}
               </>
             ) : (
-              <div className="max-w-md w-full p-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl space-y-6">
-                <div className="text-center space-y-4">
-                  <CheckCircle2 className="h-20 w-20 text-green-400 mx-auto drop-shadow-lg" />
-                  <h2 className="text-3xl font-bold text-white">Report Complete</h2>
-                  <div className="text-7xl font-bold text-white drop-shadow-lg">
+              <div className="w-full max-w-md space-y-6 rounded-3xl border border-border/50 bg-card/95 p-8 shadow-xl backdrop-blur-sm">
+                <div className="space-y-4 text-center">
+                  <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-500 drop-shadow-lg" />
+                  <h2 className="text-3xl font-bold text-foreground">Report complete</h2>
+                  <div className="text-7xl font-bold text-primary drop-shadow-sm">
                     {reportScore !== null ? reportScore : "--"}/10
                   </div>
                 </div>
 
                 <div className="space-y-5">
                   {reportFeedback ? (
-                    <div className="rounded-2xl border border-white/30 bg-white/15 p-4 text-sm leading-relaxed text-white/90">
+                    <div className="rounded-2xl border border-border/50 bg-muted/40 p-4 text-sm leading-relaxed text-foreground">
                       {reportFeedback}
                     </div>
                   ) : null}
@@ -1008,23 +1009,23 @@ export default function CompanionCreatePage() {
                       })
                     }
                       variant="outline"
-                      className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
+                      className="h-12 min-h-12 w-full border-border"
                       size="lg"
                     >
-                    {showDetailedReport ? "Hide Detailed Report Card" : "Show Detailed Report Card"}
+                    {showDetailedReport ? "Hide detailed report" : "Show detailed report"}
                     </Button>
 
                   {showDetailedReport ? (
                     <div className="space-y-4">
-                      <div className="overflow-hidden rounded-2xl border border-white/30 bg-white/20">
+                      <div className="overflow-hidden rounded-2xl border border-border/50 bg-muted/30">
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-green-200"
+                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-emerald-700 dark:text-emerald-400"
                           onClick={() => toggleSection("strengths")}
                         >
                           <span className="flex items-center gap-2">
                             <CheckCircle2 className="h-5 w-5" />
-                            What You Did Well
+                            What you did well
                           </span>
                           <ChevronDown
                             className={`h-4 w-4 transition-transform ${
@@ -1033,18 +1034,18 @@ export default function CompanionCreatePage() {
                           />
                         </button>
                         {expandedSections.strengths ? (
-                          <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90">
+                          <div className="border-t border-border/50 px-4 py-3 text-sm text-foreground/90">
                             {safeReportDetails.whatYouDidWell.length > 0 ? (
                           <ul className="space-y-2">
                                 {safeReportDetails.whatYouDidWell.map((item, index) => (
                                   <li key={`strength-${index}`} className="flex gap-2">
-                                    <span className="text-green-300 shrink-0">[+]</span>
+                                    <span className="shrink-0 text-emerald-600">[+]</span>
                                 <span>{item}</span>
                               </li>
                             ))}
                           </ul>
                             ) : (
-                              <p className="text-white/70">
+                              <p className="text-muted-foreground">
                                 {reportDetails
                                   ? "We'll highlight strengths once more detail is provided."
                                   : "Detailed strengths will appear once scoring is ready."}
@@ -1054,30 +1055,30 @@ export default function CompanionCreatePage() {
                         ) : null}
                         </div>
 
-                      <div className="overflow-hidden rounded-2xl border border-white/30 bg-white/20">
+                      <div className="overflow-hidden rounded-2xl border border-border/50 bg-muted/30">
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-amber-200"
+                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-amber-700 dark:text-amber-400"
                           onClick={() => toggleSection("gaps")}
                         >
-                          <span>What Needs Work</span>
+                          <span>What needs work</span>
                           <ChevronDown
                             className={`h-4 w-4 transition-transform ${expandedSections.gaps ? "rotate-180" : ""}`}
                           />
                         </button>
                         {expandedSections.gaps ? (
-                          <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90">
+                          <div className="border-t border-border/50 px-4 py-3 text-sm text-foreground/90">
                             {safeReportDetails.whatWasMissed.length > 0 ? (
                           <ul className="space-y-2">
                                 {safeReportDetails.whatWasMissed.map((item, index) => (
                                   <li key={`gap-${index}`} className="flex gap-2">
-                                    <span className="text-amber-200 shrink-0">[!]</span>
+                                    <span className="shrink-0 text-amber-600">[!]</span>
                                 <span>{item}</span>
                               </li>
                             ))}
                           </ul>
                             ) : (
-                              <p className="text-white/70">
+                              <p className="text-muted-foreground">
                                 {reportDetails
                                   ? "No major gaps identified. Keep this level of detail."
                                   : "Gap analysis will display as soon as WAiK finishes scoring."}
@@ -1087,13 +1088,13 @@ export default function CompanionCreatePage() {
                         ) : null}
                       </div>
 
-                      <div className="overflow-hidden rounded-2xl border border-white/30 bg-white/20">
+                      <div className="overflow-hidden rounded-2xl border border-border/50 bg-muted/30">
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-sky-200"
+                          className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-primary"
                           onClick={() => toggleSection("narrative")}
                         >
-                          <span>See Original Narrative</span>
+                          <span>See original narrative</span>
                           <ChevronDown
                             className={`h-4 w-4 transition-transform ${
                               expandedSections.narrative ? "rotate-180" : ""
@@ -1101,7 +1102,7 @@ export default function CompanionCreatePage() {
                           />
                         </button>
                         {expandedSections.narrative ? (
-                          <div className="border-t border-white/20 px-4 py-3 text-sm text-white/90 whitespace-pre-line">
+                          <div className="whitespace-pre-line border-t border-border/50 px-4 py-3 text-sm text-foreground/90">
                             {initialNarrative.trim().length > 0
                               ? initialNarrative
                               : "No initial narrative captured for this session."}
@@ -1109,7 +1110,7 @@ export default function CompanionCreatePage() {
                         ) : null}
                       </div>
                       {!reportDetails ? (
-                        <p className="text-xs text-white/70">
+                        <p className="text-xs text-muted-foreground">
                           Detailed scoring is still loading—sections will fill in automatically once ready.
                         </p>
                       ) : null}
@@ -1118,26 +1119,26 @@ export default function CompanionCreatePage() {
 
                     <Button
                       onClick={handleFinish}
-                      className="w-full bg-white text-indigo-600 hover:bg-white/90 font-semibold"
+                      className="h-12 min-h-12 w-full font-semibold shadow-lg shadow-primary/20"
                       size="lg"
                     >
-                      Finish & Return to Dashboard
+                      Finish & return to dashboard
                     </Button>
                   </div>
               </div>
             )}
           </div>
 
-          <div className="relative z-10 pb-6 flex justify-center">
-            <div className="px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full">
-              <p className="text-sm text-white/80">
+          <div className="relative z-10 flex justify-center pb-6">
+            <div className="rounded-full border border-border/50 bg-muted/50 px-6 py-3 backdrop-blur-sm">
+              <p className="text-sm text-muted-foreground">
                 {isListening
-                  ? "🎤 Listening..."
+                  ? "Listening…"
                   : isSpeaking
-                    ? "💬 Speaking..."
+                    ? "Speaking…"
                     : isProcessing
-                      ? "⏳ Processing..."
-                      : "✓ Ready"}
+                      ? "Processing…"
+                      : "Ready"}
               </p>
             </div>
           </div>

@@ -84,7 +84,7 @@ export function markdownToHtml(markdown: string): string {
     return withItalics
   }
 
-  for (let rawLine of lines) {
+  for (const rawLine of lines) {
     const line = rawLine.trim()
     if (!line) {
       flushList()

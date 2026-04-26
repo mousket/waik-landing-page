@@ -29,7 +29,7 @@ function redisDbIndex(): number {
   return 0
 }
 
-function useTls(): boolean {
+function redisConnectionUsesTls(): boolean {
   return process.env.REDIS_USE_TLS === "1" || (process.env.REDIS_URL?.startsWith("rediss://") ?? false)
 }
 
@@ -65,7 +65,7 @@ function createClient(): Redis {
     connectTimeout: 15_000,
     enableReadyCheck: true,
     lazyConnect: false,
-    ...(useTls() ? { tls: { servername: host } } : {}),
+    ...(redisConnectionUsesTls() ? { tls: { servername: host } } : {}),
   })
 }
 

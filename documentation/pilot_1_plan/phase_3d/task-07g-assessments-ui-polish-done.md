@@ -1,7 +1,8 @@
-# Task 07g — Assessments UI Polish (Staff + Admin)
+# Task 07g — Assessments UI Polish (Staff + Admin) — DONE
 ## Phase: 3d — Design Unification
 ## Estimated Time: 2–4 hours
 ## Depends On: task-07b
+## Status: **Complete** (staff + admin pages in scope; task doc closed)
 
 ---
 
@@ -12,12 +13,11 @@ This task makes assessments feel cohesive, calm, and premium—consistent with t
 
 ---
 
-## In Scope
+## In Scope — addressed
 
-- `app/staff/assessments/page.tsx`
-- `app/admin/assessments/page.tsx`
-- Any shared assessment components used by both pages
-- Skeleton states and empty states for assessments lists/detail panes (if applicable)
+- `app/staff/assessments/page.tsx` — `PageHeader` + wash; **WaikCard** wrapping **EmptyState** (placeholder list)
+- `app/admin/assessments/page.tsx` — **WaikCard** + soft table (headers, row hover); **Skeleton** loading; **Badge** for status; **Overdue** / **Due soon** (7-day window) on next-due when applicable
+- No shared cross-route assessment component was required; both routes use the same **WaikCard** / **PageHeader** / token patterns as the rest of Phase 3d
 
 ---
 
@@ -32,9 +32,9 @@ This task makes assessments feel cohesive, calm, and premium—consistent with t
 
 ## Success Criteria
 
-- [ ] Staff + Admin assessment pages share the same card/table recipes
-- [ ] Status chips are consistent with incident phase/status chips
-- [ ] Loading/empty states look intentional and on-brand
+- [x] Staff + Admin assessment pages share the same card/table recipes
+- [x] Status chips are consistent with incident phase/status chips (outline **Badge** + semantic borders)
+- [x] Loading/empty states look intentional and on-brand
 
 ---
 
@@ -50,4 +50,3 @@ Polish staff and admin assessments UI to match the landing page design system.
 3) Implement consistent empty + loading states.
 4) Keep behavior unchanged.
 ```
-

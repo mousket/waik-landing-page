@@ -2,9 +2,10 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import { inviteStaffMember } from "@/lib/admin-staff-invite"
-import { getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
 import { authErrorResponse } from "@/lib/auth"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 
 export async function POST(request: Request) {
   try {
@@ -29,8 +30,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "firstName, lastName, email, and roleSlug are required" }, { status: 400 })
     }
 
-    const facilityId = user.facilityId
-    requireFacilityAccess(user, facilityId)
+    const resolved = await resolveEffectiveAdminFacility(request, user, {
+      bodyFacilityId: typeof b.facilityId === "string" ? b.facilityId : undefined,
+      bodyOrganizationId: typeof b.organizationId === "string" ? b.organizationId : undefined,
+    })
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const { facilityId } = resolved
 
     await connectMongo()
     const facility = await FacilityModel.findOne({ id: facilityId }).lean().exec()
@@ -38,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Facility not found" }, { status: 404 })
     }
 
-    const orgId = String((facility as { organizationId?: string }).organizationId ?? user.organizationId ?? "")
+    const orgId = String((facility as { organizationId?: string }).organizationId ?? resolved.organizationId ?? "")
     const facilityName = String((facility as { name?: string }).name ?? "")
 
     const inviterName = `${user.firstName} ${user.lastName}`.trim() || user.email

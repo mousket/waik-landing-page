@@ -5,7 +5,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { UserButton } from "@clerk/nextjs"
 import { Bell, Home, ClipboardList, ClipboardCheck, Lightbulb } from "lucide-react"
-import { brand } from "@/lib/design-tokens"
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
 import { WaikLogo } from "@/components/waik-logo"
@@ -79,7 +78,7 @@ function ShellContents({
   const badges = useBadges()
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-brand-shell-bg text-brand-body">
+    <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
       <header
         className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border/20 bg-background/80 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"
       >
@@ -92,7 +91,7 @@ function ShellContents({
           ) : null}
           <button
             type="button"
-            className="flex h-12 w-12 min-h-[48px] min-w-[48px] items-center justify-center text-brand-muted"
+            className="flex h-12 w-12 min-h-[48px] min-w-[48px] items-center justify-center text-muted-foreground"
             aria-label="Notifications"
           >
             <Bell className="h-6 w-6" strokeWidth={1.75} />
@@ -131,7 +130,7 @@ function ShellContents({
                 href={href}
                 className={cn(
                   "relative flex min-h-[48px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold transition-colors",
-                  active ? "text-brand-teal" : "text-brand-muted",
+                  active ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 <span className="relative">

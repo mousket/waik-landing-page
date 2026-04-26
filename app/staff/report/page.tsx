@@ -7,9 +7,10 @@ import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { PageHeader } from "@/components/ui/page-header"
 import VoiceInputScreen, { type VoiceInputScreenProps } from "@/components/voice-input-screen"
 import { WaikLogo } from "@/components/waik-logo"
-import { brand } from "@/lib/design-tokens"
+import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { useWaikUser } from "@/hooks/use-waik-user"
 import { postIncidentOrQueue } from "@/lib/offline-queue"
 
@@ -83,13 +84,12 @@ function SplashScreen({
   disabled: boolean
 }) {
   return (
-    <div className="mx-auto max-w-2xl p-4">
-      <h1 className="mb-1 text-2xl font-semibold" style={{ color: brand.darkTeal }}>
-        New incident report
-      </h1>
-      <p className="mb-6 text-sm" style={{ color: brand.muted }}>
-        Select an incident type to begin.
-      </p>
+    <div className="mx-auto w-full max-w-2xl px-4 py-6">
+      <PageHeader
+        className="mb-6"
+        title="New incident report"
+        description="Select an incident type to begin."
+      />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {INCIDENT_TYPE_PRESETS.map((t) => (
           <button
@@ -97,14 +97,10 @@ function SplashScreen({
             type="button"
             disabled={disabled}
             onClick={() => onStart(t.key)}
-            className="rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-[#0D7377]/50 disabled:opacity-50"
+            className="min-h-[48px] rounded-3xl border border-border bg-background p-4 text-left shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-2xl disabled:opacity-50"
           >
-            <p className="font-semibold" style={{ color: brand.darkTeal }}>
-              {t.title}
-            </p>
-            <p className="mt-1 text-sm" style={{ color: brand.muted }}>
-              {t.description}
-            </p>
+            <p className="font-semibold text-foreground">{t.title}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
           </button>
         ))}
       </div>
@@ -190,14 +186,14 @@ export default function StaffReportPage() {
           priority: "medium" as const,
         }
         const result = await postIncidentOrQueue(payload)
-        if (result.ok === true) {
+        if (result.ok) {
           const incident = (await result.response.json()) as { id: string }
           setIncidentId(incident.id)
           setSessionId(null)
           setPhase("tier1_board")
           return
         }
-        if (result.queued) {
+        if ("queued" in result && result.queued) {
           toast.success("Saved offline. Your report will send when you reconnect.", {
             duration: 5_000,
           })
@@ -206,7 +202,7 @@ export default function StaffReportPage() {
           setPhase("tier1_board")
           return
         }
-        toast.error(result.error ?? "Could not create incident.")
+        toast.error("error" in result ? result.error : "Could not create incident.")
       } catch (e) {
         console.error(e)
         toast.error("Something went wrong. Try again.")
@@ -230,28 +226,33 @@ export default function StaffReportPage() {
       case "tier1_board": {
         return (
           <div className="p-4">
-            <div className="mx-auto max-w-lg rounded-xl border border-gray-200 bg-white p-6 text-center">
-              <p className="mb-2 font-semibold" style={{ color: brand.darkTeal }}>
-                Tier 1 Question Board
-              </p>
-              <p className="mb-1 text-sm text-[#5A7070]">Question board UI renders here (task-04b)</p>
-              <p className="mb-4 text-xs text-[#5A7070]">
-                {incidentId ? `Incident: ${incidentId}` : ""}
-                {sessionId ? ` · Session: ${sessionId}` : ""}
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                <Button
-                  type="button"
-                  onClick={() => openQuestion(TIER1_SAMPLE)}
-                  className="rounded-xl bg-[#0D7377] px-6 text-white"
-                >
-                  Answer first question
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setPhase("gap_analysis")}>
-                  All Tier 1 answered (next step)
-                </Button>
-              </div>
-            </div>
+            <WaikCard className="mx-auto max-w-lg">
+              <WaikCardContent className="text-center">
+                <p className="mb-2 font-semibold text-foreground">Tier 1 Question Board</p>
+                <p className="mb-1 text-sm text-muted-foreground">Question board UI renders here (task-04b)</p>
+                <p className="mb-4 text-xs text-muted-foreground">
+                  {incidentId ? `Incident: ${incidentId}` : ""}
+                  {sessionId ? ` · Session: ${sessionId}` : ""}
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  <Button
+                    type="button"
+                    onClick={() => openQuestion(TIER1_SAMPLE)}
+                    className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
+                  >
+                    Answer first question
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 rounded-xl"
+                    onClick={() => setPhase("gap_analysis")}
+                  >
+                    All Tier 1 answered (next step)
+                  </Button>
+                </div>
+              </WaikCardContent>
+            </WaikCard>
           </div>
         )
       }
@@ -277,94 +278,114 @@ export default function StaffReportPage() {
 
       case "gap_analysis":
         return (
-          <div
-            className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4"
-            style={{ color: brand.darkTeal }}
-          >
-            <Loader2 className="h-8 w-8 animate-spin" style={{ color: brand.teal }} />
-            <div className="mt-1 flex justify-center">
+          <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4 text-primary">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="mt-1 flex justify-center text-foreground">
               <WaikLogo size="md" />
             </div>
-            <p className="text-sm" style={{ color: brand.muted }}>
-              Analyzing your report…
-            </p>
+            <p className="text-sm text-muted-foreground">Analyzing your report…</p>
           </div>
         )
 
       case "tier2_board":
         return (
           <div className="p-4">
-            <div className="mx-auto max-w-lg rounded-xl border border-gray-200 bg-white p-6 text-center">
-              <p className="mb-2 font-semibold" style={{ color: brand.darkTeal }}>
-                Tier 2 Question Board
-              </p>
-              <p className="mb-4 text-sm text-[#5A7070]">Gap-fill questions — task-04b</p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                <Button
-                  type="button"
-                  onClick={() => openQuestion(TIER2_SAMPLE)}
-                  className="rounded-xl bg-[#0D7377] px-6 text-white"
-                >
-                  Answer next question
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setPhase("closing")}>
-                  Met threshold (next: closing)
-                </Button>
-              </div>
-            </div>
+            <WaikCard className="mx-auto max-w-lg">
+              <WaikCardContent className="text-center">
+                <p className="mb-2 font-semibold text-foreground">Tier 2 Question Board</p>
+                <p className="mb-4 text-sm text-muted-foreground">Gap-fill questions — task-04b</p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  <Button
+                    type="button"
+                    onClick={() => openQuestion(TIER2_SAMPLE)}
+                    className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
+                  >
+                    Answer next question
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 rounded-xl"
+                    onClick={() => setPhase("closing")}
+                  >
+                    Met threshold (next: closing)
+                  </Button>
+                </div>
+              </WaikCardContent>
+            </WaikCard>
           </div>
         )
 
       case "closing":
         return (
           <div className="p-4">
-            <div className="mx-auto max-w-lg rounded-xl border border-gray-200 bg-white p-6 text-center">
-              <p className="mb-2 font-semibold" style={{ color: brand.darkTeal }}>
-                Closing Questions
-              </p>
-              <p className="mb-4 text-sm text-[#5A7070]">Closing question board — task-04b</p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                <Button
-                  type="button"
-                  onClick={() => openQuestion(CLOSING_SAMPLE)}
-                  className="rounded-xl bg-[#0D7377] px-6 text-white"
-                >
-                  Answer closing question
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setPhase("signoff")}>
-                  All 3 closing answered (dev)
-                </Button>
-              </div>
-            </div>
+            <WaikCard className="mx-auto max-w-lg">
+              <WaikCardContent className="text-center">
+                <p className="mb-2 font-semibold text-foreground">Closing Questions</p>
+                <p className="mb-4 text-sm text-muted-foreground">Closing question board — task-04b</p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  <Button
+                    type="button"
+                    onClick={() => openQuestion(CLOSING_SAMPLE)}
+                    className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
+                  >
+                    Answer closing question
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 rounded-xl"
+                    onClick={() => setPhase("signoff")}
+                  >
+                    All 3 closing answered (dev)
+                  </Button>
+                </div>
+              </WaikCardContent>
+            </WaikCard>
           </div>
         )
 
       case "signoff":
         return (
-          <div className="p-8 text-center">
-            <p className="font-semibold" style={{ color: brand.darkTeal }}>
-              Sign-Off
-            </p>
-            <p className="mt-2 text-sm text-[#5A7070]">Implemented in a later task.</p>
-            <Button type="button" className="mt-4" onClick={() => setPhase("reportcard")}>
-              Continue to report card
-            </Button>
+          <div className="p-4 sm:p-8">
+            <WaikCard className="mx-auto max-w-lg">
+              <WaikCardContent className="text-center">
+                <p className="font-semibold text-foreground">Sign-Off</p>
+                <p className="mt-2 text-sm text-muted-foreground">Implemented in a later task.</p>
+                <Button
+                  type="button"
+                  className="mt-6 min-h-12 w-full min-w-[12rem] sm:w-auto"
+                  onClick={() => setPhase("reportcard")}
+                >
+                  Continue to report card
+                </Button>
+              </WaikCardContent>
+            </WaikCard>
           </div>
         )
 
       case "reportcard":
         return (
-          <div className="p-8 text-center">
-            <p className="font-semibold" style={{ color: brand.darkTeal }}>
-              Report Card
-            </p>
-            <p className="mt-2 text-sm text-[#5A7070]">Score &amp; coaching — to be connected to live data (task-05+).</p>
-            <p className="mt-2 text-xs text-[#5A7070]">
-              {incidentId ? `Incident: ${incidentId}` : ""} · {Object.keys(answers).length} answers in session
-            </p>
-            <Button type="button" className="mt-4 bg-[#0D7377] text-white" onClick={handleFinishDashboard}>
-              Finish &amp; return to dashboard
-            </Button>
+          <div className="p-4 sm:p-8">
+            <WaikCard className="mx-auto max-w-lg">
+              <WaikCardContent className="text-center">
+                <p className="font-semibold text-foreground">Report Card</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Score &amp; coaching — to be connected to live data (task-05+).
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {incidentId ? `Incident: ${incidentId}` : ""} · {Object.keys(answers).length} answers in
+                  session
+                </p>
+                <Button
+                  type="button"
+                  className="mt-6 min-h-12 w-full min-w-[12rem] shadow-xl shadow-primary/30 sm:w-auto"
+                  onClick={handleFinishDashboard}
+                >
+                  Finish &amp; return to dashboard
+                </Button>
+              </WaikCardContent>
+            </WaikCard>
           </div>
         )
 
@@ -384,7 +405,8 @@ export default function StaffReportPage() {
 
   return (
     <ErrorBoundary onReset={resetToSplash}>
-      <div className="min-h-screen" style={{ background: brand.lightBg ?? brand.shellBg }}>
+      <div className="relative flex flex-1 flex-col">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
         {renderPhase()}
       </div>
     </ErrorBoundary>

@@ -82,7 +82,7 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
       } else {
         setSubmitStatus({ type: "error", message: result.message })
       }
-    } catch (error) {
+    } catch {
       setSubmitStatus({
         type: "error",
         message: "An unexpected error occurred. Please try again.",

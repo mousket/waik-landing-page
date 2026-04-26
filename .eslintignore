@@ -1,0 +1,11 @@
+# Build and generated output (keep eslint focused on source)
+.next
+out
+node_modules
+
+# Serwist / PWA bundle output
+public/sw.js
+
+# Node entrypoints and one-off scripts (not in tsconfig; lint app/lib/components for UI)
+server.js
+scripts

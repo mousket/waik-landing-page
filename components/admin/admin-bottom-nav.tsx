@@ -2,6 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
+import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import {
   ClipboardCheck,
   ClipboardList,
@@ -10,7 +12,6 @@ import {
   Settings,
   Users,
 } from "lucide-react"
-import { brand } from "@/lib/design-tokens"
 import { cn } from "@/lib/utils"
 
 const tabs = [
@@ -37,23 +38,24 @@ function tabActive(pathname: string, href: string): boolean {
  */
 export function AdminBottomNav() {
   const pathname = usePathname()
+  const searchParams = useAdminUrlSearchParams()
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white pb-[env(safe-area-inset-bottom,0px)] md:hidden"
-      style={{ borderColor: brand.midGray }}
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)] md:hidden"
       aria-label="Admin navigation"
     >
       <div className="mx-auto flex min-h-[64px] w-full max-w-2xl items-stretch justify-between gap-0.5 px-0.5">
         {tabs.map(({ href, label, icon: Icon }) => {
           const active = tabActive(pathname, href)
+          const hrefWithContext = buildAdminPathWithContext(href, searchParams)
           return (
             <Link
               key={href}
-              href={href}
+              href={hrefWithContext}
               className={cn(
                 "flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1 text-[9px] font-semibold leading-[1.15] transition-colors sm:text-[11px]",
-                active ? "text-brand-teal" : "text-brand-muted",
+                active ? "text-primary" : "text-muted-foreground",
               )}
             >
               <Icon className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" strokeWidth={active ? 2.25 : 1.75} aria-hidden />

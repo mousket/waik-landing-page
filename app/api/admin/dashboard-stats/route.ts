@@ -3,44 +3,20 @@ import connectMongo from "@/backend/src/lib/mongodb"
 import AssessmentModel from "@/backend/src/models/assessment.model"
 import IncidentModel from "@/backend/src/models/incident.model"
 import { withAdminAuth } from "@/lib/api-handler"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 import type { DashboardStats } from "@/lib/types/dashboard-stats"
 import getRedis from "@/lib/redis"
 
 const CACHE_TTL_SEC = 300
-
-function effectiveFacilityId(request: Request, currentUser: { facilityId: string; isWaikSuperAdmin: boolean }): {
-  id: string
-  error?: NextResponse
-} {
-  const url = new URL(request.url)
-  const requested = (url.searchParams.get("facilityId") || "").trim()
-  if (currentUser.isWaikSuperAdmin) {
-    const id = (requested || currentUser.facilityId || "").trim()
-    if (!id) {
-      return {
-        id: "",
-        error: NextResponse.json({ error: "facilityId query required for super admin" }, { status: 400 }),
-      }
-    }
-    return { id }
-  }
-  const id = (currentUser.facilityId || "").trim()
-  if (!id) {
-    return { id: "", error: NextResponse.json({ error: "No facility assigned to user" }, { status: 400 }) }
-  }
-  if (requested && requested !== id) {
-    return { id: "", error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
-  return { id }
-}
 
 function startedAtExpr() {
   return { $ifNull: ["$startedAt", "$createdAt"] } as const
 }
 
 export const GET = withAdminAuth(async (request, { currentUser }) => {
-  const { id: facilityId, error } = effectiveFacilityId(request, currentUser)
-  if (error) return error
+  const resolved = await resolveEffectiveAdminFacility(request, currentUser)
+  if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+  const { facilityId } = resolved
 
   const cacheKey = `waik:stats:${facilityId}`
 

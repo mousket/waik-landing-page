@@ -3,12 +3,13 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import UserModel from "@/backend/src/models/user.model"
-import { authErrorResponse, getCurrentUser, unauthorizedResponse, requireFacilityAccess } from "@/lib/auth"
+import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 import { generateTempPassword } from "@/lib/waik-admin-utils"
 import { sendStaffWelcomeEmail } from "@/lib/send-welcome-email"
 
-export async function POST(_request: Request, { params }: { params: { userId: string } }) {
+export async function POST(request: Request, { params }: { params: { userId: string } }) {
   try {
     const user = await getCurrentUser()
     if (!user) return unauthorizedResponse()
@@ -19,18 +20,21 @@ export async function POST(_request: Request, { params }: { params: { userId: st
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
     }
 
+    const resolved = await resolveEffectiveAdminFacility(request, user)
+    if (isEffectiveAdminFacilityError(resolved)) return resolved.error
+    const { facilityId } = resolved
+
     await connectMongo()
-    const target = await UserModel.findOne({ id: params.userId, facilityId: user.facilityId }).exec()
+    const target = await UserModel.findOne({ id: params.userId, facilityId }).exec()
     if (!target) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    requireFacilityAccess(user, String(target.facilityId ?? ""))
 
     if (!target.clerkUserId) {
       return NextResponse.json({ error: "User has no Clerk account" }, { status: 400 })
     }
 
-    const facility = await FacilityModel.findOne({ id: user.facilityId }).lean().exec()
+    const facility = await FacilityModel.findOne({ id: facilityId }).lean().exec()
     const facilityName =
       facility && !Array.isArray(facility) ? String((facility as { name?: string }).name ?? "") : ""
 
