@@ -1,24 +1,85 @@
 import { NextResponse } from "next/server"
+import connectMongo from "@/backend/src/lib/mongodb"
+import IncidentModel, { INCIDENT_PHASES } from "@/backend/src/models/incident.model"
+import { withAdminAuth } from "@/lib/api-handler"
 import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
-import { getIncidents, createIncidentFromReport, addQuestionToIncident, getUserById } from "@/lib/db"
+import { createIncidentFromReport, addQuestionToIncident, getUserById } from "@/lib/db"
+import { mapIncidentDocToSummary } from "@/lib/map-incident-summary"
 import { getQuestionEmbedding } from "@/lib/embeddings"
 import { isOpenAIConfigured } from "@/lib/openai"
+import type { IncidentPhase } from "@/lib/types/incident-summary"
 
-export async function GET() {
-  const sessionUser = await getCurrentUser()
-  if (!sessionUser) return unauthorizedResponse()
+function parsePhaseList(raw: string | null): IncidentPhase[] | null {
+  if (!raw || !raw.trim()) return null
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean) as IncidentPhase[]
+  const allowed = new Set(INCIDENT_PHASES as readonly string[])
+  const filtered = parts.filter((p) => allowed.has(p))
+  return filtered.length ? filtered : null
+}
+
+export const GET = withAdminAuth(async (request, { currentUser }) => {
   try {
-    const facilityId = sessionUser.facilityId ?? ""
-    if (!facilityId && !sessionUser.isWaikSuperAdmin) {
-      return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
+    const url = new URL(request.url)
+    const requestedFacility = url.searchParams.get("facilityId")
+    const phaseRaw = url.searchParams.get("phase")
+    const daysRaw = url.searchParams.get("days")
+    const hasInjuryRaw = url.searchParams.get("hasInjury")
+
+    let effectiveFacilityId: string
+    if (currentUser.isWaikSuperAdmin) {
+      effectiveFacilityId = (requestedFacility || currentUser.facilityId || "").trim()
+      if (!effectiveFacilityId) {
+        return NextResponse.json({ error: "facilityId query required for super admin" }, { status: 400 })
+      }
+    } else {
+      effectiveFacilityId = (currentUser.facilityId || "").trim()
+      if (!effectiveFacilityId) {
+        return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
+      }
+      if (requestedFacility && requestedFacility !== effectiveFacilityId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
     }
-    const incidents = await getIncidents(facilityId)
-    return NextResponse.json(incidents)
+
+    await connectMongo()
+
+    const filter: Record<string, unknown> = { facilityId: effectiveFacilityId }
+
+    const phases = parsePhaseList(phaseRaw)
+    if (phases) {
+      filter.phase = phases.length === 1 ? phases[0] : { $in: phases }
+    }
+
+    const days = daysRaw != null ? Number.parseInt(daysRaw, 10) : NaN
+    if (!Number.isNaN(days) && days > 0) {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      const closedOnly = phases?.length === 1 && phases[0] === "closed"
+      if (closedOnly) {
+        // Closed tab: window by when the investigation was locked, not when it was reported (task-06d).
+        filter["phaseTransitionTimestamps.phase2Locked"] = { $gte: cutoff }
+      } else {
+        filter.$expr = {
+          $gte: [{ $ifNull: ["$phaseTransitionTimestamps.phase1Started", "$createdAt"] }, cutoff],
+        }
+      }
+    }
+
+    if (hasInjuryRaw === "true") {
+      filter.$or = [{ hasInjury: true }, { "redFlags.hasInjury": true }]
+    }
+
+    const raw = await IncidentModel.find(filter).sort({ updatedAt: -1 }).lean().exec()
+    const incidents = raw.map((doc) => mapIncidentDocToSummary(doc as unknown as Record<string, unknown>))
+
+    return NextResponse.json({ incidents, total: incidents.length })
   } catch (error) {
-    console.error("[v0] Error fetching incidents:", error)
+    console.error("[api/incidents GET]", error)
     return NextResponse.json({ error: "Failed to fetch incidents" }, { status: 500 })
   }
-}
+})
 
 export async function POST(request: Request) {
   const sessionUser = await getCurrentUser()

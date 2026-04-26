@@ -15,8 +15,14 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     redirect("/admin/dashboard")
   }
 
+  const todayYmd = new Date().toISOString().slice(0, 10)
+  const unitLabel =
+    user.selectedUnit && user.selectedUnitDate && user.selectedUnitDate === todayYmd
+      ? user.selectedUnit
+      : null
+
   return (
-    <StaffAppShell firstName={user.firstName} lastName={user.lastName}>
+    <StaffAppShell firstName={user.firstName} lastName={user.lastName} unitLabel={unitLabel}>
       {children}
     </StaffAppShell>
   )

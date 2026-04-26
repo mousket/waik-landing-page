@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useWaikUser } from "@/hooks/use-waik-user"
+import { postIncidentOrQueue } from "@/lib/offline-queue"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Volume2, VolumeX, CheckCircle2, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
@@ -575,27 +576,32 @@ export default function CompanionCreatePage() {
         speak(AI_MESSAGES.analyzing)
 
       try {
-        const incidentResponse = await fetch("/api/incidents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: `${name || "Staff"} Incident Report`,
-            narrative: narrativeSummary,
-            description: narrativeSummary,
-            residentName: "Resident",
-            residentRoom: "Unknown",
-            staffId: userId,
-            staffName: name,
-            reportedByRole: role,
-          }),
-        })
+        const incidentPayload = {
+          title: `${name || "Staff"} Incident Report`,
+          narrative: narrativeSummary,
+          description: narrativeSummary,
+          residentName: "Resident",
+          residentRoom: "Unknown",
+          staffId: userId,
+          staffName: name,
+          reportedByRole: role,
+        }
+        const postResult = await postIncidentOrQueue(incidentPayload)
 
-        if (!incidentResponse.ok) {
-          const payload = await incidentResponse.json().catch(() => ({}))
-          throw new Error(payload?.error ?? "Failed to create incident.")
+        if (postResult.ok === false && postResult.queued) {
+          setIsProcessing(false)
+          toast.success("Saved offline. Your report will send when you reconnect.", {
+            duration: 5_000,
+          })
+          setCurrentStep("greeting")
+          currentStepRef.current = "greeting"
+          return
+        }
+        if (postResult.ok === false) {
+          throw new Error(postResult.error ?? "Failed to create incident.")
         }
 
-        const incident = await incidentResponse.json()
+        const incident = (await postResult.response.json()) as { id: string }
 
         const startResponse = await fetch("/api/agent/report-conversational", {
           method: "POST",
@@ -617,7 +623,65 @@ export default function CompanionCreatePage() {
           throw new Error(payload?.error ?? "Failed to initialize investigator.")
         }
 
-        const startData = await startResponse.json()
+        let startData = (await startResponse.json()) as {
+          status?: string
+          sessionId?: string | null
+          message?: string
+          questions?: Array<{ id: string; text: string }>
+          score?: number
+          feedback?: string
+          strengths?: string[]
+          gaps?: string[]
+        }
+
+        if (startData.status === "partial") {
+          await new Promise((r) => setTimeout(r, 2000))
+          const retry = await fetch("/api/agent/report-conversational", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "start",
+              incidentId: incident.id,
+              narrative: narrativeSummary,
+              initialNarrative: narrativeSummary,
+              investigatorId: "agent-companion",
+              investigatorName: "WAiK Companion Investigator",
+              reporterName: name || "Staff Reporter",
+              assignedStaffIds: userId ? [userId] : undefined,
+            }),
+          })
+          if (retry.ok) {
+            const again = (await retry.json()) as typeof startData
+            if (again.status !== "partial") {
+              startData = again
+            }
+          }
+        }
+
+        if (startData.status === "partial") {
+          toast.info(
+            startData.message ??
+              "The investigator is taking longer than expected. Please start your answers again from the top.",
+          )
+          speak("That took too long. Let's go back to the beginning of this form.")
+          setIsProcessing(false)
+          setCurrentStep("greeting")
+          currentStepRef.current = "greeting"
+          setCurrentPromptIndex(0)
+          currentPromptIndexRef.current = 0
+          narrativeAnswersRef.current = {
+            resident: "",
+            incident: "",
+            residentState: "",
+            environment: "",
+          }
+          setAgentSessionId(null)
+          return
+        }
+
+        if (!startData.sessionId) {
+          throw new Error("Investigator did not return a session id.")
+        }
 
         setAgentSessionId(startData.sessionId)
         const firstQuestion = startData.questions?.[0]
@@ -682,6 +746,20 @@ export default function CompanionCreatePage() {
       }
 
       const data = await answerResponse.json()
+
+      if (data.status === "partial") {
+        toast.info(
+          (data as { message?: string }).message ??
+            "That took a while. I saved your progress. Please say your answer again.",
+        )
+        speak(
+          (data as { message?: string }).message?.split("—")[0]?.trim() ??
+            "That took a bit long. Please repeat your last answer.",
+        )
+        setIsProcessing(false)
+        startListening()
+        return
+      }
 
       if (data.status === "completed") {
           setIsProcessing(false)

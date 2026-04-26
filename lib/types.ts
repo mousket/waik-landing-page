@@ -316,6 +316,8 @@ export interface CurrentUser {
   isWaikSuperAdmin: boolean
   deviceType: DeviceType
   mustChangePassword: boolean
+  selectedUnit?: string
+  selectedUnitDate?: string
   isAdminTier: boolean
   canAccessPhase2: boolean
   canInviteStaff: boolean

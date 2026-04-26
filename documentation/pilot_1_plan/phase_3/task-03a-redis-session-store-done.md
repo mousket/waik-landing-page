@@ -19,25 +19,24 @@ This task replaces the Map with Redis. Session state is written to Redis
 on every update and read from Redis on every access. The session survives
 across any number of serverless invocations.
 
-Redis is already provisioned on Redis Cloud (Azure East US). This task
-wires it in, establishes the key naming and TTL contract, and proves the
-fix with automated tests.
+Redis is provisioned on Redis Cloud. This task wires it in, establishes the
+key naming and TTL contract, and proves the fix with automated tests.
 
 ---
 
 ## Environment Variables
 
-Add to `.env.local` (values already provisioned):
+Add to `.env.local` (get values from Redis Cloud / your secrets manager):
 ```
-REDIS_HOST=redis-12024.c56.east-us.azure.cloud.redislabs.com:12024
-WAIK_REDIS_USER=waik_redis_dev_user
-WAIK_REDIS_USER_PASSWORD=Cram9641+Wai!_Red
-REDIS_WAIK_DATABASE=waik
-REDIS_URL=redis://waik_redis_dev_user:Cram9641+Wai!_Red@redis-12024.c56.east-us.azure.cloud.redislabs.com:12024
+REDIS_HOST=your-host:port
+WAIK_REDIS_USER=your_acl_username
+WAIK_REDIS_USER_PASSWORD=your_password
+REDIS_WAIK_DATABASE=0
+# Or a single URL (URL-encode special characters in the password):
+# REDIS_URL=redis://user:password@host:port
 ```
 
-Note: `REDIS_URL` is the combined connection string that ioredis accepts.
-Construct it from the component parts above.
+Note: `REDIS_URL` is optional if `REDIS_HOST` + `WAIK_REDIS_*` are set. See `lib/redis.ts` and `.env.example`.
 
 ---
 
@@ -152,39 +151,13 @@ I'm building WAiK on Next.js 14. The Expert Investigator session store
 currently uses an in-memory Map which fails on Vercel serverless because
 each API call can be a different process. I need to replace it with Redis.
 
-Redis is already provisioned on Redis Cloud. Connection details:
-  REDIS_URL=redis://waik_redis_dev_user:Cram9641+Wai!_Red@redis-12024.c56.east-us.azure.cloud.redislabs.com:12024
+Set `REDIS_URL` or `REDIS_HOST` + `WAIK_REDIS_USER` + `WAIK_REDIS_USER_PASSWORD` in `.env` (see `.env.example`).
 
 STEP 1 — Install ioredis:
   npm install ioredis
   npm install --save-dev @types/ioredis (if needed — ioredis v5+ includes types)
 
-STEP 2 — Create lib/redis.ts (singleton client):
-
-import Redis from "ioredis"
-
-if (!process.env.REDIS_URL) {
-  throw new Error("REDIS_URL environment variable is not set")
-}
-
-// Singleton pattern — reuse connection across serverless warm invocations
-const globalForRedis = global as unknown as { redis?: Redis }
-
-export const redis = globalForRedis.redis ?? new Redis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: 3,
-  enableReadyCheck: true,
-  lazyConnect: false,
-})
-
-if (process.env.NODE_ENV !== "production") {
-  globalForRedis.redis = redis
-}
-
-redis.on("error", (err) => {
-  console.error("[Redis] Connection error:", err.message)
-})
-
-export default redis
+STEP 2 — Create `lib/redis.ts` with lazy `getRedis()` (see repo for implementation: supports `REDIS_URL` or `REDIS_HOST` + `WAIK_REDIS_USER` + `WAIK_REDIS_USER_PASSWORD`, optional TLS).
 
 STEP 3 — Replace lib/agents/expert_investigator/session_store.ts entirely:
 
@@ -194,7 +167,7 @@ CONTRACT:
   DB:   The Redis URL already points to the correct database
   Fail: throw Error on Redis failure — never silently fall back
 
-import { redis } from "@/lib/redis"
+import { getRedis } from "@/lib/redis"
 
 const SESSION_PREFIX = "waik:session:"
 const SESSION_TTL = 7200  // 2 hours in seconds
@@ -210,14 +183,14 @@ export async function createSession(
 ): Promise<void> {
   const key = SESSION_PREFIX + sessionId
   const serialized = JSON.stringify(data)
-  await redis.set(key, serialized, "EX", SESSION_TTL)
+  await getRedis().set(key, serialized, "EX", SESSION_TTL)
 }
 
 export async function getSession(
   sessionId: SessionId
 ): Promise<InvestigatorSession | null> {
   const key = SESSION_PREFIX + sessionId
-  const raw = await redis.get(key)
+  const raw = await getRedis().get(key)
   if (!raw) return null
   return JSON.parse(raw) as InvestigatorSession
 }
@@ -232,14 +205,14 @@ export async function updateSession(
     throw new Error(`[Redis] Cannot update session ${sessionId} — not found`)
   }
   const updated = { ...existing, ...data }
-  await redis.set(key, JSON.stringify(updated), "EX", SESSION_TTL)
+  await getRedis().set(key, JSON.stringify(updated), "EX", SESSION_TTL)
 }
 
 export async function deleteSession(
   sessionId: SessionId
 ): Promise<void> {
   const key = SESSION_PREFIX + sessionId
-  await redis.del(key)
+  await getRedis().del(key)
 }
 
 STEP 4 — Verify no in-memory Map remains:
@@ -248,11 +221,9 @@ STEP 4 — Verify no in-memory Map remains:
   If any other file imports from session_store: verify it still works
   with the new async API (all functions are now async — callers must await)
 
-STEP 5 — Add to .env.local:
-  REDIS_URL=redis://waik_redis_dev_user:Cram9641+Wai!_Red@redis-12024.c56.east-us.azure.cloud.redislabs.com:12024
+STEP 5 — Add real values to .env.local (see .env.example).
 
-STEP 6 — Add to .env.example (without real credentials):
-  REDIS_URL=redis://username:password@host:port
+STEP 6 — .env.example documents placeholders (no real credentials).
 
 Run npm run build. Fix all TypeScript errors.
 Do not touch any route handlers yet — that is the next task.

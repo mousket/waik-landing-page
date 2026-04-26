@@ -5,6 +5,7 @@ export function LoginWaveAnimation() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -81,11 +82,13 @@ export function LoginWaveAnimation() {
       animationId = requestAnimationFrame(animate)
     }
 
-    animate()
+    if (!reduceMotion) {
+      animate()
+    }
 
     return () => {
       window.removeEventListener("resize", resizeCanvas)
-      cancelAnimationFrame(animationId)
+      if (!reduceMotion) cancelAnimationFrame(animationId)
     }
   }, [])
 

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { RedirectLoading } from "@/components/ui/redirect-loading"
+import { AuthPageFrame } from "@/components/ui/auth-background"
 
 function strengthScore(password: string): number {
   let s = 0
@@ -87,51 +88,53 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gradient-to-br from-primary/10 via-background to-accent/10">
-      <div className="w-full max-w-md space-y-8 rounded-xl border bg-card p-8 shadow-lg">
-        <div className="flex justify-center">
-          <Image src="/waik-logo.png" alt="WAiK" width={140} height={56} className="h-12 w-auto" />
-        </div>
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">Create your password</h1>
-          <p className="text-sm text-muted-foreground">Please set a new password to get started with WAiK.</p>
-        </div>
-        <form onSubmit={onSubmit} className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="password">New password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="h-11"
-            />
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Strength</span>
-                <span>{label}</span>
+    <AuthPageFrame>
+      <div className="w-full max-w-md">
+        <div className="space-y-8 rounded-3xl border border-border/20 bg-background/90 p-8 shadow-xl backdrop-blur-sm">
+          <div className="flex justify-center">
+            <Image src="/waik-logo.png" alt="WAiK" width={140} height={56} className="h-12 w-auto" />
+          </div>
+          <div className="space-y-2 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Create your password</h1>
+            <p className="text-sm text-muted-foreground">Please set a new password to get started with WAiK.</p>
+          </div>
+          <form onSubmit={onSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="password">New password</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11"
+              />
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Strength</span>
+                  <span>{label}</span>
+                </div>
+                <Progress value={score} className="h-2" />
               </div>
-              <Progress value={score} className="h-2" />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm">Confirm password</Label>
-            <Input
-              id="confirm"
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className="h-11"
-            />
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button type="submit" className="w-full h-11" disabled={submitting}>
-            {submitting ? "Saving…" : "Set password"}
-          </Button>
-        </form>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirm password</Label>
+              <Input
+                id="confirm"
+                type="password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                className="h-11"
+              />
+            </div>
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            <Button type="submit" className="h-11 w-full" disabled={submitting}>
+              {submitting ? "Saving…" : "Set password"}
+            </Button>
+          </form>
+        </div>
       </div>
-    </div>
+    </AuthPageFrame>
   )
 }

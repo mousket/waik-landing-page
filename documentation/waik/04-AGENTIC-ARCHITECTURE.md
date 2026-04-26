@@ -574,8 +574,35 @@ Adjustments:
 
 ---
 
+## Redis session store (Phase 3 — core hardening)
+
+- **Client**: `lib/redis.ts` — lazy singleton; connects on first `getRedis()` in API / Node runtimes.
+- **Expert investigator keys**: `waik:session:{sessionId}` — JSON `InvestigatorSession`, **TTL 7200 seconds** (2h). **Failure mode**: Redis errors surface as thrown `Error` from `session_store.ts` (no silent fallbacks to in-memory state).
+- **Legacy interview work sessions** (beta `/api/agent/interview/*`): `waik:interview-work:{id}`, same TTL pattern via `lib/interview_work_session_store.ts`.
+- **Env**: `REDIS_URL` and/or `REDIS_HOST` + `WAIK_REDIS_USER` / `WAIK_REDIS_USER_PASSWORD` — see `.env.example` (placeholders only; no production secrets in repo templates).
+
+## Session consumer map
+
+| Area | Functions | Notes |
+|------|------------|--------|
+| `lib/agents/expert_investigator/graph.ts` | `createSession`, `getSession`, `updateSession`, `deleteSession` | All **awaited**; drives investigator conversation. |
+| `app/api/agent/report-conversational/route.ts` | `getSession` (pre-answer 404) + graph | `action: "start"` / `"answer"`. |
+| `app/api/agent/interview/*` | `interview_work_session_store` (start/answer/complete) | `sessionId` in JSON; work-session key prefix `waik:interview-work:`. |
+| `app/api/agent/investigate`, `report` | — | No session store. |
+
+## report-conversational timeout handling
+
+- **Platform**: `export const maxDuration = 60` in `app/api/agent/report-conversational/route.ts` (plan/host may still cap lower, e.g. Hobby ~10s).
+- **App**: `Promise.race` with **45s** `createTimeout()` around `startInvestigatorConversation` and `answerInvestigatorQuestion`.
+- **Partial response** (200, not 504): `{ status: "partial", sessionId, incidentId, message, questions?: [] }` — `sessionId` may be `null` on a slow **start** timeout.
+- **Data**: `updateInvestigationProgressOnTimeout` in `lib/db.ts` best-effort; investigator Redis session is **not** deleted on timeout.
+
+---
+
 ## Related Documentation
 
+- [08-COMPONENTS.md](./08-COMPONENTS.md) — VoiceInputScreen, ErrorBoundary
+- [09-STATE-MACHINES.md](./09-STATE-MACHINES.md) — Staff report `ReportPhase`
 - [05-REPORT-AGENT.md](./05-REPORT-AGENT.md) - Detailed Report Agent documentation
 - [06-INVESTIGATION-AGENT.md](./06-INVESTIGATION-AGENT.md) - Detailed Investigation Agent documentation
 - [07-EXPERT-INVESTIGATOR.md](./07-EXPERT-INVESTIGATOR.md) - Expert Investigator documentation

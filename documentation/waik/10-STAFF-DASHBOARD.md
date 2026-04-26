@@ -1,156 +1,140 @@
 # WAiK Staff Dashboard
 
-**Version**: 1.0  
-**Last Updated**: December 2024  
-**Role**: Staff (Nurses, CNAs, Healthcare Workers)
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Access & Authentication](#access--authentication)
-3. [Layout & Navigation](#layout--navigation)
-4. [Dashboard Features](#dashboard-features)
-5. [Incident List](#incident-list)
-6. [Incident Detail Page](#incident-detail-page)
-7. [Notifications](#notifications)
-8. [Key User Flows](#key-user-flows)
+**Version**: 1.1  
+**Last Updated**: April 2026  
+**Surface**: Mobile-first Staff command center (`/staff/*`)
 
 ---
 
 ## Overview
 
-The Staff Dashboard is the primary interface for healthcare workers to:
-- View incidents assigned to them
-- Answer follow-up questions (text or voice)
-- Query the AI Intelligence system
-- Review AI-generated reports
+The staff dashboard is optimized for a nurse opening WAiK on an iPhone with ~30 seconds:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         STAFF DASHBOARD OVERVIEW                            │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   ┌──────────────────┐                                                      │
-│   │     SIDEBAR      │    ┌─────────────────────────────────────────────┐   │
-│   │                  │    │                                             │   │
-│   │  WAiK Logo       │    │              MAIN CONTENT AREA              │   │
-│   │  Staff Portal    │    │                                             │   │
-│   │  User Name       │    │   ┌─────────┐ ┌─────────┐ ┌─────────┐       │   │
-│   │                  │    │   │  Open   │ │ Pending │ │Completed│       │   │
-│   │  ──────────────  │    │   │Incidents│ │Questions│ │  Today  │       │   │
-│   │                  │    │   │   (3)   │ │   (7)   │ │   (2)   │       │   │
-│   │  Dashboard       │    │   └─────────┘ └─────────┘ └─────────┘       │   │
-│   │  New Incident    │    │                                             │   │
-│   │  Conversational  │    │   ┌─────────────────────────────────────┐   │   │
-│   │  AI Companion    │    │   │                                     │   │   │
-│   │                  │    │   │         INCIDENT LIST               │   │   │
-│   │  ──────────────  │    │   │    (Search, Filter, Sort)           │   │   │
-│   │                  │    │   │                                     │   │   │
-│   │  Logout          │    │   └─────────────────────────────────────┘   │   │
-│   │                  │    │                                             │   │
-│   └──────────────────┘    └─────────────────────────────────────────────┘   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+- **Is anything urgent?** (pending questions, due assessments)
+- **How do I report what just happened?** (one-tap “Report Incident”)
 
 ---
 
-## Access & Authentication
+## Layout, Routing, and Role Gating
 
-### Route Protection
+### Layout entry point
 
-```typescript
-// app/staff/layout.tsx
-<AuthGuard allowedRoles={["staff"]}>
-  {children}
-</AuthGuard>
-```
+- `app/staff/layout.tsx` (server component guard + shell)
+- `components/staff/staff-app-shell.tsx` (mobile header + bottom tabs + badge polling)
 
-Only users with `role: "staff"` can access the `/staff/*` routes.
+### Role gating (defense-in-depth)
 
-### Auth State
-
-```typescript
-const { name, userId, logout } = useAuthStore()
-```
-
-| Property | Description |
-|----------|-------------|
-| `name` | Display name of logged-in user |
-| `userId` | Unique identifier for API calls |
-| `role` | Always "staff" for this dashboard |
-| `logout` | Function to clear auth and redirect |
+- Unauthenticated → redirect to `/sign-in`
+- WAiK super admin → redirect to `/waik-admin`
+- Admin-tier (DON/Admin roles) → redirect to `/admin/dashboard`
+- Staff-tier roles (RN/CNA/LPN/etc.) → allowed
 
 ---
 
-## Layout & Navigation
+## Dashboard Page (Home Tab)
 
-### File Structure
+### File
 
-```
-app/staff/
-├── layout.tsx              # Staff layout with sidebar
-├── dashboard/
-│   ├── page.tsx            # Main dashboard
-│   └── loading.tsx         # Loading state
-├── incidents/
-│   └── [id]/
-│       └── page.tsx        # Incident detail view
-└── report/
-    └── page.tsx            # Conversational reporting
-```
+- `app/staff/dashboard/page.tsx` (`"use client"`)
 
-### Sidebar Navigation
+### Data fetching
 
-| Button | Route | Description |
-|--------|-------|-------------|
-| **Dashboard** | `/staff/dashboard` | Main incident list |
-| **New Incident** | `/incidents/create` | Standard voice-guided form |
-| **Conversational Reporting** | `/incidents/conversational/create` | Chat-based reporting |
-| **AI Companion** | `/incidents/companion/create` | Full voice conversation |
+The dashboard makes **three** API calls on load:
 
-### Mobile Responsiveness
+1. `GET /api/staff/incidents` — shared state for hero banner + pending + recent
+2. `GET /api/assessments/due` — due assessments strip (7-day window)
+3. `GET /api/staff/performance` — performance card analytics (cached)
 
-- Collapsible sidebar on mobile (`< 1024px`)
-- Touch-friendly notification bell in header
-- Responsive incident cards
+### Section 1 — Hero card
+
+- Primary CTA: **“🎤 Report Incident”** → `/staff/report`
+- Must remain visible without scrolling on a 375px viewport (iPhone SE)
+- If an unfinished report exists, an **amber “continue” banner** renders above the hero and deep-links to `/staff/incidents/[id]`
+
+### Section 2 — Pending Questions
+
+**Authoritative rule:** An incident is pending when:
+
+- `phase === "phase_1_in_progress"` **and**
+- `completenessScore < 100`
+
+Cards are sorted **oldest first** by `startedAt`.
+
+UI elements per card:
+
+- room (room number only)
+- incident type
+- elapsed time since `startedAt`
+- “N questions remaining” badge (derived from `tier2QuestionsGenerated - questionsAnswered`, min 1)
+- circular completion ring
+- “Continue report” → `/staff/incidents/[id]`
+
+### Section 3 — Recent Reports
+
+- Shows the staff member’s **latest 5** reports (newest first)
+- Row is tappable and routes to `/staff/incidents/[id]`
+- Phase dot colors:
+  - `phase_1_in_progress` → amber `#E8A838`
+  - `phase_1_complete` → yellow `#F4D03F`
+  - `phase_2_in_progress` → blue `#2E86DE`
+  - `closed` → teal `#0D7377`
+
+### Section 4 — Assessments Due This Week
+
+- Driven by `GET /api/assessments/due`
+- **Conditionally invisible** when the list is empty (no empty headings)
+- Days badge colors:
+  - ≤ 1 day: green
+  - 2–3 days: amber
+  - 4–7 days: gray
+- “Start” deep link: `/staff/assessments/[type]?residentId=...`
+
+### Section 5 — Performance Card
+
+- Driven by `GET /api/staff/performance`
+- **Collapsed by default**, expands on tap
+- Score colors:
+  - ≥ 85: teal
+  - 60–84: amber
+  - < 60: red
+- Streak definition:
+  - consecutive signed reports (newest first) with `completenessAtSignoff >= 85`
+  - stops at first below 85
+- Streak banner only shown when `currentStreak >= 3`
 
 ---
 
-## Dashboard Features
+## Bottom Tab Bar + Badge Polling
 
-### Statistics Cards
+Tabs:
 
-```typescript
-const openIncidents = incidents.filter((i) => i.status === "open")
-const pendingQuestions = incidents.reduce((count, incident) => {
-  return count + incident.questions.filter((q) => !q.answer).length
-}, 0)
-const completedToday = incidents.filter((i) => {
-  const today = new Date().toDateString()
-  return i.status === "closed" && new Date(i.updatedAt).toDateString() === today
-}).length
-```
+- Home (`/staff/dashboard`)
+- Incidents (`/staff/incidents`)
+- Assessments (`/staff/assessments`)
+- Intelligence (`/staff/intelligence`)
 
-| Card | Color | Description |
-|------|-------|-------------|
-| **Open Incidents** | Primary | Incidents assigned to this staff |
-| **Pending Questions** | Accent | Questions awaiting response |
-| **Completed Today** | Green | Incidents closed today |
+Badges:
 
-### Data Fetching
+- Home + Incidents: `pendingQuestions`
+- Assessments: `dueAssessments`
 
-```typescript
-const fetchIncidents = async () => {
-  const response = await fetch(`/api/staff/incidents?staffId=${userId}`)
-  const data = await response.json()
-  setIncidents(data.incidents)
-}
-```
+Polling:
 
-Only incidents where `staffId === userId` are returned.
+- `GET /api/staff/badge-counts` on mount and every **60 seconds**
+
+---
+
+## Privacy Constraints (PHI)
+
+- Dashboard APIs and UI surfaces must not return or render resident names.
+- Room number is allowed.
+
+---
+
+## Related Docs
+
+- `documentation/waik/03-API-REFERENCE.md`
+- `documentation/pilot_1_plan/phase_3c/task-05e-integration-verification.md`
 
 ---
 

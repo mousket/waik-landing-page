@@ -285,7 +285,7 @@ export async function startInvestigatorConversation(
     updatedAt: Date.now(),
   }
 
-  createSession(session)
+  await createSession(session)
 
   return {
     sessionId,
@@ -302,7 +302,7 @@ export async function startInvestigatorConversation(
 }
 
 export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Promise<AnswerQuestionResult> {
-  const session = getSession(input.sessionId)
+  const session = await getSession(input.sessionId)
   if (!session) {
     throw new Error(`Investigator session ${input.sessionId} not found`)
   }
@@ -365,7 +365,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
     if (supplementedNextQuestions.length === 0) {
       const remainingDescriptors = collectMissingFields(nextState)
 
-      updateSession(input.sessionId, (current) => ({
+      await updateSession(input.sessionId, (current) => ({
         ...current,
         state: nextState,
         pendingQuestions: newPendingQuestions,
@@ -389,7 +389,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
         feedback: session.baseFeedback,
       })
 
-      deleteSession(input.sessionId)
+      await deleteSession(input.sessionId)
 
       return {
         sessionId: input.sessionId,
@@ -425,7 +425,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
 
     newPendingQuestions = [...newPendingQuestions, ...newQuestions]
 
-    updateSession(input.sessionId, (current) => ({
+    await updateSession(input.sessionId, (current) => ({
       ...current,
       state: nextState,
       pendingQuestions: newPendingQuestions,
@@ -459,7 +459,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
   }
 
   // Finalize when no missing fields remain
-  updateSession(input.sessionId, (current) => ({
+  await updateSession(input.sessionId, (current) => ({
     ...current,
     state: nextState,
     pendingQuestions: newPendingQuestions,
@@ -483,7 +483,7 @@ export async function answerInvestigatorQuestion(input: AnswerQuestionInput): Pr
     feedback: session.baseFeedback,
   })
 
-  deleteSession(input.sessionId)
+  await deleteSession(input.sessionId)
 
   return {
     sessionId: input.sessionId,

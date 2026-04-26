@@ -3,12 +3,12 @@ import { useState } from "react"
 import Link from "next/link"
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
-import Image from "next/image"
 import { DemoModal } from "@/components/demo-modal"
 
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
 import { SignedOutHeaderSignIn } from "@/components/signed-out-header-sign-in"
+import { WaikLogo } from "@/components/waik-logo"
 
 export function Header() {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false)
@@ -17,9 +17,7 @@ export function Header() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
         <div className="container mx-auto flex h-20 items-center justify-between px-6">
-          <Link href="/" className="flex items-center">
-            <Image src="/waik-logo.png" alt="WAiK" width={100} height={40} className="h-10 w-auto" />
-          </Link>
+          <WaikLogo href="/" size="xl" priority />
 
           <nav className="hidden items-center gap-8 md:flex">
             <Link

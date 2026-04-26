@@ -1,9 +1,16 @@
+import { randomUUID } from "node:crypto"
 import { NextResponse } from "next/server"
 import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { detectIncidentCategory, detectFallSubtype } from "@/lib/agents/category_detector"
 import { analyzeNarrativeAndScore } from "@/lib/agents/expert_investigator/analyze"
 import { generateGapQuestions } from "@/lib/agents/expert_investigator/gap_questions"
+import {
+  createInterviewWorkSession,
+  type InterviewWorkSession,
+} from "@/lib/interview_work_session_store"
 import { isOpenAIConfigured } from "@/lib/openai"
+
+export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   const user = await getCurrentUser()
@@ -71,7 +78,28 @@ export async function POST(request: Request) {
       questions = [...questions, ...additionalQuestions]
     }
 
+    const sessionId = randomUUID()
+    const workSession: InterviewWorkSession = {
+      id: sessionId,
+      userId: user.userId,
+      facilityId: user.facilityId ?? "",
+      residentName: typeof residentName === "string" ? residentName : undefined,
+      roomNumber: typeof roomNumber === "string" ? roomNumber : undefined,
+      narrative: typeof narrative === "string" ? narrative : "",
+      reportedById: typeof reportedById === "string" ? reportedById : user.userId,
+      reportedByName: typeof reportedByName === "string" ? reportedByName : undefined,
+      category: categoryResult.category,
+      subtype: subtype ?? null,
+      completenessScore,
+      questions,
+      answers: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    await createInterviewWorkSession(workSession)
+
     return NextResponse.json({
+      sessionId,
       category: categoryResult.category,
       categoryConfidence: categoryResult.confidence,
       subtype,

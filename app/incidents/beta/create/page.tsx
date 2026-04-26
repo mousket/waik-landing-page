@@ -109,6 +109,7 @@ export default function BetaCreateIncidentPage() {
   const [narrative, setNarrative] = useState("")
 
   // Interview state
+  const [interviewWorkSessionId, setInterviewWorkSessionId] = useState<string | null>(null)
   const [questions, setQuestions] = useState<InterviewQuestion[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<InterviewAnswer[]>([])
@@ -290,6 +291,12 @@ export default function BetaCreateIncidentPage() {
 
       const data = await response.json()
 
+      if (typeof data.sessionId === "string" && data.sessionId) {
+        setInterviewWorkSessionId(data.sessionId)
+      } else {
+        setInterviewWorkSessionId(null)
+      }
+
       setIncidentCategory(data.category || "fall")
       setIncidentSubtype(data.subtype || null)
       // Store initial completeness score (static report card - based on narrative only)
@@ -449,6 +456,7 @@ export default function BetaCreateIncidentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(interviewWorkSessionId ? { sessionId: interviewWorkSessionId } : {}),
           questionId: "final-review",
           answer: answers.map((a) => a.text).join(" "),
           narrative,
@@ -484,6 +492,7 @@ export default function BetaCreateIncidentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(interviewWorkSessionId ? { sessionId: interviewWorkSessionId } : {}),
           residentName,
           roomNumber,
           narrative,

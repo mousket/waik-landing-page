@@ -16,9 +16,9 @@ const isPublicRoute = createRouteMatcher([
   "/waik-demo-start(.*)",
   "/offline(.*)",
   "/auth/after-sign-in(.*)",
+  "/auth/account-pending(.*)",
   "/accept-invite(.*)",
   "/sign-out(.*)",
-  "/api/push(.*)",
 ])
 
 function isMustChangePasswordExempt(pathname: string): boolean {
@@ -29,6 +29,7 @@ function isMustChangePasswordExempt(pathname: string): boolean {
   if (pathname === "/change-password" || pathname.startsWith("/change-password/")) return true
   if (pathname.startsWith("/api/auth/change-password")) return true
   if (pathname.startsWith("/auth/after-sign-in")) return true
+  if (pathname.startsWith("/auth/account-pending")) return true
   if (pathname.includes("/sign-out")) return true
   return false
 }

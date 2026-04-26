@@ -3,9 +3,15 @@
 import type React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { UserButton } from "@clerk/nextjs"
 import { Bell, Home, ClipboardList, ClipboardCheck, Lightbulb } from "lucide-react"
 import { brand } from "@/lib/design-tokens"
+import { clerkAppearance } from "@/lib/clerk-appearance"
+import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
+import { WaikLogo } from "@/components/waik-logo"
 import { cn } from "@/lib/utils"
+import { BadgePoller } from "@/components/staff/badge-poller"
+import { BadgeProvider, useBadges } from "@/components/staff/badge-context"
 
 const tabs = [
   { href: "/staff/dashboard", label: "Home", icon: Home },
@@ -25,36 +31,65 @@ function tabActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-function initials(firstName: string, lastName: string): string {
-  const a = firstName.trim().charAt(0)
-  const b = lastName.trim().charAt(0)
-  if (a && b) return (a + b).toUpperCase()
-  if (a) return a.toUpperCase()
-  return "?"
-}
-
 export function StaffAppShell({
   firstName,
   lastName,
+  unitLabel,
   children,
 }: {
   firstName: string
   lastName: string
+  unitLabel?: string | null
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const ini = initials(firstName, lastName)
+
+  return (
+    <BadgeProvider>
+      <BadgePoller />
+      <ShellContents firstName={firstName} lastName={lastName} unitLabel={unitLabel} pathname={pathname}>
+        {children}
+      </ShellContents>
+    </BadgeProvider>
+  )
+}
+
+function Badge({ count }: { count: number }) {
+  if (!count || count <= 0) return null
+  return (
+    <span className="absolute -right-2 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+      {count > 99 ? "99+" : count}
+    </span>
+  )
+}
+
+function ShellContents({
+  firstName,
+  lastName,
+  unitLabel,
+  pathname,
+  children,
+}: {
+  firstName: string
+  lastName: string
+  unitLabel?: string | null
+  pathname: string
+  children: React.ReactNode
+}) {
+  const badges = useBadges()
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-brand-shell-bg text-brand-body">
       <header
-        className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center justify-between border-b bg-white px-4"
-        style={{ borderColor: brand.midGray }}
+        className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border/20 bg-background/80 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"
       >
-        <span className="text-xl font-bold" style={{ color: brand.teal }}>
-          WAiK
-        </span>
+        <WaikLogo href="/staff/dashboard" size="md" />
         <div className="flex items-center gap-3">
+          {unitLabel ? (
+            <span className="hidden rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary sm:inline-flex">
+              {unitLabel}
+            </span>
+          ) : null}
           <button
             type="button"
             className="flex h-12 w-12 min-h-[48px] min-w-[48px] items-center justify-center text-brand-muted"
@@ -62,12 +97,9 @@ export function StaffAppShell({
           >
             <Bell className="h-6 w-6" strokeWidth={1.75} />
           </button>
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-            style={{ backgroundColor: brand.teal }}
-            aria-hidden
-          >
-            {ini}
+          <div className="flex shrink-0 items-center [&_.cl-userButtonTrigger]:h-9 [&_.cl-userButtonTrigger]:w-9">
+            <span className="sr-only">{`Signed in as ${[firstName, lastName].filter(Boolean).join(" ")}`}</span>
+            <UserButton appearance={clerkAppearance} afterSignOutUrl={getClerkAfterSignOutUrl()} />
           </div>
         </div>
       </header>
@@ -80,23 +112,32 @@ export function StaffAppShell({
       </main>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white pb-[env(safe-area-inset-bottom,0px)]"
-        style={{ borderColor: brand.midGray }}
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/20 bg-background/80 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"
         aria-label="Staff navigation"
       >
         <div className="mx-auto flex min-h-[64px] max-w-lg items-stretch">
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = tabActive(pathname, href)
+            const count =
+              href === "/staff/assessments"
+                ? badges.dueAssessments
+                : href === "/staff/dashboard" || href === "/staff/incidents"
+                  ? badges.pendingQuestions
+                  : 0
+
             return (
               <Link
                 key={href}
                 href={href}
                 className={cn(
-                  "flex min-h-[48px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold transition-colors",
+                  "relative flex min-h-[48px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold transition-colors",
                   active ? "text-brand-teal" : "text-brand-muted",
                 )}
               >
-                <Icon className="h-6 w-6 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+                <span className="relative">
+                  <Icon className="h-6 w-6 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+                  <Badge count={count} />
+                </span>
                 <span>{label}</span>
               </Link>
             )

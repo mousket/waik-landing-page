@@ -6,10 +6,15 @@ import { usePathname } from "next/navigation"
 /**
  * Landing (`/`) uses `components/header.tsx` for auth controls on the right.
  * Omit this slim bar on the home page to avoid a duplicate row / misaligned avatar.
+ * Admin and staff shells use fixed headers with Clerk `UserButton` — omit here so the root
+ * bar is not covered invisibly (users could not reach Sign out).
  */
 export function ConditionalRootHeader({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? ""
   if (pathname === "/" || pathname === "") {
+    return null
+  }
+  if (pathname.startsWith("/admin") || pathname.startsWith("/staff")) {
     return null
   }
 

@@ -85,6 +85,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     isWaikSuperAdmin: Boolean(mongoUser.isWaikSuperAdmin),
     deviceType: mongoUser.deviceType ?? "personal",
     mustChangePassword: Boolean(mongoUser.mustChangePassword),
+    selectedUnit: mongoUser.selectedUnit ?? undefined,
+    selectedUnitDate: mongoUser.selectedUnitDate ?? undefined,
     isAdminTier: role.isAdminTier,
     canAccessPhase2: role.canAccessPhase2,
     canInviteStaff: role.canInviteStaff,

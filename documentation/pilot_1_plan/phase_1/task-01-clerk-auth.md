@@ -108,7 +108,7 @@ WHAT I NEED:
 
 2. Create middleware.ts at the project root:
    - Protect all routes under /staff/*, /admin/*, /api/incidents/*, /api/agent/*, /api/assessments/*, /api/residents/*
-   - Public routes: /, /sign-in/*, /sign-up/*, /api/push/*, /offline
+   - Public routes: /, /sign-in/*, /sign-up/*, /offline (`/api/push/*` requires a session — task-06f send stub + task-12 subscribe)
    - Use clerkMiddleware() with createRouteMatcher
 
 3. Define the role hierarchy using Clerk's publicMetadata on each user:

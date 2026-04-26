@@ -1,10 +1,11 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 import { Plus_Jakarta_Sans, Inter } from "next/font/google"
 
 import { ConditionalRootHeader } from "@/components/conditional-root-header"
 import { SignedOutHeaderSignIn } from "@/components/signed-out-header-sign-in"
+import { PwaProviders } from "@/components/pwa-providers"
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl, getClerkPostAuthUrl } from "@/lib/clerk-routes"
 import "./globals.css"
@@ -58,11 +59,18 @@ const clerkPostAuthUrl = getClerkPostAuthUrl()
 const clerkAfterSignOutUrl = getClerkAfterSignOutUrl()
 
 export const metadata: Metadata = {
+  applicationName: "WAiK",
   title: "WAiK - Voice-First Documentation and Reporting for Healthcare Incidents",
   description:
     "Stay Audit ready and Turn critical incident documentation and reports into a 5-minute conversation. Give your nurses and staff back hundreds of hours and slash compliance risk.",
   generator: "v0.app",
   metadataBase: new URL(siteUrl),
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "WAiK",
+  },
   openGraph: {
     title: "WAiK - Voice-First Documentation and Reporting for Healthcare Incidents",
     description:
@@ -89,6 +97,11 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  themeColor: "#0D7377",
+  colorScheme: "light",
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -103,6 +116,7 @@ export default function RootLayout({
           signUpForceRedirectUrl={clerkPostAuthUrl}
           afterSignOutUrl={clerkAfterSignOutUrl}
         >
+          <PwaProviders />
           <ConditionalRootHeader>
             <SignedOut>
               <SignedOutHeaderSignIn />

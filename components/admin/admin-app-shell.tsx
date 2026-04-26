@@ -3,12 +3,16 @@
 import type React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { UserButton } from "@clerk/nextjs"
 import { Bell } from "lucide-react"
 import { brand } from "@/lib/design-tokens"
+import { clerkAppearance } from "@/lib/clerk-appearance"
+import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
 import { cn } from "@/lib/utils"
-import { AdminMobileNav, type AdminMobileNavLink } from "@/components/admin/mobile-nav"
+import { AdminBottomNav } from "@/components/admin/admin-bottom-nav"
+import { WaikLogo } from "@/components/waik-logo"
 
-const NAV_LINKS: readonly AdminMobileNavLink[] = [
+const NAV_LINKS = [
   { label: "Dashboard", href: "/admin/dashboard" },
   { label: "Incidents", href: "/admin/incidents" },
   { label: "Assessments", href: "/admin/assessments" },
@@ -27,14 +31,6 @@ function navActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-function initials(firstName: string, lastName: string): string {
-  const a = firstName.trim().charAt(0)
-  const b = lastName.trim().charAt(0)
-  if (a && b) return (a + b).toUpperCase()
-  if (a) return a.toUpperCase()
-  return "?"
-}
-
 export function AdminAppShell({
   firstName,
   lastName,
@@ -45,28 +41,24 @@ export function AdminAppShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const ini = initials(firstName, lastName)
 
   return (
-    <div className="min-h-[100dvh] bg-brand-shell-bg text-brand-body">
+    <div className="flex min-h-[100dvh] flex-col bg-brand-shell-bg text-brand-body">
       <header
-        className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center border-b bg-white px-4"
-        style={{ borderColor: brand.midGray }}
+        className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center border-b border-border/20 bg-background/80 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 md:h-16"
       >
-        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <Link
-              href="/admin/dashboard"
-              className="shrink-0 text-xl font-bold"
-              style={{ color: brand.teal }}
-            >
-              WAiK
-            </Link>
-            <AdminMobileNav links={NAV_LINKS} />
+        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 md:gap-4">
+          <div className="flex min-w-0 shrink-0 items-center">
+            <span className="md:hidden">
+              <WaikLogo href="/admin/dashboard" size="md" />
+            </span>
+            <span className="hidden md:inline">
+              <WaikLogo href="/admin/dashboard" size="lg" />
+            </span>
           </div>
 
           <nav className="absolute left-1/2 top-1/2 hidden w-auto max-w-[min(100%,52rem)] -translate-x-1/2 -translate-y-1/2 md:block">
-            <ul className="flex flex-wrap items-center justify-center gap-8">
+            <ul className="flex flex-wrap items-center justify-center gap-6 lg:gap-8">
               {NAV_LINKS.map(({ label, href }) => {
                 const active = navActive(pathname, href)
                 return (
@@ -88,27 +80,31 @@ export function AdminAppShell({
             </ul>
           </nav>
 
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              className="flex h-12 w-12 min-h-[48px] min-w-[48px] items-center justify-center"
+              className="flex h-11 w-11 min-h-[48px] min-w-[48px] items-center justify-center md:h-12 md:w-12"
               style={{ color: brand.muted }}
               aria-label="Notifications"
             >
-              <Bell className="h-[22px] w-[22px]" strokeWidth={1.75} />
+              <Bell className="h-5 w-5 md:h-[22px] md:w-[22px]" strokeWidth={1.75} />
             </button>
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-              style={{ backgroundColor: brand.teal }}
-              aria-hidden
-            >
-              {ini}
+            <div className="flex shrink-0 items-center [&_.cl-userButtonTrigger]:h-9 [&_.cl-userButtonTrigger]:w-9 md:[&_.cl-userButtonTrigger]:h-10 md:[&_.cl-userButtonTrigger]:w-10">
+              <span className="sr-only">{`Signed in as ${[firstName, lastName].filter(Boolean).join(" ")}`}</span>
+              <UserButton appearance={clerkAppearance} afterSignOutUrl={getClerkAfterSignOutUrl()} />
             </div>
           </div>
         </div>
       </header>
 
-      <div className="pt-16">{children}</div>
+      <div
+        className="flex flex-1 flex-col overflow-y-auto overscroll-contain pt-14 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6 md:pt-16"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        {children}
+      </div>
+
+      <AdminBottomNav />
     </div>
   )
 }

@@ -1,0 +1,28 @@
+{
+  "name": "WAiK — Conversations not Checkboxes",
+  "short_name": "WAiK",
+  "description": "Voice-first clinical documentation for senior care",
+  "start_url": "/staff/dashboard",
+  "display": "standalone",
+  "background_color": "#0A3D40",
+  "theme_color": "#0D7377",
+  "orientation": "portrait-primary",
+  "categories": ["medical", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Report Incident",
+      "url": "/staff/report",
+      "icons": [{ "src": "/icons/shortcut-report.png", "sizes": "96x96" }]
+    }
+  ]
+}

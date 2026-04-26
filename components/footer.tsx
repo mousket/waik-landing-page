@@ -1,5 +1,7 @@
 import Link from "next/link"
-import { Phone, Twitter, Linkedin, Mail } from "lucide-react"
+import { Twitter, Linkedin, Mail } from "lucide-react"
+
+import { WaikLogo } from "@/components/waik-logo"
 
 export function Footer() {
   return (
@@ -7,11 +9,8 @@ export function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
-            <Link href="/" className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <Phone className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold">WAiK</span>
+            <Link href="/" className="mb-4 inline-flex" aria-label="WAiK home">
+              <WaikLogo size="lg" />
             </Link>
             <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
               Voice-first AI agent that turns critical incident documentation into a 5-minute conversation. Give your

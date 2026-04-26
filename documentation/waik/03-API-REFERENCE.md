@@ -121,6 +121,61 @@ Fetch all incidents (admin use).
 ]
 ```
 
+#### Query parameters (admin `GET /api/incidents`)
+
+| Parameter | Description |
+|-----------|-------------|
+| `phase` | Comma-separated: `phase_1_in_progress`, `phase_1_complete`, `phase_2_in_progress`, `closed` |
+| `days` | Positive integer window. For **non–closed-only** queries, incidents are filtered where phase 1 start (`phaseTransitionTimestamps.phase1Started` or `createdAt`) is on or after the cutoff. For **`phase=closed` only**, the cutoff applies to **`phaseTransitionTimestamps.phase2Locked`** (when the investigation was locked), which powers the admin **Closed** tab. |
+| `hasInjury` | `true` — injury-flagged incidents only |
+| `facilityId` | Super-admin only: target facility |
+
+#### Closed tab CSV (client-side)
+
+The admin dashboard **Closed** tab calls `GET /api/incidents?phase=closed&days=30` and can export **`waik-closed-incidents-[YYYY-MM-DD].csv`** in the browser using `lib/utils/csv-export.ts` (no extra API). Default columns: `roomNumber`, `incidentType`, `completenessAtSignoff`, `phase1SignedAt`, `phase2LockedAt`, `investigatorName`, `daysToClose` (room numbers only; no resident names unless a future Settings flag adds them).
+
+---
+
+### GET `/api/admin/dashboard-stats`
+
+Admin-tier JSON for the dashboard **stats sidebar** and **daily brief**. Requires the same session as other admin APIs (`withAdminAuth`).
+
+| Query | Description |
+|-------|-------------|
+| `facilityId` | **WAiK super-admin only** — target facility when the session has no default facility. |
+
+**Caching:** Response is stored in **Redis** at `waik:stats:{facilityId}` with **TTL 300s**. On Redis errors, the handler still returns fresh aggregation results.
+
+**Shape:** See `lib/types/dashboard-stats.ts` — includes 30-day and prior-30-day incident aggregates, `avgDaysToClose` from **closed** incidents in each window (using `phaseTransitionTimestamps.phase2Locked` / `phase1Signed`), `injuryFlagPercent30d`, `upcomingAssessments7d`, and `upcomingAssessmentItems` (preview rows).
+
+---
+
+### POST `/api/push/send` (stub — task-12)
+
+**Admin session required** (`withAdminAuth`). Unauthenticated requests receive **401** / **403** via middleware + handler.
+
+Queues a web push–shaped payload for an IDT reminder. **Stub behavior (task-06f):** validates `targetUserId` and `payload.title` / `payload.body`, logs intent to the server console, returns `{ success: true, queued: true, delivered: false, message }`. **No VAPID / no real delivery** until task-12 replaces this route.
+
+| Field | Type | Required |
+|-------|------|----------|
+| `targetUserId` | string | ✅ |
+| `payload.title` | string | ✅ |
+| `payload.body` | string | ✅ |
+| `payload.url` | string | ❌ (recommended deep link) |
+
+---
+
+### PATCH `/api/incidents/[id]/phase`
+
+Admin-tier phase transition for the facility incident **`id`**. Body: `{ "phase": "<IncidentPhase>" }`.
+
+| Transition | Notes |
+|------------|--------|
+| `phase_1_complete` → `phase_2_in_progress` | **Claim:** sets investigator, `phaseTransitionTimestamps.phase2Claimed`. Requires **`canAccessPhase2`** (or super admin). |
+| `phase_2_in_progress` → `closed` | Sets **`phaseTransitionTimestamps.phase2Locked`**. Same permission as claim. |
+
+**Errors:** **401** unauthenticated, **403** wrong role / facility / `canAccessPhase2`, **400** invalid transition, **404** unknown incident.
+
 ---
 
 ### POST `/api/incidents`
@@ -790,13 +845,13 @@ When all gaps are filled, `status` becomes `"completed"`.
 
 ### GET `/api/staff/incidents`
 
-Get incidents for a specific staff member.
+Get the **current signed-in staff member's** incident summaries (reporter-only).
 
 #### Query Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `staffId` | string | ✅ | Staff member's user ID |
+| `unit` | string | ❌ | Optional unit filter (reserved for future when incidents store unit/wing). |
 
 #### Success Response (200)
 
@@ -805,17 +860,96 @@ Get incidents for a specific staff member.
   "incidents": [
     {
       "id": "inc-1734567890123",
-      "title": "Margaret Chen Incident Report",
-      ...
+      "facilityId": "fac-sunrise-mpls-001",
+      "residentRoom": "515",
+      "incidentType": "Fall",
+      "hasInjury": false,
+      "phase": "phase_1_in_progress",
+      "staffId": "user-rn-001",
+      "startedAt": "2026-04-25T12:34:56.000Z",
+      "phase1SignedAt": null,
+      "completenessScore": 88,
+      "completenessAtSignoff": 0,
+      "tier2QuestionsGenerated": 6,
+      "questionsAnswered": 5,
+      "questionsDeferred": 0
     }
-  ]
+  ],
+  "total": 1
 }
 ```
 
-Returns incidents where the staff member:
-- Is the reporter (`staffId` matches)
-- Has assigned questions
-- Is in `assignedStaffIds` metadata
+**Auth:** Requires a Clerk session (`withAuth`). Without auth returns **401**.
+**Privacy:** Room numbers only; do not return resident names / PHI.
+
+---
+
+### GET `/api/staff/badge-counts`
+
+Lightweight badge endpoint polled from the staff layout every 60 seconds.
+
+#### Success Response (200)
+
+```json
+{
+  "pendingQuestions": 1,
+  "dueAssessments": 1
+}
+```
+
+- `pendingQuestions`: count of in-progress incidents for the current staff member where `completenessScore < 100`
+- `dueAssessments`: count of assessments due in the next 7 days for the current staff member
+
+**Auth:** Requires a Clerk session (`withAuth`). Without auth returns **401**.
+
+---
+
+### GET `/api/staff/performance`
+
+Staff analytics endpoint powering the collapsible performance card.
+
+**Caching:** Response is stored in Redis at `waik:perf:{userId}:{facilityId}` with **TTL 600s**. On Redis errors, the handler still returns fresh results.
+
+#### Success Response (200)
+
+```json
+{
+  "averageCompleteness30d": 87,
+  "averageCompleteness30dPrev": 0,
+  "currentStreak": 2,
+  "bestStreak": 2,
+  "totalReports30d": 5,
+  "generatedAt": "2026-04-25T23:45:01.000Z"
+}
+```
+
+**Auth:** Requires a Clerk session (`withAuth`). Without auth returns **401**.
+
+---
+
+### GET `/api/assessments/due`
+
+Assessments due for the current staff member within the next 7 days.
+
+#### Success Response (200)
+
+```json
+{
+  "assessments": [
+    {
+      "id": "assess-003",
+      "residentId": "res-002",
+      "residentRoom": "204",
+      "assessmentType": "activity",
+      "nextDueAt": "2026-04-26T12:00:00.000Z",
+      "daysUntilDue": 1
+    }
+  ],
+  "total": 1
+}
+```
+
+**Auth:** Requires a Clerk session (`withAuth`). Without auth returns **401**.
 
 ---
 
@@ -957,8 +1091,11 @@ Currently no rate limiting is implemented. Production should add:
 | POST | `/api/agent/report` | Run Report Agent |
 | POST | `/api/agent/investigate` | Run Investigation Agent |
 | POST | `/api/agent/report-conversational` | Expert Investigator |
-| GET | `/api/staff/incidents` | Staff's incidents |
-| GET | `/api/staff/notifications` | Staff's notifications |
+| GET | `/api/staff/incidents` | Staff incident summaries (reporter-only) |
+| GET | `/api/staff/badge-counts` | Staff tab badge counts (polled) |
+| GET | `/api/staff/performance` | Staff performance analytics (cached) |
+| GET | `/api/assessments/due` | Assessments due within 7 days |
+| GET | `/api/staff/notifications` | Staff notifications |
 | GET | `/api/users` | List users |
 
 ---

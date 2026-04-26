@@ -4,9 +4,28 @@ import {
   answerInvestigatorQuestion,
   startInvestigatorConversation,
 } from "@/lib/agents/expert_investigator/graph"
+import { getSession } from "@/lib/agents/expert_investigator/session_store"
+import { updateInvestigationProgressOnTimeout } from "@/lib/db"
 
+/** Vercel / serverless: allow this route to run long enough for chained LLM calls (plan limit may still cap). */
+export const maxDuration = 60
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+const INTERNAL_TIMEOUT_MS = 45_000
+
+const PARTIAL_MESSAGE =
+  "Analysis is taking longer than expected. Your progress has been saved. WAiK will continue processing — please check back in a moment."
+
+function createTimeout(ms: number): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`TIMEOUT_${ms}`)), ms)
+  })
+}
+
+function isTimeoutError(err: unknown): boolean {
+  return err instanceof Error && err.message.startsWith("TIMEOUT_")
+}
 
 type StartActionBody = {
   action: "start"
@@ -66,29 +85,88 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
       }
       const narrative = body.initialNarrative ?? body.narrative ?? ""
-      const result = await startInvestigatorConversation({
-        incidentId: body.incidentId,
-        facilityId: user.facilityId,
-        narrative,
-        investigatorId: body.investigatorId,
-        investigatorName: body.investigatorName,
-        assignedStaffIds: body.assignedStaffIds,
-        reporterName: body.reporterName,
-      })
-      return NextResponse.json(result, { status: 200 })
+      try {
+        const result = await Promise.race([
+          startInvestigatorConversation({
+            incidentId: body.incidentId,
+            facilityId: user.facilityId,
+            narrative,
+            investigatorId: body.investigatorId,
+            investigatorName: body.investigatorName,
+            assignedStaffIds: body.assignedStaffIds,
+            reporterName: body.reporterName,
+          }),
+          createTimeout(INTERNAL_TIMEOUT_MS),
+        ])
+        return NextResponse.json(result, { status: 200 })
+      } catch (err) {
+        if (!isTimeoutError(err)) {
+          throw err
+        }
+        try {
+          await updateInvestigationProgressOnTimeout(body.incidentId, user.facilityId, 0)
+        } catch (saveErr) {
+          console.error("[report-conversational] Timeout: could not update incident:", saveErr)
+        }
+        return NextResponse.json(
+          {
+            status: "partial" as const,
+            sessionId: null,
+            incidentId: body.incidentId,
+            questions: [] as { id: string; text: string }[],
+            message: PARTIAL_MESSAGE,
+          },
+          { status: 200 },
+        )
+      }
     }
 
-    const result = await answerInvestigatorQuestion({
-      sessionId: body.sessionId,
-      questionId: body.questionId,
-      answerText: body.answerText,
-      answeredBy: body.answeredBy,
-      answeredByName: body.answeredByName,
-      method: body.method,
-      assignedStaffIds: body.assignedStaffIds,
-    })
+    if (!(await getSession(body.sessionId))) {
+      return NextResponse.json(
+        { error: "Session not found or expired. Please start a new report." },
+        { status: 404 },
+      )
+    }
 
-    return NextResponse.json(result, { status: 200 })
+    try {
+      const result = await Promise.race([
+        answerInvestigatorQuestion({
+          sessionId: body.sessionId,
+          questionId: body.questionId,
+          answerText: body.answerText,
+          answeredBy: body.answeredBy,
+          answeredByName: body.answeredByName,
+          method: body.method,
+          assignedStaffIds: body.assignedStaffIds,
+        }),
+        createTimeout(INTERNAL_TIMEOUT_MS),
+      ])
+      return NextResponse.json(result, { status: 200 })
+    } catch (err) {
+      if (!isTimeoutError(err)) {
+        throw err
+      }
+      const session = await getSession(body.sessionId)
+      const incidentId = session?.incidentId ?? ""
+      const completeness = session?.completenessScore ?? 0
+      if (user.facilityId && incidentId) {
+        try {
+          await updateInvestigationProgressOnTimeout(incidentId, user.facilityId, completeness)
+        } catch (saveErr) {
+          console.error("[report-conversational] Timeout: could not update incident:", saveErr)
+        }
+      }
+      return NextResponse.json(
+        {
+          status: "partial" as const,
+          sessionId: body.sessionId,
+          incidentId,
+          questions: [] as { id: string; text: string }[],
+          message: PARTIAL_MESSAGE,
+        },
+        { status: 200 },
+      )
+    }
   } catch (error) {
     console.error("[report-conversational] Error:", error)
     return NextResponse.json({ error: "Failed to process investigator agent request" }, { status: 500 })

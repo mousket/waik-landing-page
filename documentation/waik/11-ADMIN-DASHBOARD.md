@@ -103,6 +103,39 @@ app/admin/
 
 **Note**: Admin sidebar is simpler because admins primarily review and manage rather than create reports.
 
+### Command Center (`/admin/dashboard`, Phase 3b)
+
+```mermaid
+flowchart TB
+  subgraph shell [AdminDashboardShell]
+    I[("Shared incidents state")]
+    S[Stats fetch]
+  end
+  A["GET incidents?phase=p1,p2_active"]
+  B["GET incidents?phase=closed&days=30"]
+  C["GET dashboard-stats"]
+  shell --> A
+  shell --> C
+  NT[Needs Attention tab]
+  AC[Active Investigations tab]
+  CL[Closed tab]
+  NT --> I
+  AC --> I
+  CL --> B
+```
+
+**Role gates:** `app/admin/layout.tsx` requires **`isAdminTier` or `isWaikSuperAdmin`**. Staff are redirected to **`/staff/dashboard`**. Phase transitions that claim Phase 2 or close an investigation require **`canAccessPhase2`** (or super admin) on **`PATCH /api/incidents/[id]/phase`**.
+
+**One incident list for two tabs:** The shell performs a single **`GET /api/incidents?phase=phase_1_in_progress,phase_1_complete,phase_2_in_progress`** on load and every **60s**. **Needs Attention** and **Active Investigations** both read that shared state (no duplicate list request). The **Closed** tab uses a separate **`GET ...?phase=closed&days=30`**.
+
+**`IncidentSummary` (lists):** See `lib/types/incident-summary.ts`. Dashboard cards use **`residentRoom`** only — no resident name on list surfaces.
+
+**Classification (`lib/utils/incident-classification.ts`):** **`classifyIncident`** drives red vs yellow on Needs Attention. **`isIdtOverdue`** flags IDT members pending more than **24h** since **`questionSentAt`**. **`computeClock(phase1SignedAt)`** powers the **48h** regulatory clock on the Active tab (gray / amber / red / overdue thresholds).
+
+**Stats:** **`GET /api/admin/dashboard-stats`** — Mongo aggregations, **Redis** cache key **`waik:stats:{facilityId}`**, TTL **300s** (see task-06e).
+
+**Push:** **`POST /api/push/send`** is a **stub** (logs intent, `delivered: false`) until **task-12** replaces it with real web push.
+
 ---
 
 ## Dashboard Features
@@ -141,6 +174,23 @@ const fetchIncidents = async () => {
   setIncidents(data)
 }
 ```
+
+### Closed tab (last 30 days)
+
+On **`/admin/dashboard`**, the **Closed** tab lists investigations in phase **`closed`** whose **`phase2Locked`** timestamp falls within the last **30 days** (`GET /api/incidents?phase=closed&days=30`). The table shows room, lock date (e.g. Today / Yesterday / `MMM d`), completeness at sign-off, investigator, and **days to close** (phase 2 locked minus phase 1 signed). A subtitle shows the count for that window.
+
+**Export CSV** generates `waik-closed-incidents-[YYYY-MM-DD].csv` in the browser from the loaded rows (`lib/utils/csv-export.ts`): room numbers and investigation metadata only, no resident names by default.
+
+### Quick stats sidebar + daily brief
+
+- **`GET /api/admin/dashboard-stats`** (admin-auth) returns 30-day / prior-30-day aggregates from MongoDB: incident counts, average completeness, average days to close (closed investigations in each window), injury-flag percentage, and upcoming assessments in the next 7 days. Results are cached in **Redis** for **5 minutes** under key `waik:stats:{facilityId}` (cache read/write failures fall back to uncached aggregation).
+- The **right column** on desktop (`StatsSidebar`) shows those metrics with **trend arrows** vs the prior 30 days. On small screens the same block stacks **below** the tabs.
+- The **daily brief** appears once per calendar day until dismissed (**`localStorage`** key `waik-brief-dismissed-{YYYY-MM-DD}`) and summarizes recent totals from the same stats payload.
+- The sidebar **“Ask your community…”** field navigates to **`/admin/intelligence?q=…`** on Enter.
+
+### Needs Attention — Overdue IDT (task-06f)
+
+Below red and yellow sections, **Overdue IDT Tasks** lists each IDT member on a Phase 2 investigation where `isIdtOverdue()` is true (pending question sent more than **24 hours** ago). Each card shows name, role, room + incident type, hours beyond that threshold, and **Send Reminder**, which calls **`POST /api/push/send`** (stub: logs intent, returns `delivered: false` until task-12). The **Needs Attention** tab badge counts red + yellow + **one per overdue member**.
 
 ---
 

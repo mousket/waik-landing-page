@@ -34,7 +34,7 @@ const RADIUS_LG = "1rem"
  * Primary button / links: #2DD4BF → hover #14B8A6. Input wells: #EBF2FF.
  */
 const cardShell =
-  "shadow-xl border border-[#2DD4BF]/25 rounded-2xl bg-white/95 backdrop-blur-sm overflow-hidden"
+  "shadow-xl border border-border/20 rounded-3xl bg-white/95 backdrop-blur-sm overflow-hidden"
 
 const linkPrimary = "text-[#2DD4BF] hover:text-[#14B8A6]"
 

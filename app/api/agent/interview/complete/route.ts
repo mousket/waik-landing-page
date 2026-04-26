@@ -3,7 +3,10 @@ import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { createIncidentFromReport, queueInvestigationQuestions } from "@/lib/db"
 import { runInvestigationAgent } from "@/lib/agents/investigation_agent"
 import { FINAL_CRITICAL_QUESTIONS } from "@/lib/gold_standards_extended"
+import { deleteInterviewWorkSession, getInterviewWorkSession } from "@/lib/interview_work_session_store"
 import { isOpenAIConfigured, openai } from "@/lib/openai"
+
+export const runtime = "nodejs"
 
 // Interface for interview questions passed from the client
 interface InterviewQuestionInput {
@@ -29,6 +32,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const {
+      sessionId,
       residentName,
       roomNumber,
       narrative,
@@ -42,6 +46,19 @@ export async function POST(request: Request) {
       completenessScore,
       initialReportCardScore, // Static score calculated from narrative before questions
     } = body
+
+    if (sessionId) {
+      const work = await getInterviewWorkSession(sessionId)
+      if (!work) {
+        return NextResponse.json(
+          { error: "Session not found or expired. Please start a new report." },
+          { status: 404 },
+        )
+      }
+      if (work.userId !== sessionUser.userId) {
+        return NextResponse.json({ error: "Session does not belong to this user" }, { status: 403 })
+      }
+    }
 
     if (!residentName || !roomNumber || !narrative || !reportedById) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -106,6 +123,10 @@ export async function POST(request: Request) {
 
     // Queue final critical questions (these are always added)
     await queueFinalCriticalQuestions(incident.id, facilityId, reportedById, reportedByName)
+
+    if (typeof sessionId === "string" && sessionId.length > 0) {
+      await deleteInterviewWorkSession(sessionId)
+    }
 
     return NextResponse.json({
       success: true,

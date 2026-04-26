@@ -3,7 +3,7 @@
 ## Implemented
 
 - **`@clerk/nextjs`** — already installed; `ClerkProvider` in `app/layout.tsx`, sign-in/up routes, middleware.
-- **`middleware.ts`** — `clerkMiddleware` + `createRouteMatcher`: public routes include `/`, `/sign-in`, `/sign-up`, `/login` (redirect), `/auth/after-sign-in`, `/waik-demo-start`, `/offline`, `/api/push/*`. All other matched routes call `auth.protect()`. Existing API CORS behavior preserved for `/api/*`.
+- **`middleware.ts`** — `clerkMiddleware` + `createRouteMatcher`: public routes include `/`, `/sign-in`, `/sign-up`, `/login` (redirect), `/auth/after-sign-in`, `/waik-demo-start`, `/offline`. `/api/push/*` is not public (task-06f). All other matched routes call `auth.protect()`. Existing API CORS behavior preserved for `/api/*`.
 - **`lib/waik-roles.ts`** — `WaikRole` union, admin vs staff tier lists, `toUiRole()` for legacy UI (`"admin"` | `"staff"`), `canAccessPhase2`, `WaikPublicMetadata` shape.
 - **`lib/auth.ts`** — `getCurrentUser()`, `requireRole()`, `requireFacilityAccess()`, `unauthorizedResponse` / `forbiddenResponse`, re-exports `isAdminRole` / `canAccessPhase2`.
 - **`hooks/use-waik-user.ts`** — client mapping from Clerk `publicMetadata` to legacy UI role for existing pages.

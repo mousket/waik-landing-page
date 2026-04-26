@@ -1,13 +1,18 @@
-import { brand } from "@/lib/design-tokens"
+import { PageHeader } from "@/components/ui/page-header"
+import { EmptyState } from "@/components/ui/empty-state"
+import { ClipboardCheck } from "lucide-react"
 
 export default function StaffAssessmentsPlaceholderPage() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-brand-dark-teal">Assessments</h1>
-        <p className="mt-3 text-sm" style={{ color: brand.muted }}>
-          Your assessments will appear here.
-        </p>
+    <div className="relative flex flex-1 flex-col">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6 px-4 py-6">
+        <PageHeader title="Assessments" description="Your due assessments will appear here." />
+        <EmptyState
+          icon={<ClipboardCheck className="h-6 w-6" />}
+          title="No assessments due"
+          description="When an assessment is assigned or becomes due, you’ll see it here."
+        />
       </div>
     </div>
   )

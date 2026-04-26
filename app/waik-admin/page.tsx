@@ -16,32 +16,77 @@ type OrgRow = {
   createdAt: string
 }
 
+type OverviewStats = {
+  totalOrganizations: number
+  incidentsThisMonth: number
+  mostActiveOrganizationName: string | null
+}
+
 export default function WaikAdminHomePage() {
   const [orgs, setOrgs] = useState<OrgRow[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<OverviewStats | null>(null)
+  const [orgsError, setOrgsError] = useState<string | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [orgsLoading, setOrgsLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setError(null)
+    async function loadOrgs() {
+      setOrgsError(null)
       try {
         const oRes = await fetch("/api/waik-admin/organizations", { credentials: "include" })
         if (!oRes.ok) {
-          if (!cancelled) setError("Could not load data.")
+          if (!cancelled) {
+            setOrgsError(
+              oRes.status === 403
+                ? "Organizations could not load (forbidden). Your account may not be marked as WAiK super admin in the database."
+                : oRes.status === 401
+                  ? "Sign in required to load organizations."
+                  : "Could not load organizations.",
+            )
+            setOrgs([])
+          }
           return
         }
         const o = await oRes.json()
-        if (!cancelled) {
-          setOrgs(o.organizations ?? [])
-        }
+        if (!cancelled) setOrgs(o.organizations ?? [])
       } catch {
-        if (!cancelled) setError("Could not load data.")
+        if (!cancelled) {
+          setOrgsError("Could not load organizations.")
+          setOrgs([])
+        }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setOrgsLoading(false)
       }
     }
-    void load()
+    async function loadStats() {
+      setStatsError(null)
+      try {
+        const sRes = await fetch("/api/waik-admin/stats", { credentials: "include" })
+        if (!sRes.ok) {
+          if (!cancelled) setStatsError("Overview stats could not load; the table below may still show communities.")
+          return
+        }
+        const s = await sRes.json()
+        if (!cancelled) {
+          setStats({
+            totalOrganizations: s.totalOrganizations ?? 0,
+            incidentsThisMonth: s.incidentsThisMonth ?? 0,
+            mostActiveOrganizationName:
+              s.mostActiveOrganizationName == null || s.mostActiveOrganizationName === ""
+                ? null
+                : String(s.mostActiveOrganizationName),
+          })
+        }
+      } catch {
+        if (!cancelled) setStatsError("Overview stats could not load; the table below may still show communities.")
+      } finally {
+        if (!cancelled) setStatsLoading(false)
+      }
+    }
+    void loadOrgs()
+    void loadStats()
     return () => {
       cancelled = true
     }
@@ -53,21 +98,35 @@ export default function WaikAdminHomePage() {
 
       <section className="rounded-xl border border-brand-mid-gray bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-brand-dark-teal">WAiK Platform Overview</h2>
-        <p className="mt-1 text-sm text-brand-muted">Placeholder metrics — live intelligence wiring comes in a later phase.</p>
+        <p className="mt-1 text-sm text-brand-muted">
+          Counts are from the database. “Most active” is the org with the most incidents created this month (UTC), when
+          incidents have an organization id.
+        </p>
         <div className="mt-6 grid gap-6 md:grid-cols-3">
           <div className="rounded-lg bg-brand-light-bg/80 p-4 text-center">
-            <p className="text-3xl font-bold tabular-nums text-brand-teal">2</p>
+            <p className="text-3xl font-bold tabular-nums text-brand-teal">
+              {statsLoading ? "—" : stats?.totalOrganizations ?? 0}
+            </p>
             <p className="mt-2 text-sm text-brand-muted">Total Communities</p>
           </div>
           <div className="rounded-lg bg-brand-light-bg/80 p-4 text-center">
-            <p className="text-3xl font-bold tabular-nums text-brand-teal">28</p>
+            <p className="text-3xl font-bold tabular-nums text-brand-teal">
+              {statsLoading ? "—" : stats?.incidentsThisMonth ?? 0}
+            </p>
             <p className="mt-2 text-sm text-brand-muted">Incidents This Month</p>
           </div>
           <div className="rounded-lg bg-brand-light-bg/80 p-4 text-center">
-            <p className="text-base font-semibold leading-snug text-brand-teal">Sunrise Minneapolis</p>
-            <p className="mt-2 text-sm text-brand-muted">Most Active</p>
+            <p className="text-base font-semibold leading-snug text-brand-teal">
+              {statsLoading
+                ? "—"
+                : stats?.mostActiveOrganizationName
+                  ? stats.mostActiveOrganizationName
+                  : "—"}
+            </p>
+            <p className="mt-2 text-sm text-brand-muted">Most Active (this month)</p>
           </div>
         </div>
+        {statsError ? <p className="mt-3 text-sm text-amber-800">{statsError}</p> : null}
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
@@ -77,7 +136,7 @@ export default function WaikAdminHomePage() {
         </Button>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {orgsError ? <p className="text-sm text-red-600">{orgsError}</p> : null}
 
       <div className="overflow-hidden rounded-xl border border-brand-mid-gray bg-white shadow-sm">
         <table className="w-full min-w-[720px] text-left text-sm">
@@ -93,21 +152,22 @@ export default function WaikAdminHomePage() {
             </tr>
           </thead>
           <tbody>
-            {loading && (
+            {orgsLoading && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-brand-muted">
                   Loading…
                 </td>
               </tr>
             )}
-            {!loading && orgs.length === 0 && (
+            {!orgsLoading && orgs.length === 0 && !orgsError && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-brand-muted">
-                  No communities yet. Create your first organization above.
+                  No communities yet. Create your first organization above. If you expected pilot data, confirm this
+                  deployment uses the same MongoDB database where you ran the seed (see <code className="text-xs">MONGODB_URI</code>).
                 </td>
               </tr>
             )}
-            {!loading &&
+            {!orgsLoading &&
               orgs.map((row) => (
                 <tr key={row.id} className="border-b border-brand-mid-gray/60 last:border-0">
                   <td className="px-4 py-3 font-medium text-brand-body">{row.name}</td>
