@@ -6,6 +6,7 @@
 import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
 import { getUsers, addQuestionToIncident } from "../db"
+import { isStaffTierRole } from "@/lib/waik-roles"
 
 /**
  * Tool: Search for staff members by name
@@ -15,18 +16,48 @@ export const searchStaffTool = new DynamicStructuredTool({
   description: "Search for staff members by name. Use this when the user mentions a staff member name (e.g., 'send to Sarah', 'ask James'). Returns matching staff members with their IDs.",
   schema: z.object({
     searchQuery: z.string().describe("The name to search for (e.g., 'Sarah', 'James Martinez')"),
+    facilityId: z.string().describe("Restrict search to this facility only (required)"),
   }),
-  func: async ({ searchQuery }) => {
-    console.log("[Tool] Searching for staff:", searchQuery)
-    
-    const users = await getUsers()
-    const staff = users.filter(u => u.role === "staff")
+  func: async ({ searchQuery, facilityId }) => {
+    console.log("[Tool] Searching for staff:", searchQuery, "facility", facilityId)
+    if (!facilityId?.trim()) {
+      return JSON.stringify({ found: false, message: "facilityId is required for staff search" })
+    }
+    const connectMongo = (await import("@/backend/src/lib/mongodb")).default
+    const { default: UserModel } = await import("@/backend/src/models/user.model")
+    await connectMongo()
+    const raw = await UserModel.find({ facilityId: facilityId.trim() })
+      .lean()
+      .limit(200)
+      .exec()
+    const users = (raw as Array<{
+      id?: string
+      firstName?: string
+      lastName?: string
+      email?: string
+      username?: string
+      roleSlug?: string
+      role?: string
+    }>)
+      .map((u) => {
+        const name = [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || String(u.id)
+        return {
+          id: String(u.id ?? ""),
+          name,
+          email: (u.email ?? "").toString(),
+          username: (u.username ?? "").toString(),
+          role: u.roleSlug ?? u.role ?? "",
+        }
+      })
+    const staff = users.filter((u) => isStaffTierRole(String(u.role || "staff")))
     
     // Search by name (case-insensitive, partial match)
     const query = searchQuery.toLowerCase()
-    const matches = staff.filter(s => 
-      s.name.toLowerCase().includes(query) || 
-      s.username.toLowerCase().includes(query)
+    const matches = staff.filter(
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        s.email.toLowerCase().includes(query) ||
+        s.username.toLowerCase().includes(query),
     )
     
     if (matches.length === 0) {

@@ -7,8 +7,10 @@ export default async function WaikAdminLayout({ children }: { children: ReactNod
 
   if (!user?.isWaikSuperAdmin) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-white">
-        <p>Access denied.</p>
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+        <p className="max-w-md text-center text-sm text-muted-foreground">
+          You don&apos;t have permission to view this page.
+        </p>
       </div>
     )
   }

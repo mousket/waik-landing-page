@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import { inviteStaffMember } from "@/lib/admin-staff-invite"
+import { actorNameFromUser, logActivity } from "@/lib/activity-logger"
 import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
 import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
@@ -69,12 +70,25 @@ export async function POST(request: Request) {
         roleSlug: row.role_slug,
         inviterName,
         inviterRole,
+        inviterRoleSlug: user.roleSlug,
+        invitedByUserId: user.userId,
         sendWelcomeEmail: true,
       })
 
       if (r.ok) {
         created++
         results.push({ email: row.email, status: "created" })
+        logActivity({
+          userId: user.userId,
+          userName: actorNameFromUser(user),
+          role: user.roleSlug,
+          facilityId,
+          action: "user_invited",
+          resourceType: "user",
+          resourceId: r.clerkUserId,
+          metadata: { email: row.email, roleSlug: row.role_slug, source: "csv" },
+          req: request,
+        })
       } else {
         failed++
         results.push({ email: row.email, status: "failed", error: r.message })

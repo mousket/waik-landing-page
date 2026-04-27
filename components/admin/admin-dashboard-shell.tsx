@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
 import { toast } from "sonner"
+import { DashboardOnboarding } from "@/components/dashboard-onboarding"
 import { ActiveInvestigationsTab } from "@/components/admin/active-investigations-tab"
 import { ClosedInvestigationsTab } from "@/components/admin/closed-incidents-tab"
-import { DailyBrief } from "@/components/admin/daily-brief"
+import { AdminFacilitySwitcher } from "@/components/admin/admin-facility-switcher"
+import { AdminDashboardGreeting, DailyBrief } from "@/components/admin/daily-brief"
 import { NeedsAttentionTab } from "@/components/admin/needs-attention-tab"
 import { StatsSidebar } from "@/components/admin/stats-sidebar"
 import { Badge } from "@/components/ui/badge"
@@ -17,8 +19,6 @@ import type { DashboardStats } from "@/lib/types/dashboard-stats"
 import type { IncidentSummary } from "@/lib/types/incident-summary"
 
 const RED = "#C0392B"
-
-type FacilityOption = { id: string; name: string; organizationId: string }
 
 const INCIDENT_PHASES_QUERY = "phase=phase_1_in_progress,phase_1_complete,phase_2_in_progress"
 
@@ -44,16 +44,11 @@ export function AdminDashboardShell({
   canAccessPhase2,
   userDisplayName,
   defaultFacilityId,
-  showFacilityPicker,
-  isWaikSuperAdmin = false,
 }: {
   canAccessPhase2: boolean
   userDisplayName: string
   /** Default facility (from user record) if none selected yet. */
   defaultFacilityId?: string
-  /** Show facility picker for super admins and admins. */
-  showFacilityPicker: boolean
-  isWaikSuperAdmin?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -63,9 +58,6 @@ export function AdminDashboardShell({
   const [facilityId, setFacilityId] = useState<string | undefined>(
     () => (facilityIdFromUrl ?? (defaultFacilityId || "").trim()) || undefined,
   )
-  const [facilityOptions, setFacilityOptions] = useState<FacilityOption[]>([])
-  const [facilityLoading, setFacilityLoading] = useState(showFacilityPicker)
-
   const [attentionCount, setAttentionCount] = useState<number | null>(null)
   const [activePhase2Count, setActivePhase2Count] = useState<number | null>(null)
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -98,42 +90,6 @@ export function AdminDashboardShell({
     [searchParams, facilityId, defaultFacilityId],
   )
 
-  // Facility picker: load options + choose initial facility.
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadFacilities() {
-      if (!showFacilityPicker) {
-        setFacilityLoading(false)
-        return
-      }
-      setFacilityLoading(true)
-      try {
-        const res = await fetch("/api/facilities", { credentials: "include" })
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string }
-          throw new Error(typeof j.error === "string" ? j.error : "Could not load facilities")
-        }
-        const data = (await res.json()) as { facilities?: FacilityOption[] }
-        const list = Array.isArray(data.facilities) ? data.facilities : []
-        if (!cancelled) setFacilityOptions(list)
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Could not load facilities"
-        if (!cancelled) {
-          setFacilityOptions([])
-          toast.error(msg)
-        }
-      } finally {
-        if (!cancelled) setFacilityLoading(false)
-      }
-    }
-
-    void loadFacilities()
-    return () => {
-      cancelled = true
-    }
-  }, [showFacilityPicker])
-
   // Keep address bar in sync with a known home facility so child links and APIs that read
   // `searchParams` (and super-admin `resolveEffectiveAdminFacility` which requires a facilityId)
   // all see the same id as the parent fetch.
@@ -145,42 +101,10 @@ export function AdminDashboardShell({
     applyFacilityIdToPath(router, pathname, searchParams, d)
   }, [defaultFacilityId, facilityIdFromUrl, pathname, router, searchParams])
 
-  // Super admin with no `user.facilityId` but exactly one org facility: lock URL to it (mirrors
-  // `AdminFacilitySwitcher` so the dashboard is not stuck without `?facilityId=`).
+  // Keep `facilityId` in sync with URL + localStorage, and auto-pick a sensible default. On the
+  // dashboard, the facility picker sits beside the Command center; on other admin routes it is in
+  // the app shell. This component only holds id for API/query consistency.
   useEffect(() => {
-    if (!isWaikSuperAdmin) return
-    if (facilityIdFromUrl) return
-    if ((defaultFacilityId || "").trim()) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch("/api/facilities", { credentials: "include" })
-        if (!res.ok || cancelled) return
-        const data = (await res.json()) as { facilities?: FacilityOption[] }
-        const list = Array.isArray(data.facilities) ? data.facilities : []
-        if (list.length !== 1 || cancelled) return
-        const only = (list[0]!.id || "").trim()
-        if (!only) return
-        if (pathname === "/admin/dashboard") {
-          applyFacilityIdToPath(router, pathname, searchParams, only)
-        }
-      } catch {
-        // ignore
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [defaultFacilityId, facilityIdFromUrl, isWaikSuperAdmin, pathname, router, searchParams])
-
-  // Keep facilityId in sync with URL + localStorage, and auto-pick a sensible default.
-  useEffect(() => {
-    if (!showFacilityPicker) {
-      // Still allow query param override (useful for super admin deep links).
-      setFacilityId((facilityIdFromUrl ?? (defaultFacilityId || "").trim()) || undefined)
-      return
-    }
-
     const fromUrl = facilityIdFromUrl
     if (fromUrl) {
       setFacilityId(fromUrl)
@@ -200,16 +124,9 @@ export function AdminDashboardShell({
       fromStorage = undefined
     }
 
-    const candidate = fromStorage ?? defaultFacilityId ?? undefined
+    const fromDefault = (defaultFacilityId || "").trim() || undefined
+    const candidate = fromStorage ?? fromDefault
     if (!candidate) {
-      setFacilityId(undefined)
-      return
-    }
-
-    // If we have facilityOptions, ensure candidate is valid; otherwise accept it optimistically.
-    const valid =
-      facilityOptions.length === 0 ? true : facilityOptions.some((f) => f.id === candidate)
-    if (!valid) {
       setFacilityId(undefined)
       return
     }
@@ -218,13 +135,7 @@ export function AdminDashboardShell({
     const sp = new URLSearchParams(searchParams.toString())
     sp.set("facilityId", candidate)
     router.replace(`${pathname}?${sp.toString()}`)
-  }, [defaultFacilityId, facilityIdFromUrl, facilityOptions, pathname, router, searchParams, showFacilityPicker])
-
-  const facilityLabel = useMemo(() => {
-    if (!facilityId) return null
-    const row = facilityOptions.find((f) => f.id === facilityId)
-    return row?.name ?? facilityId
-  }, [facilityId, facilityOptions])
+  }, [defaultFacilityId, facilityIdFromUrl, pathname, router, searchParams])
 
   const loadIncidents = useCallback(async () => {
     if (incidentsFirstLoad.current) setIncidentsLoading(true)
@@ -384,63 +295,16 @@ export function AdminDashboardShell({
     }
   }, [defaultFacilityId, facilityId, searchParams])
 
-  const facilityPicker = showFacilityPicker ? (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-primary">Managing facility</p>
-          <p className="mt-1 text-xs text-muted-foreground">Pick the facility you want the dashboard to load.</p>
+  const mainColumn = (
+    <div className="min-h-0 min-w-0 flex-1 space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+        <div className="min-w-0 flex-1">
+          <AdminDashboardGreeting userDisplayName={userDisplayName} scopeHealthLine={scopeHealthLine} />
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-muted-foreground" htmlFor="facility-select">
-            Facility
-          </label>
-          <select
-            id="facility-select"
-            className="min-h-[44px] min-w-[260px] max-w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm"
-            value={facilityId ?? ""}
-            disabled={facilityLoading || facilityOptions.length === 0}
-            onChange={(e) => {
-              const next = e.target.value.trim() || undefined
-              setFacilityId(next)
-              if (next) {
-                try {
-                  window.localStorage.setItem("waik:admin:facilityId", next)
-                } catch {
-                  // ignore
-                }
-                const sp = new URLSearchParams(searchParams.toString())
-                sp.set("facilityId", next)
-                router.replace(`${pathname}?${sp.toString()}`)
-              }
-            }}
-          >
-            <option value="" disabled>
-              {facilityLoading ? "Loading facilities…" : "Select a facility…"}
-            </option>
-            {facilityOptions.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+        <div className="w-full min-w-0 shrink-0 lg:max-w-md xl:max-w-lg">
+          <AdminFacilitySwitcher defaultFacilityId={defaultFacilityId} layout="dashboardInline" />
         </div>
       </div>
-      {!facilityId ? (
-        <p className="mt-3 text-sm text-amber-800">
-          Select a facility to load incidents and stats.
-        </p>
-      ) : (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Current facility: <span className="font-medium text-foreground">{facilityLabel}</span>
-        </p>
-      )}
-    </section>
-  ) : null
-
-  const mainColumn = (
-    <div className="min-w-0 flex-1 space-y-6">
-      {facilityPicker}
       {incidentsListError ? (
         <div
           className="rounded-lg border border-red-200/90 bg-red-50/90 p-3 text-sm text-red-900 shadow-sm"
@@ -459,67 +323,71 @@ export function AdminDashboardShell({
           <p className="mt-1 text-amber-900/90">{scopeCheckError}</p>
         </div>
       ) : null}
-      {scopeHealthLine && !incidentsListError ? (
-        <p className="text-xs leading-relaxed text-muted-foreground">{scopeHealthLine}</p>
-      ) : null}
+      {/* scopeHealthLine is rendered inside the Command center card. */}
       {stats && !statsLoading ? <DailyBrief stats={stats} userDisplayName={userDisplayName} /> : null}
 
-      <Tabs defaultValue="attention" className="w-full gap-4">
-        <TabsList className="mb-2 flex h-auto w-full min-h-[48px] flex-wrap items-stretch justify-start gap-1 rounded-none border-b border-border bg-transparent p-0 sm:gap-4">
+      <Tabs defaultValue="attention" className="flex min-h-0 w-full flex-col gap-2.5 sm:gap-3">
+        <TabsList className="mb-0 flex h-auto min-h-11 w-full max-w-full flex-wrap items-stretch justify-start gap-1.5 rounded-2xl border border-border/50 bg-gradient-to-b from-muted/30 to-muted/5 p-1.5 sm:min-h-12 sm:gap-2 sm:p-2">
           <TabsTrigger
             value="attention"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-semibold shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            className="shrink-0 grow rounded-xl border border-transparent px-2.5 py-2.5 text-xs font-semibold transition-all data-[state=active]:border-primary/25 data-[state=active]:bg-gradient-to-b data-[state=active]:from-primary/10 data-[state=active]:to-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:sm:shadow-lg sm:px-4 sm:text-sm"
           >
-            <span className="flex items-center gap-2">
+            <span className="flex items-center justify-center gap-2 sm:gap-2.5">
               Needs Attention
-              <Badge className="rounded-full px-1.5 text-xs" style={{ backgroundColor: RED, color: "#fff" }}>
+              <Badge className="rounded-full px-1.5 text-xs tabular-nums" style={{ backgroundColor: RED, color: "#fff" }}>
                 {attentionCount === null ? "…" : attentionCount}
               </Badge>
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="active"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-semibold shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary"
+            className="shrink-0 grow rounded-xl border border-transparent px-2.5 py-2.5 text-xs font-semibold transition-all data-[state=active]:border-primary/25 data-[state=active]:bg-gradient-to-b data-[state=active]:from-primary/10 data-[state=active]:to-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:sm:shadow-lg sm:px-4 sm:text-sm"
           >
-            <span className="flex items-center gap-2">
+            <span className="flex items-center justify-center gap-2 sm:gap-2.5">
               Active Investigations
-              <Badge className="rounded-full bg-sky-600 px-1.5 text-xs text-white">
+              <Badge className="rounded-full bg-sky-600 px-1.5 text-xs tabular-nums text-white">
                 {activePhase2Count === null ? "…" : activePhase2Count}
               </Badge>
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="closed"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-semibold shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary"
+            className="shrink-0 grow rounded-xl border border-transparent px-2.5 py-2.5 text-xs font-semibold transition-all data-[state=active]:border-primary/25 data-[state=active]:bg-gradient-to-b data-[state=active]:from-primary/10 data-[state=active]:to-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:sm:shadow-lg sm:px-4 sm:text-sm"
           >
             Closed
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="attention" className="mt-0 space-y-8 outline-none">
-          <NeedsAttentionTab
-            canAccessPhase2={canAccessPhase2}
-            onAttentionCount={onAttentionCount}
-            sharedIncidents={incidents}
-            sharedLoading={incidentsLoading}
-            setSharedIncidents={setIncidents}
-          />
+        <TabsContent value="attention" className="mt-0 min-h-0 flex flex-col outline-none data-[state=inactive]:hidden">
+          <div className="scrollbar-thin h-[min(64dvh,720px)] min-h-[220px] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl border border-border/80 bg-card/50 px-2 py-3 shadow-sm [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:px-4 sm:py-4">
+            <NeedsAttentionTab
+              canAccessPhase2={canAccessPhase2}
+              onAttentionCount={onAttentionCount}
+              sharedIncidents={incidents}
+              sharedLoading={incidentsLoading}
+              setSharedIncidents={setIncidents}
+            />
+          </div>
         </TabsContent>
 
-        <TabsContent value="active" className="mt-0 space-y-4 outline-none">
-          <ActiveInvestigationsTab
-            onActiveCount={onActiveCount}
-            sharedIncidents={incidents}
-            sharedLoading={incidentsLoading}
-            useParentList
-          />
+        <TabsContent value="active" className="mt-0 min-h-0 flex flex-col outline-none data-[state=inactive]:hidden">
+          <div className="scrollbar-thin h-[min(64dvh,720px)] min-h-[220px] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl border border-border/80 bg-card/50 px-2 py-3 pb-6 shadow-sm [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:px-4 sm:py-4 sm:pb-8">
+            <ActiveInvestigationsTab
+              onActiveCount={onActiveCount}
+              sharedIncidents={incidents}
+              sharedLoading={incidentsLoading}
+              useParentList
+            />
+          </div>
         </TabsContent>
 
-        <TabsContent value="closed" className="mt-0 space-y-4 outline-none">
-          <ClosedInvestigationsTab
-            facilityId={effectiveFacilityId}
-            organizationId={effectiveOrgId}
-          />
+        <TabsContent value="closed" className="mt-0 min-h-0 flex flex-col outline-none data-[state=inactive]:hidden">
+          <div className="scrollbar-thin h-[min(64dvh,720px)] min-h-[220px] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl border border-border/80 bg-card/50 px-2 py-3 pb-6 shadow-sm [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:px-4 sm:py-4 sm:pb-8">
+            <ClosedInvestigationsTab
+              facilityId={effectiveFacilityId}
+              organizationId={effectiveOrgId}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -533,6 +401,7 @@ export function AdminDashboardShell({
 
   return (
     <div className="relative w-full flex-1">
+      <DashboardOnboarding role="admin" />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
         {mainColumn}

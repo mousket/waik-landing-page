@@ -1,10 +1,9 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 import { Plus_Jakarta_Sans, Inter } from "next/font/google"
 
-import { ConditionalRootHeader } from "@/components/conditional-root-header"
-import { SignedOutHeaderSignIn } from "@/components/signed-out-header-sign-in"
+import { ClerkRootProvider } from "@/components/clerk-root-provider"
+import { RootClerkHeader } from "@/components/root-clerk-header"
 import { PwaProviders } from "@/components/pwa-providers"
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl, getClerkPostAuthUrl } from "@/lib/clerk-routes"
@@ -110,23 +109,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${plusJakartaSans.variable} ${inter.variable} font-sans antialiased`}>
-        <ClerkProvider
+        <ClerkRootProvider
           appearance={clerkAppearance}
           signInForceRedirectUrl={clerkPostAuthUrl}
           signUpForceRedirectUrl={clerkPostAuthUrl}
           afterSignOutUrl={clerkAfterSignOutUrl}
         >
           <PwaProviders />
-          <ConditionalRootHeader>
-            <SignedOut>
-              <SignedOutHeaderSignIn />
-            </SignedOut>
-            <SignedIn>
-              <UserButton appearance={clerkAppearance} afterSignOutUrl={clerkAfterSignOutUrl} />
-            </SignedIn>
-          </ConditionalRootHeader>
+          <RootClerkHeader appearance={clerkAppearance} afterSignOutUrl={clerkAfterSignOutUrl} />
           {children}
-        </ClerkProvider>
+        </ClerkRootProvider>
       </body>
     </html>
   )

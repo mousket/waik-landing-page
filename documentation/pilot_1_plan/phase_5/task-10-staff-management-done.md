@@ -29,18 +29,18 @@ Read these before starting:
 
 ## Success Criteria
 
-- [ ] `npm run build` passes
-- [ ] `app/admin/settings/staff/page.tsx` shows all staff for the facility
-- [ ] "Invite Staff" form sends Clerk invitation email to entered email address
-- [ ] Pending invitations list shows all sent-but-not-accepted invitations
-- [ ] "Cancel" removes pending invitation
-- [ ] "Edit Role" modal changes role (respects permission matrix)
-- [ ] "Deactivate" suspends user (they cannot log in)
-- [ ] Role permission matrix enforced: DON cannot invite admin-tier roles
-- [ ] `components/role-gate.tsx` renders null for unauthorized roles
-- [ ] Activity log records login, incident creation, phase transition, user invite, role change
-- [ ] `app/admin/settings/activity/page.tsx` shows last 100 activity entries
-- [ ] Activity log is filterable by user and action type
+- [x] `npm run build` passes
+- [x] `app/admin/settings/staff/page.tsx` shows all staff for the facility
+- [x] "Invite Staff" form sends Clerk invitation email to entered email address
+- [x] Pending invitations list shows all sent-but-not-accepted invitations
+- [x] "Cancel" removes pending invitation
+- [x] "Edit Role" modal changes role (respects permission matrix)
+- [x] "Deactivate" suspends user (they cannot log in)
+- [x] Role permission matrix enforced: DON cannot invite admin-tier roles
+- [x] `components/role-gate.tsx` renders null for unauthorized roles
+- [x] Activity log records login, incident creation, phase transition, user invite, role change
+- [x] `app/admin/settings/activity/page.tsx` shows last 100 activity entries
+- [x] Activity log is filterable by user and action type
 
 ---
 

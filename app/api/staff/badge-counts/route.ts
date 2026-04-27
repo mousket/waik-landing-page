@@ -1,5 +1,6 @@
 import IncidentModel from "@/backend/src/models/incident.model"
 import { withAuth } from "@/lib/api-handler"
+import { sameIdsForOrMatch, staffIdMatch } from "@/lib/staff-identity"
 
 export const GET = withAuth(async (_req, { currentUser }) => {
   const now = new Date()
@@ -14,17 +15,21 @@ export const GET = withAuth(async (_req, { currentUser }) => {
     AssessmentModel = null
   }
 
+  const byIds = sameIdsForOrMatch(currentUser)
+  const conductedQ =
+    byIds.length > 1 ? { conductedById: { $in: byIds } } : { conductedById: byIds[0] || currentUser.userId }
+
   const [pendingCount, assessmentCount] = await Promise.all([
     IncidentModel.countDocuments({
       facilityId: currentUser.facilityId,
-      staffId: currentUser.userId,
+      ...staffIdMatch(currentUser),
       phase: "phase_1_in_progress",
       completenessScore: { $lt: 100 },
     }),
     AssessmentModel
       ? AssessmentModel.countDocuments({
           facilityId: currentUser.facilityId,
-          conductedById: currentUser.userId,
+          ...conductedQ,
           nextDueAt: { $gte: now, $lte: sevenDaysFromNow },
         })
       : Promise.resolve(0),

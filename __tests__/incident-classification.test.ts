@@ -5,6 +5,7 @@ import type { IdtTeamMember, IncidentSummary } from "@/lib/types/incident-summar
 const base = (): IncidentSummary => ({
   id: "inc-1",
   facilityId: "fac-1",
+  residentName: "Resident",
   residentRoom: "101",
   incidentType: "fall",
   hasInjury: false,
@@ -175,6 +176,14 @@ describe("computeClock", () => {
     const c = computeClock(signed, 48, now)
     expect(c!.status).toBe("overdue")
     expect(c!.label).toBe("Overdue by 2h")
+  })
+
+  it("100hr elapsed → overdue, Overdue by 2d 4h", () => {
+    const now = Date.now()
+    const signed = new Date(now - 100 * 60 * 60 * 1000).toISOString()
+    const c = computeClock(signed, 48, now)
+    expect(c!.status).toBe("overdue")
+    expect(c!.label).toBe("Overdue by 2d 4h")
   })
 
   it("null phase1SignedAt → null", () => {

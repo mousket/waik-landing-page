@@ -1,5 +1,4 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
-import { createClerkClient } from "@clerk/backend"
 import { NextResponse } from "next/server"
 import type { NextFetchEvent, NextRequest } from "next/server"
 
@@ -28,6 +27,7 @@ function isMustChangePasswordExempt(pathname: string): boolean {
   if (pathname.startsWith("/accept-invite")) return true
   if (pathname === "/change-password" || pathname.startsWith("/change-password/")) return true
   if (pathname.startsWith("/api/auth/change-password")) return true
+  if (pathname === "/api/auth/user-flags" || pathname.startsWith("/api/auth/user-flags/")) return true
   if (pathname.startsWith("/auth/after-sign-in")) return true
   if (pathname.startsWith("/auth/account-pending")) return true
   if (pathname.includes("/sign-out")) return true
@@ -43,13 +43,14 @@ const clerk = clerkMiddleware(async (auth, request) => {
   const pathname = request.nextUrl.pathname
 
   if (userId && !isMustChangePasswordExempt(pathname)) {
-    const secretKey = process.env.CLERK_SECRET_KEY
-    if (secretKey) {
-      try {
-        const clerkClient = createClerkClient({ secretKey })
-        const u = await clerkClient.users.getUser(userId)
-        const meta = u.publicMetadata as { mustChangePassword?: boolean } | undefined
-        if (meta?.mustChangePassword === true) {
+    try {
+      const flagsUrl = new URL("/api/auth/user-flags", request.nextUrl)
+      const fr = await fetch(flagsUrl, {
+        headers: { cookie: request.headers.get("cookie") ?? "" },
+      })
+      if (fr.ok) {
+        const j = (await fr.json()) as { mustChangePassword?: boolean }
+        if (j.mustChangePassword === true) {
           if (pathname.startsWith("/api/")) {
             return NextResponse.json(
               { error: "Password change required", code: "must_change_password" },
@@ -61,9 +62,9 @@ const clerk = clerkMiddleware(async (auth, request) => {
           url.search = ""
           return NextResponse.redirect(url)
         }
-      } catch (e) {
-        console.error("[middleware] mustChangePassword check failed:", e)
       }
+    } catch (e) {
+      console.error("[middleware] mustChangePassword (user-flags) failed:", e)
     }
   }
 

@@ -4,6 +4,7 @@
  *
  * Requires: DATABASE_URL, MONGODB_DB_NAME, CLERK_SECRET_KEY, SEED_CLERK_PASSWORD (optional),
  * and super-admin gerard@waik.care for createdBySuperId (or falls back to "seed-script").
+ * Optional: WAIK_SEED_CLERK_ORG_ID — Clerk `org_…` for org-sunrise-001 (defaults in script).
  */
 import path from "path"
 import dotenv from "dotenv"
@@ -27,6 +28,10 @@ import AssessmentModel from "../backend/src/models/assessment.model"
 const ORG_ID = "org-sunrise-001"
 const FACILITY_ID = "fac-sunrise-mpls-001"
 const SEED_PASSWORD = process.env.SEED_CLERK_PASSWORD || "WaiK@Seed2026!"
+
+/** Clerk `org_…` for "Sunrise Senior Living Minnesota" — override if your Clerk instance differs. */
+const SUNRISE_CLERK_ORGANIZATION_ID =
+  process.env.WAIK_SEED_CLERK_ORG_ID?.trim() || "org_3CuCbODTv8IKAeXaSRizVZLkXDZ"
 
 const DECLARATION =
   "I certify this investigation report is complete and accurate to the best of my knowledge."
@@ -73,6 +78,12 @@ async function main() {
   })
   await seedInterventions(daysAgo)
   await seedAssessments(daysAgo, daysFromNow)
+  await seedBeaubrunFamilyDemo({
+    now,
+    daysAgo,
+    hoursAgo,
+    daysFromNow,
+  })
 
   console.log("\n══════════════════════════════")
   console.log("Seed complete. WAiK development database is ready.")
@@ -81,6 +92,8 @@ async function main() {
   console.log("  Maria Torres (RN):        m.torres@sunrisemn.com")
   console.log("  Dr. Sarah Kim (DON):      s.kim@sunrisemn.com")
   console.log("  Patricia Walsh (Admin):   p.walsh@sunrisemn.com")
+  console.log("  Gerard Beaubrun (demo RN):  gerardbeaubrun@yahoo.com")
+  console.log("  Mousket Beaubrun (demo CNA): mousket.beaubrun@yahoo.com")
 
   await mongoose.disconnect()
   process.exit(0)
@@ -90,7 +103,13 @@ async function seedOrganization(createdBySuperId: string) {
   console.log("\n📁 Organization")
   const existing = await OrganizationModel.findOne({ id: ORG_ID }).exec()
   if (existing) {
-    console.log("  Sunrise Senior Living already exists — skipping")
+    await OrganizationModel.updateOne(
+      { id: ORG_ID },
+      { $set: { clerkOrganizationId: SUNRISE_CLERK_ORGANIZATION_ID } },
+    ).exec()
+    console.log(
+      `  Sunrise Senior Living already exists — synced clerkOrganizationId (${SUNRISE_CLERK_ORGANIZATION_ID})`,
+    )
     return
   }
   await OrganizationModel.create({
@@ -105,8 +124,9 @@ async function seedOrganization(createdBySuperId: string) {
     },
     createdBySuperId,
     isActive: true,
+    clerkOrganizationId: SUNRISE_CLERK_ORGANIZATION_ID,
   })
-  console.log("  ✓ Created: Sunrise Senior Living Minnesota")
+  console.log(`  ✓ Created: Sunrise Senior Living Minnesota (Clerk org ${SUNRISE_CLERK_ORGANIZATION_ID})`)
 }
 
 async function seedFacility(daysAgo: (n: number) => Date) {
@@ -232,6 +252,28 @@ const STAFF: StaffDef[] = [
     deviceType: "personal",
     lastLoginAt: new Date(),
   },
+  {
+    id: "user-brun-ger-001",
+    firstName: "Gerard",
+    lastName: "Beaubrun",
+    email: "gerardbeaubrun@yahoo.com",
+    roleSlug: "rn",
+    deviceType: "personal",
+    lastLoginAt: new Date(),
+    selectedUnit: "Wing B — West",
+    selectedUnitDate: null,
+  },
+  {
+    id: "user-brun-mou-001",
+    firstName: "Mousket",
+    lastName: "Beaubrun",
+    email: "mousket.beaubrun@yahoo.com",
+    roleSlug: "cna",
+    deviceType: "personal",
+    lastLoginAt: new Date(),
+    selectedUnit: "Skilled Nursing",
+    selectedUnitDate: null,
+  },
 ]
 
 async function seedStaffUsers(
@@ -262,7 +304,10 @@ async function seedStaffUsers(
                     ? daysAgo(2)
                     : daysAgo(1)
 
-    const selectedUnitDate = def.id === "user-rn-001" ? todayYmd : def.selectedUnitDate ?? undefined
+    const selectedUnitDate =
+      def.id === "user-rn-001" || def.id === "user-brun-ger-001"
+        ? todayYmd
+        : (def.selectedUnitDate ?? undefined)
 
     const existingMongo = await UserModel.findOne({ id: def.id }).exec()
     if (existingMongo) {
@@ -454,6 +499,75 @@ function closedSignatures(signedAt: Date) {
       declaration: DECLARATION,
     },
   }
+}
+
+/** Shared with main seed and Beaubrun family demo. */
+async function createIncidentFromSeedRow(raw: Record<string, unknown>, now: Date) {
+  const id = raw.id as string
+  if (!id) return
+  const existing = await IncidentModel.findOne({ id }).exec()
+  if (existing) {
+    console.log(`  ${raw.label} already exists — skipping`)
+    return
+  }
+
+  const reportedById = raw.reportedById as string
+  const reportedByName = raw.reportedByName as string
+  const startedAt = raw.startedAt as Date
+  const phase1SignedAt = raw.phase1SignedAt as Date | undefined
+  const phase2LockedAt = raw.phase2LockedAt as Date | undefined
+
+  const phaseTransitionTimestamps: Record<string, Date> = {
+    phase1Started: startedAt,
+  }
+  if (phase1SignedAt) phaseTransitionTimestamps.phase1Signed = phase1SignedAt
+  if (phase2LockedAt) phaseTransitionTimestamps.phase2Locked = phase2LockedAt
+
+  const doc: Record<string, unknown> = {
+    id,
+    facilityId: FACILITY_ID,
+    organizationId: ORG_ID,
+    title: raw.label,
+    description: `${raw.incidentType} — ${raw.location}`,
+    incidentType: raw.incidentType,
+    location: raw.location,
+    incidentDate: raw.incidentDate,
+    incidentTime: raw.incidentTime,
+    witnessesPresent: raw.witnessesPresent,
+    hasInjury: raw.hasInjury,
+    injuryDescription: raw.injuryDescription,
+    residentId: raw.residentId,
+    completenessScore: raw.completenessScore,
+    completenessAtTier1Complete: raw.completenessAtTier1Complete ?? 0,
+    completenessAtSignoff: raw.completenessAtSignoff ?? 0,
+    tier2QuestionsGenerated: raw.tier2QuestionsGenerated ?? 0,
+    questionsAnswered: raw.questionsAnswered ?? 0,
+    questionsDeferred: raw.questionsDeferred ?? 0,
+    questionsMarkedUnknown: 0,
+    activeDataCollectionSeconds: 0,
+    dataPointsPerQuestion: [],
+    phaseTransitionTimestamps,
+    phase: raw.phase,
+    phase2Sections: raw.phase2Sections,
+    redFlags: raw.redFlags,
+    status: raw.status,
+    priority: raw.priority,
+    staffId: reportedById,
+    staffName: reportedByName,
+    residentName: raw.residentName,
+    residentRoom: raw.residentRoom,
+    createdAt: startedAt,
+    updatedAt: now,
+    questions: [],
+    investigatorId: raw.investigatorId,
+    investigatorName: raw.investigatorName,
+    idtTeam: raw.idtTeam ?? [],
+    investigation: raw.investigation,
+    auditTrail: [],
+  }
+
+  await IncidentModel.create(doc)
+  console.log(`  ✓ Created: ${raw.label}`)
 }
 
 async function seedIncidents(t: TimeHelpers) {
@@ -890,70 +1004,7 @@ async function seedIncidents(t: TimeHelpers) {
   ]
 
   for (const raw of incidentRows) {
-    const id = raw.id as string
-    const existing = await IncidentModel.findOne({ id }).exec()
-    if (existing) {
-      console.log(`  ${raw.label} already exists — skipping`)
-      continue
-    }
-
-    const reportedById = raw.reportedById as string
-    const reportedByName = raw.reportedByName as string
-    const startedAt = raw.startedAt as Date
-    const phase1SignedAt = raw.phase1SignedAt as Date | undefined
-    const phase2LockedAt = raw.phase2LockedAt as Date | undefined
-
-    const phaseTransitionTimestamps: Record<string, Date> = {
-      phase1Started: startedAt,
-    }
-    if (phase1SignedAt) phaseTransitionTimestamps.phase1Signed = phase1SignedAt
-    if (phase2LockedAt) phaseTransitionTimestamps.phase2Locked = phase2LockedAt
-
-    const doc: Record<string, unknown> = {
-      id,
-      facilityId: FACILITY_ID,
-      organizationId: ORG_ID,
-      title: raw.label,
-      description: `${raw.incidentType} — ${raw.location}`,
-      incidentType: raw.incidentType,
-      location: raw.location,
-      incidentDate: raw.incidentDate,
-      incidentTime: raw.incidentTime,
-      witnessesPresent: raw.witnessesPresent,
-      hasInjury: raw.hasInjury,
-      injuryDescription: raw.injuryDescription,
-      residentId: raw.residentId,
-      completenessScore: raw.completenessScore,
-      completenessAtTier1Complete: raw.completenessAtTier1Complete ?? 0,
-      completenessAtSignoff: raw.completenessAtSignoff ?? 0,
-      tier2QuestionsGenerated: raw.tier2QuestionsGenerated ?? 0,
-      questionsAnswered: raw.questionsAnswered ?? 0,
-      questionsDeferred: raw.questionsDeferred ?? 0,
-      questionsMarkedUnknown: 0,
-      activeDataCollectionSeconds: 0,
-      dataPointsPerQuestion: [],
-      phaseTransitionTimestamps,
-      phase: raw.phase,
-      phase2Sections: raw.phase2Sections,
-      redFlags: raw.redFlags,
-      status: raw.status,
-      priority: raw.priority,
-      staffId: reportedById,
-      staffName: reportedByName,
-      residentName: raw.residentName,
-      residentRoom: raw.residentRoom,
-      createdAt: startedAt,
-      updatedAt: now,
-      questions: [],
-      investigatorId: raw.investigatorId,
-      investigatorName: raw.investigatorName,
-      idtTeam: raw.idtTeam ?? [],
-      investigation: raw.investigation,
-      auditTrail: [],
-    }
-
-    await IncidentModel.create(doc)
-    console.log(`  ✓ Created: ${raw.label}`)
+    await createIncidentFromSeedRow(raw, now)
   }
 
   console.log("  Phase distribution: 3 in progress / 2 complete / 3 phase 2 / 2 closed ✓")
@@ -1112,6 +1163,411 @@ async function seedAssessments(
     })
     console.log(`  ✓ Created: ${a.label}`)
   }
+}
+
+/** Extra load for `gerardbeaubrun@yahoo.com` and `mousket.beaubrun@yahoo.com` staff dashboard demos. */
+async function seedBeaubrunFamilyDemo(t: TimeHelpers) {
+  const { now, daysAgo, hoursAgo, daysFromNow } = t
+  console.log("\n🧪 Beaubrun family — staff dashboard (synthetic)")
+
+  const g = await UserModel.findOne({ id: "user-brun-ger-001" }).lean()
+  if (!g) {
+    console.log("  user-brun-ger-001 not found — skipping Beaubrun seed")
+    return
+  }
+
+  const gId = "user-brun-ger-001"
+  const gName = "Gerard Beaubrun"
+  const mId = "user-brun-mou-001"
+  const mName = "Mousket Beaubrun"
+
+  const p2s = (status: "not_started" | "in_progress" | "complete" = "not_started") => ({
+    contributingFactors: {
+      status,
+      factors: status === "complete" ? (["Resident Behavior"] as string[]) : ([] as string[]),
+    },
+    rootCause: { status: "not_started" as const },
+    interventionReview: { status: "not_started" as const, reviewedInterventions: [] as string[] },
+    newIntervention: { status: "not_started" as const, interventions: [] as unknown[] },
+  })
+
+  const rows: Array<Record<string, unknown>> = [
+    {
+      id: "inc-brun-ger-001",
+      label: "INC-BRUN-001 — 102 fall (P1, open)",
+      residentId: "res-001",
+      residentName: "Margaret Chen",
+      residentRoom: "102",
+      incidentType: "fall",
+      location: "Bathroom",
+      incidentDate: now,
+      incidentTime: "04:00",
+      reportedById: gId,
+      reportedByName: gName,
+      reportedByRole: "rn",
+      hasInjury: true,
+      injuryDescription: "Minor contusion to elbow",
+      witnessesPresent: true,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "high",
+      startedAt: hoursAgo(2),
+      completenessScore: 35,
+      completenessAtTier1Complete: 30,
+      tier2QuestionsGenerated: 10,
+      questionsAnswered: 2,
+      questionsDeferred: 1,
+      redFlags: { hasInjury: true, carePlanViolated: false, notificationSentToAdmin: true },
+    },
+    {
+      id: "inc-brun-ger-002",
+      label: "INC-BRUN-002 — 204 fall (P1, open)",
+      residentId: "res-002",
+      residentName: "Robert Johnson",
+      residentRoom: "204",
+      incidentType: "fall",
+      location: "Dining",
+      incidentDate: now,
+      incidentTime: "10:00",
+      reportedById: gId,
+      reportedByName: gName,
+      hasInjury: false,
+      witnessesPresent: false,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "medium",
+      startedAt: hoursAgo(5),
+      completenessScore: 55,
+      tier2QuestionsGenerated: 8,
+      questionsAnswered: 4,
+      questionsDeferred: 0,
+      redFlags: { hasInjury: false, carePlanViolated: false, notificationSentToAdmin: false },
+    },
+    {
+      id: "inc-brun-ger-003",
+      label: "INC-BRUN-003 — 306 med (P1, open)",
+      residentId: "res-003",
+      residentName: "Dorothy Martinez",
+      residentRoom: "306",
+      incidentType: "medication_error",
+      location: "Nurses station",
+      incidentDate: now,
+      incidentTime: "11:00",
+      reportedById: gId,
+      reportedByName: gName,
+      hasInjury: false,
+      witnessesPresent: true,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "urgent",
+      startedAt: hoursAgo(7),
+      completenessScore: 72,
+      tier2QuestionsGenerated: 6,
+      questionsAnswered: 3,
+      questionsDeferred: 1,
+      redFlags: { hasInjury: false, carePlanViolated: true, notificationSentToAdmin: false },
+    },
+    {
+      id: "inc-brun-ger-004",
+      label: "INC-BRUN-004 — 411 conflict (P1, open)",
+      residentId: "res-004",
+      residentName: "James Okafor",
+      residentRoom: "411",
+      incidentType: "resident_conflict",
+      location: "Common area",
+      incidentDate: now,
+      incidentTime: "13:20",
+      reportedById: gId,
+      reportedByName: gName,
+      hasInjury: false,
+      witnessesPresent: true,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "medium",
+      startedAt: hoursAgo(8),
+      completenessScore: 62,
+      tier2QuestionsGenerated: 9,
+      questionsAnswered: 5,
+      questionsDeferred: 0,
+      redFlags: { hasInjury: false, carePlanViolated: false, notificationSentToAdmin: false },
+    },
+    {
+      id: "inc-brun-ger-005",
+      label: "INC-BRUN-005 — 515 fall (P1, open)",
+      residentId: "res-005",
+      residentName: "Helen Thompson",
+      residentRoom: "515",
+      incidentType: "fall",
+      location: "Hall",
+      incidentDate: now,
+      incidentTime: "15:00",
+      reportedById: gId,
+      reportedByName: gName,
+      hasInjury: true,
+      injuryDescription: "Abrasion right knee",
+      witnessesPresent: false,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "high",
+      startedAt: hoursAgo(10),
+      completenessScore: 80,
+      tier2QuestionsGenerated: 5,
+      questionsAnswered: 4,
+      questionsDeferred: 0,
+      redFlags: { hasInjury: true, carePlanViolated: false, notificationSentToAdmin: true },
+    },
+    {
+      id: "inc-brun-ger-006",
+      label: "INC-BRUN-006 — 102 med (P1 done)",
+      residentId: "res-001",
+      residentName: "Margaret Chen",
+      residentRoom: "102",
+      incidentType: "medication_error",
+      location: "Med cart",
+      incidentDate: daysAgo(1),
+      incidentTime: "08:00",
+      reportedById: gId,
+      reportedByName: gName,
+      hasInjury: false,
+      witnessesPresent: true,
+      phase: "phase_1_complete",
+      status: "pending-review",
+      priority: "medium",
+      startedAt: daysAgo(1),
+      phase1SignedAt: hoursAgo(2),
+      completenessAtSignoff: 84,
+      completenessScore: 84,
+      redFlags: { hasInjury: false, carePlanViolated: false, notificationSentToAdmin: false },
+    },
+    {
+      id: "inc-brun-ger-007",
+      label: "INC-BRUN-007 — 204 wound (P2 in progress)",
+      residentId: "res-002",
+      residentName: "Robert Johnson",
+      residentRoom: "204",
+      incidentType: "wound_injury",
+      location: "Room 204",
+      incidentDate: daysAgo(2),
+      incidentTime: "19:00",
+      reportedById: gId,
+      reportedByName: gName,
+      hasInjury: true,
+      injuryDescription: "Skin tear to forearm",
+      witnessesPresent: false,
+      phase: "phase_2_in_progress",
+      status: "in-progress",
+      priority: "high",
+      startedAt: daysAgo(2),
+      phase1SignedAt: hoursAgo(8),
+      completenessAtSignoff: 78,
+      completenessScore: 78,
+      investigatorId: "user-don-001",
+      investigatorName: "Dr. Sarah Kim",
+      idtTeam: [] as const,
+      phase2Sections: p2s("in_progress"),
+      investigation: {
+        status: "in-progress",
+        investigatorId: "user-don-001",
+        investigatorName: "Dr. Sarah Kim",
+      },
+      redFlags: { hasInjury: true, carePlanViolated: false, notificationSentToAdmin: true },
+    },
+    {
+      id: "inc-brun-ger-008",
+      label: "INC-BRUN-008 — 306 fall (closed)",
+      residentId: "res-003",
+      residentName: "Dorothy Martinez",
+      residentRoom: "306",
+      incidentType: "fall",
+      location: "Bathroom",
+      incidentDate: daysAgo(12),
+      incidentTime: "05:00",
+      reportedById: gId,
+      reportedByName: gName,
+      hasInjury: false,
+      witnessesPresent: false,
+      phase: "closed",
+      status: "closed",
+      priority: "low",
+      startedAt: daysAgo(12),
+      phase1SignedAt: daysAgo(12),
+      phase2LockedAt: daysAgo(8),
+      completenessAtSignoff: 90,
+      completenessScore: 90,
+      phase2Sections: p2s("complete"),
+      investigatorId: "user-don-001",
+      investigatorName: "Dr. Sarah Kim",
+      investigation: {
+        status: "completed",
+        investigatorId: "user-don-001",
+        investigatorName: "Dr. Sarah Kim",
+        completedAt: daysAgo(8),
+        signatures: closedSignatures(daysAgo(8)),
+      },
+      redFlags: { hasInjury: false, carePlanViolated: false, notificationSentToAdmin: false },
+    },
+    {
+      id: "inc-brun-mou-001",
+      label: "INC-BRUN-M1 — 102 transfer (P1, open) — Mousket",
+      residentId: "res-001",
+      residentName: "Margaret Chen",
+      residentRoom: "102",
+      incidentType: "fall",
+      location: "Bathroom",
+      incidentDate: now,
+      incidentTime: "12:00",
+      reportedById: mId,
+      reportedByName: mName,
+      hasInjury: false,
+      witnessesPresent: false,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "medium",
+      startedAt: hoursAgo(1),
+      completenessScore: 48,
+      tier2QuestionsGenerated: 7,
+      questionsAnswered: 1,
+      questionsDeferred: 2,
+      redFlags: { hasInjury: false, carePlanViolated: false, notificationSentToAdmin: false },
+    },
+    {
+      id: "inc-brun-mou-002",
+      label: "INC-BRUN-M2 — 204 meal (P1, open) — Mousket",
+      residentId: "res-002",
+      residentName: "Robert Johnson",
+      residentRoom: "204",
+      incidentType: "resident_conflict",
+      location: "Dining",
+      incidentDate: now,
+      incidentTime: "12:30",
+      reportedById: mId,
+      reportedByName: mName,
+      hasInjury: false,
+      witnessesPresent: true,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "low",
+      startedAt: hoursAgo(3),
+      completenessScore: 58,
+      tier2QuestionsGenerated: 5,
+      questionsAnswered: 2,
+      questionsDeferred: 0,
+      redFlags: { hasInjury: false, carePlanViolated: false, notificationSentToAdmin: false },
+    },
+    {
+      id: "inc-brun-mou-003",
+      label: "INC-BRUN-M3 — 411 wound (P1, open) — Mousket",
+      residentId: "res-004",
+      residentName: "James Okafor",
+      residentRoom: "411",
+      incidentType: "wound_injury",
+      location: "Wound check",
+      incidentDate: now,
+      incidentTime: "14:00",
+      reportedById: mId,
+      reportedByName: mName,
+      hasInjury: true,
+      injuryDescription: "Slight redness to heel",
+      witnessesPresent: true,
+      phase: "phase_1_in_progress",
+      status: "open",
+      priority: "high",
+      startedAt: hoursAgo(4),
+      completenessScore: 68,
+      tier2QuestionsGenerated: 6,
+      questionsAnswered: 3,
+      questionsDeferred: 0,
+      redFlags: { hasInjury: true, carePlanViolated: false, notificationSentToAdmin: true },
+    },
+    {
+      id: "inc-brun-mou-004",
+      label: "INC-BRUN-M4 — 515 (P1 complete) — Mousket",
+      residentId: "res-005",
+      residentName: "Helen Thompson",
+      residentRoom: "515",
+      incidentType: "fall",
+      location: "Gym",
+      incidentDate: daysAgo(2),
+      incidentTime: "10:00",
+      reportedById: mId,
+      reportedByName: mName,
+      hasInjury: false,
+      witnessesPresent: true,
+      phase: "phase_1_complete",
+      status: "pending-review",
+      priority: "medium",
+      startedAt: daysAgo(2),
+      phase1SignedAt: hoursAgo(3),
+      completenessAtSignoff: 81,
+      completenessScore: 81,
+      redFlags: { hasInjury: false, carePlanViolated: false, notificationSentToAdmin: false },
+    },
+  ]
+
+  for (const raw of rows) {
+    await createIncidentFromSeedRow(raw, now)
+  }
+
+  const assRows = [
+    {
+      id: "assess-brun-ger-1",
+      residentId: "res-001",
+      room: "102",
+      assessmentType: "behavioral" as const,
+      conductedById: gId,
+      conductedByName: gName,
+      conductedAt: daysAgo(5),
+      completenessScore: 82,
+      nextDueAt: daysFromNow(1),
+    },
+    {
+      id: "assess-brun-ger-2",
+      residentId: "res-002",
+      room: "204",
+      assessmentType: "activity" as const,
+      conductedById: gId,
+      conductedByName: gName,
+      conductedAt: daysAgo(8),
+      completenessScore: 76,
+      nextDueAt: daysFromNow(2),
+    },
+    {
+      id: "assess-brun-mou-1",
+      residentId: "res-003",
+      room: "306",
+      assessmentType: "activity" as const,
+      conductedById: mId,
+      conductedByName: mName,
+      conductedAt: daysAgo(10),
+      completenessScore: 80,
+      nextDueAt: daysFromNow(1),
+    },
+  ]
+
+  for (const a of assRows) {
+    const ex = await AssessmentModel.findOne({ id: a.id }).exec()
+    if (ex) {
+      console.log(`  ${a.id} already exists — skipping assessment`)
+      continue
+    }
+    await AssessmentModel.create({
+      id: a.id,
+      facilityId: FACILITY_ID,
+      organizationId: ORG_ID,
+      residentId: a.residentId,
+      residentRoom: a.room,
+      assessmentType: a.assessmentType,
+      conductedById: a.conductedById,
+      conductedByName: a.conductedByName,
+      conductedAt: a.conductedAt,
+      completenessScore: a.completenessScore,
+      status: "completed" as const,
+      nextDueAt: a.nextDueAt,
+    })
+    console.log(`  ✓ Created: ${a.id} (assessment)`)
+  }
+
+  console.log("  Beaubrun demo: ~12 new incidents + 3 assessments (when missing) ✓")
 }
 
 main().catch((err) => {

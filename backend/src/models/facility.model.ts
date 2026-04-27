@@ -27,6 +27,20 @@ const CompletionThresholdsSchema = new Schema(
   { _id: false },
 )
 
+export type GoldCustomField = {
+  id: string
+  name: string
+  type: "text" | "yes_no" | "multi_select"
+  required: boolean
+}
+
+export type CustomIncidentTypeDef = {
+  id: string
+  name: string
+  description: string
+  active: boolean
+}
+
 export interface FacilityDocument extends Document {
   id: string
   organizationId: string
@@ -55,6 +69,10 @@ export interface FacilityDocument extends Document {
   plan: "pilot" | "enterprise"
   onboardingDate?: Date
   isActive: boolean
+  /** Per built-in or custom type id: { customFields: { id, name, type, required }[] } } */
+  goldStandardCustom: Record<string, { customFields: GoldCustomField[] }> | null
+  /** { customTypes: { id, name, description, active }[] } */
+  incidentTypeSettings: { customTypes: CustomIncidentTypeDef[] } | null
   createdAt: Date
   updatedAt: Date
 }
@@ -83,6 +101,8 @@ const FacilitySchema = new Schema<FacilityDocument>(
     plan: { type: String, enum: ["pilot", "enterprise"], default: "pilot" },
     onboardingDate: { type: Date },
     isActive: { type: Boolean, default: true },
+    goldStandardCustom: { type: Schema.Types.Mixed, default: null },
+    incidentTypeSettings: { type: Schema.Types.Mixed, default: null },
   },
   {
     versionKey: false,

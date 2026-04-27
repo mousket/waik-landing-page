@@ -8,6 +8,8 @@ export interface AssessmentDocument extends Document {
   facilityId: string
   organizationId?: string
   residentId: string
+  /** Display name; required for conversational assessments (task-07). */
+  residentName?: string
   residentRoom: string
   assessmentType: (typeof ASSESSMENT_TYPES)[number]
   conductedById: string
@@ -15,7 +17,12 @@ export interface AssessmentDocument extends Document {
   conductedAt: Date
   completenessScore: number
   status: (typeof ASSESSMENT_STATUS)[number]
+  /** Verbatim Q/A; append-only style narrative from voice. */
+  narrativeRaw?: string
+  structuredOutput?: Record<string, unknown>
   nextDueAt?: Date
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 const AssessmentSchema = new Schema<AssessmentDocument>(
@@ -24,6 +31,7 @@ const AssessmentSchema = new Schema<AssessmentDocument>(
     facilityId: { type: String, required: true, index: true },
     organizationId: { type: String, index: true },
     residentId: { type: String, required: true, index: true },
+    residentName: { type: String, required: false, index: true },
     residentRoom: { type: String, required: true },
     assessmentType: { type: String, required: true, enum: ASSESSMENT_TYPES },
     conductedById: { type: String, required: true },
@@ -32,6 +40,10 @@ const AssessmentSchema = new Schema<AssessmentDocument>(
     completenessScore: { type: Number, required: true },
     status: { type: String, required: true, enum: ASSESSMENT_STATUS, default: "completed" },
     nextDueAt: { type: Date },
+    narrativeRaw: { type: String, required: false },
+    structuredOutput: { type: Schema.Types.Mixed, required: false },
+    createdAt: { type: Date, required: false },
+    updatedAt: { type: Date, required: false },
   },
   { versionKey: false, timestamps: false },
 )

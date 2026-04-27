@@ -1,13 +1,18 @@
 import { createClerkClient } from "@clerk/backend"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import UserModel from "@/backend/src/models/user.model"
+import { actorNameFromUser, logActivity } from "@/lib/activity-logger"
 import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
 import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 
-export async function PATCH(request: Request, { params }: { params: { userId: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ userId: string }> },
+) {
   try {
+    const { userId } = await context.params
     const user = await getCurrentUser()
     if (!user) return unauthorizedResponse()
     requireCanInviteStaff(user)
@@ -22,7 +27,7 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
     const { facilityId } = resolved
 
     await connectMongo()
-    const target = await UserModel.findOne({ id: params.userId, facilityId }).exec()
+    const target = await UserModel.findOne({ id: userId, facilityId }).exec()
     if (!target) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
@@ -34,6 +39,18 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
       const clerk = createClerkClient({ secretKey })
       await clerk.users.updateUser(target.clerkUserId, { banned: true } as never)
     }
+
+    logActivity({
+      userId: user.userId,
+      userName: actorNameFromUser(user),
+      role: user.roleSlug,
+      facilityId,
+      action: "user_deactivated",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { email: target.email },
+      req: request,
+    })
 
     return NextResponse.json({ success: true })
   } catch (err) {

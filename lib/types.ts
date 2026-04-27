@@ -54,6 +54,9 @@ export interface Question {
     reporterRole?: UserRole
     assignedStaffIds?: string[]
     createdVia?: "voice" | "text" | "system"
+    /** Phase 2 — IDT tab: questions assigned to facility staff for this investigation */
+    idt?: boolean
+    idtTargetUserId?: string
   }
 }
 
@@ -72,6 +75,16 @@ export type InvestigationStatus = "not-started" | "in-progress" | "completed"
 
 import type { GoldStandardFallReport, FallSubtypeStandards } from "./gold_standards"
 
+/** Phase 2 / Phase 1 regulatory signature blocks (Mongo `investigation.signatures`) */
+export interface InvestigationSignature {
+  signedBy: string
+  signedByName: string
+  signedAt: string
+  role: string
+  declaration: string
+  ipAddress?: string
+}
+
 export interface IncidentInvestigationMetadata {
   status: InvestigationStatus
   subtype?: string
@@ -84,6 +97,10 @@ export interface IncidentInvestigationMetadata {
   score?: number | null
   completenessScore?: number | null
   feedback?: string | null
+  signatures?: {
+    don?: InvestigationSignature
+    admin?: InvestigationSignature
+  }
 }
 
 export interface IncidentNotification {
@@ -154,7 +171,13 @@ export interface IncidentPhase2Sections {
 }
 
 export interface IncidentAuditEntry {
-  action: "locked" | "unlocked" | "relocked" | "phase_transitioned" | "signed"
+  action:
+    | "locked"
+    | "unlocked"
+    | "relocked"
+    | "phase_transitioned"
+    | "signed"
+    | "idt_roster_changed"
   performedBy: string
   performedByName?: string
   timestamp: string

@@ -21,6 +21,11 @@ export interface OrganizationDocument extends Document {
   plan: "pilot" | "enterprise"
   createdBySuperId: string
   isActive: boolean
+  /**
+   * Clerk `org_…` id — set when the org is mirrored in Clerk (Organizations) so
+   * facility users can be added as org members and skip “create your organization” at sign-in.
+   */
+  clerkOrganizationId?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -38,6 +43,7 @@ const OrganizationSchema = new Schema<OrganizationDocument>(
     plan: { type: String, enum: ["pilot", "enterprise"], default: "pilot" },
     createdBySuperId: { type: String, required: true },
     isActive: { type: Boolean, default: true },
+    clerkOrganizationId: { type: String, required: false, index: true, sparse: true },
   },
   {
     versionKey: false,

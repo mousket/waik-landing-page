@@ -25,6 +25,7 @@ to a Cursor agent or Claude Code agent as a build instruction.
 | 2 | phase_2/ | 6–10 | Critical Bug Fixes + PWA | task-03, task-04 |
 | 3 | phase_3/ | 11–16 | Dashboard Rebuilds | task-05, task-06 |
 | 4 | phase_4/ | 17–22 | Core Features | task-07, task-08, task-09 |
+| 4b | [phase_4b/](./phase_4b/phase_4b_readme.md) | after task-09 | **Phase 2 + Intelligence completion** (gaps) | 4b-01 … 4b-06 |
 | 5 | phase_5/ | 23–26 | Admin Settings & User Management | task-10, task-11 |
 | 6 | phase_6/ | 27–30 | Push Notifications & Pilot Hardening | task-12, task-13 |
 | 7 | phase_7/ | ongoing | Navigation, Intelligence & Imports | task-14, task-15, task-16, task-17 |

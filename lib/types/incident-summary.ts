@@ -22,6 +22,7 @@ export interface IdtTeamMember {
 export interface IncidentSummary {
   id: string
   facilityId: string
+  residentName: string
   residentRoom: string
   incidentType: string
   hasInjury: boolean

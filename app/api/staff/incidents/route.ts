@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
 import IncidentModel from "@/backend/src/models/incident.model"
 import { withAuth } from "@/lib/api-handler"
+import { staffIdMatch } from "@/lib/staff-identity"
 import type { StaffIncidentSummary } from "@/lib/types/staff-incident-summary"
 
 type RawIncident = {
   id?: string
   facilityId?: string
   residentRoom?: string
+  residentName?: string
   incidentType?: string
   hasInjury?: boolean
   phase?: StaffIncidentSummary["phase"]
@@ -36,7 +38,7 @@ export const GET = withAuth(async (request, { currentUser }) => {
 
   const query: Record<string, unknown> = {
     facilityId: currentUser.facilityId,
-    staffId: currentUser.userId,
+    ...staffIdMatch(currentUser),
   }
 
   // Unit filtering requires a unit/wing field on the incident; currently we only have room.
@@ -52,6 +54,7 @@ export const GET = withAuth(async (request, { currentUser }) => {
         "id",
         "facilityId",
         "residentRoom",
+        "residentName",
         "incidentType",
         "hasInjury",
         "phase",
@@ -79,6 +82,7 @@ export const GET = withAuth(async (request, { currentUser }) => {
       return {
         id: String(incident.id ?? ""),
         facilityId: String(incident.facilityId ?? currentUser.facilityId ?? ""),
+        residentName: String(incident.residentName ?? "").trim() || "Resident",
         residentRoom: String(incident.residentRoom ?? ""),
         incidentType: String(incident.incidentType ?? ""),
         hasInjury: Boolean(incident.hasInjury),

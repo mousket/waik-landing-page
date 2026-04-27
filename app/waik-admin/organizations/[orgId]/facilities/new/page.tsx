@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
-import { US_STATE_CODES } from "@/lib/us-states"
+import { US_STATE_OPTIONS } from "@/lib/us-states"
 
 const FACILITY_TYPES = [
   { value: "snf", label: "Skilled Nursing (SNF)" },
@@ -148,9 +148,9 @@ export default function NewFacilityPage() {
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                 >
-                  {US_STATE_CODES.map((s) => (
-                    <option key={s.code} value={s.code}>
-                      {s.name} ({s.code})
+                  {US_STATE_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label} ({s.value})
                     </option>
                   ))}
                 </select>

@@ -41,7 +41,7 @@ const roles = [
     name: "Director of Nursing",
     isAdminTier: true,
     canAccessPhase2: true,
-    canInviteStaff: false,
+    canInviteStaff: true,
     canManageResidents: true,
     permissions: ["incidents:*", "assessments:*", "residents:read", "phase2:*", "intelligence:*"],
   },

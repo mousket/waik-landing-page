@@ -1,17 +1,23 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import IncidentModel from "@/backend/src/models/incident.model"
+import { actorNameFromUser, logActivity } from "@/lib/activity-logger"
 import { getCurrentUser } from "@/lib/auth"
 import type { IncidentPhase } from "@/lib/types/incident-summary"
 
 const VALID_TRANSITIONS: Record<string, IncidentPhase[]> = {
   phase_1_complete: ["phase_2_in_progress"],
-  phase_2_in_progress: ["closed"],
+  /** Close only via POST /api/incidents/[id]/lock after dual sign-off. */
+  phase_2_in_progress: [],
   closed: [],
   phase_1_in_progress: [],
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id: incidentId } = await context.params
   const currentUser = await getCurrentUser()
   if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -19,8 +25,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!currentUser.isAdminTier && !currentUser.isWaikSuperAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
-
-  const incidentId = params.id
 
   try {
     const body = (await request.json()) as { phase?: string }
@@ -30,10 +34,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     if (phase === "phase_2_in_progress" && !currentUser.canAccessPhase2 && !currentUser.isWaikSuperAdmin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-
-    if (phase === "closed" && !currentUser.canAccessPhase2 && !currentUser.isWaikSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -72,11 +72,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       $set["phaseTransitionTimestamps.phase2Claimed"] = now
     }
 
-    if (phase === "closed") {
-      $set.status = "closed"
-      $set["phaseTransitionTimestamps.phase2Locked"] = now
-    }
-
     const auditEntry = {
       action: "phase_transitioned" as const,
       performedBy: currentUser.userId,
@@ -93,6 +88,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         $push: { auditTrail: auditEntry },
       },
     )
+
+    if (phase === "phase_2_in_progress") {
+      logActivity({
+        userId: currentUser.userId,
+        userName: actorNameFromUser(currentUser),
+        role: currentUser.roleSlug,
+        facilityId: facId,
+        action: "phase2_claimed",
+        resourceType: "incident",
+        resourceId: incidentId,
+        metadata: { fromPhase, toPhase: phase },
+        req: request,
+      })
+    }
 
     console.log(`[Phase transition] ${incidentId}: ${fromPhase} → ${phase} by ${currentUser.userId}`)
 

@@ -17,6 +17,8 @@ export interface UserDocument extends Document {
   selectedUnit?: string
   selectedUnitDate?: string
   lastLoginAt?: Date
+  invitedByUserId?: string
+  invitedByName?: string
   /** Legacy password auth */
   username?: string
   password?: string
@@ -45,6 +47,8 @@ const UserSchema = new Schema<UserDocument>(
     selectedUnit: { type: String },
     selectedUnitDate: { type: String },
     lastLoginAt: { type: Date },
+    invitedByUserId: { type: String },
+    invitedByName: { type: String },
     username: { type: String, index: true, sparse: true },
     password: { type: String },
     role: {

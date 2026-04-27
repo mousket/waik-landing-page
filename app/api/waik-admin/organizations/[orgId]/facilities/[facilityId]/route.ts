@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import OrganizationModel from "@/backend/src/models/organization.model"
@@ -8,11 +8,14 @@ import { leanOne } from "@/lib/mongoose-lean"
 import type { FacilityDocument } from "@/backend/src/models/facility.model"
 import type { OrganizationDocument } from "@/backend/src/models/organization.model"
 
-export async function GET(_request: Request, { params }: { params: { orgId: string; facilityId: string } }) {
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ orgId: string; facilityId: string }> },
+) {
   const gate = await requireWaikSuperAdmin()
   if (gate instanceof NextResponse) return gate
 
-  const { orgId, facilityId } = params
+  const { orgId, facilityId } = await context.params
   await connectMongo()
 
   const org = leanOne<OrganizationDocument>(await OrganizationModel.findOne({ id: orgId }).lean().exec())

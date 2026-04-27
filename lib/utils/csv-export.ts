@@ -7,9 +7,39 @@ export function computeDaysToClose(inc: Pick<IncidentSummary, "phase1SignedAt" |
   return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 
+/** Admin data export: matches phase 5 task; optional resident PHI column. */
+export function generateAdminIncidentsExportCsv(
+  incidents: IncidentSummary[],
+  options: { includeResidentName: boolean },
+): string {
+  const headers = [
+    "roomNumber",
+    ...(options.includeResidentName ? (["residentName"] as const) : []),
+    "incidentType",
+    "completenessAtSignoff",
+    "phase1SignedAt",
+    "phase2LockedAt",
+    "reportedBy",
+  ]
+
+  const rows = incidents.map((inc) => {
+    const cells: string[] = [
+      inc.residentRoom,
+      ...(options.includeResidentName ? [inc.residentName ?? ""] : []),
+      inc.incidentType,
+      String(inc.completenessAtSignoff ?? ""),
+      inc.phase1SignedAt ?? "",
+      inc.phase2LockedAt ?? "",
+      inc.reportedByName ?? "",
+    ]
+    return cells.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")
+  })
+  return [headers.join(","), ...rows].join("\n")
+}
+
 /**
  * CSV for closed investigations. Room numbers only — no resident names.
- * TODO(task-11): When admin enables "include resident names" in Settings, add optional residentName column.
+ * @deprecated Prefer generateAdminIncidentsExportCsv for new code.
  */
 export function generateClosedIncidentsCsv(incidents: IncidentSummary[]): string {
   const headers = [

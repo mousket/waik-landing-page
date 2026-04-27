@@ -97,6 +97,26 @@ const serializeIncident = (incident: any): Incident => ({
         ...incident.investigation,
         startedAt: toIsoString(incident.investigation.startedAt),
         completedAt: toIsoString(incident.investigation.completedAt),
+        signatures: incident.investigation.signatures
+          ? {
+              don: incident.investigation.signatures.don
+                ? {
+                    ...incident.investigation.signatures.don,
+                    signedAt:
+                      toIsoString(incident.investigation.signatures.don.signedAt) ??
+                      new Date().toISOString(),
+                  }
+                : undefined,
+              admin: incident.investigation.signatures.admin
+                ? {
+                    ...incident.investigation.signatures.admin,
+                    signedAt:
+                      toIsoString(incident.investigation.signatures.admin.signedAt) ??
+                      new Date().toISOString(),
+                  }
+                : undefined,
+            }
+          : undefined,
       }
     : undefined,
   humanReport: incident.humanReport
@@ -261,14 +281,31 @@ const prepareAIReport = (report?: Incident["aiReport"]) =>
       }
     : undefined
 
-const prepareInvestigation = (investigation?: IncidentInvestigationMetadata) =>
-  investigation
-    ? {
-        ...investigation,
-        startedAt: toDateOrUndefined(investigation.startedAt) ?? undefined,
-        completedAt: toDateOrUndefined(investigation.completedAt) ?? undefined,
-      }
-    : undefined
+const prepareInvestigation = (investigation?: IncidentInvestigationMetadata) => {
+  if (!investigation) return undefined
+  const sig = investigation.signatures
+  return {
+    ...investigation,
+    startedAt: toDateOrUndefined(investigation.startedAt) ?? undefined,
+    completedAt: toDateOrUndefined(investigation.completedAt) ?? undefined,
+    signatures: sig
+      ? {
+          don: sig.don
+            ? {
+                ...sig.don,
+                signedAt: toDateOrUndefined(sig.don.signedAt) ?? new Date(),
+              }
+            : undefined,
+          admin: sig.admin
+            ? {
+                ...sig.admin,
+                signedAt: toDateOrUndefined(sig.admin.signedAt) ?? new Date(),
+              }
+            : undefined,
+        }
+      : undefined,
+  }
+}
 
 export async function getUsers(): Promise<User[]> {
   await ensureDatabase()
@@ -280,6 +317,19 @@ export async function getUserById(id: string): Promise<User | null> {
   await ensureDatabase()
   const user = leanOne<UserDocument>(await UserModel.findOne({ id }).lean().exec())
   return user ? serializeUser(user) : null
+}
+
+/** Map Clerk id or business id from the client to `User.id` for `Incident.staffId`. */
+export async function resolveUserBusinessIdForReport(staffIdFromClient: string): Promise<string> {
+  const trimmed = (staffIdFromClient || "").trim()
+  if (!trimmed) return staffIdFromClient
+  const byId = await getUserById(trimmed)
+  if (byId?.id) return byId.id
+  await ensureDatabase()
+  const doc = await UserModel.findOne({ clerkUserId: trimmed }).lean().exec()
+  const d = leanOne<UserDocument>(doc)
+  if (d?.id) return d.id
+  return trimmed
 }
 
 export async function getUserByCredentials(username: string, password: string): Promise<User | null> {
@@ -326,6 +376,13 @@ export async function getIncidentForUser(
   if (user.isWaikSuperAdmin) return { kind: "ok", incident: serializeIncident(raw) }
   if (!user.facilityId || !raw.facilityId || raw.facilityId !== user.facilityId) {
     return { kind: "forbidden" }
+  }
+  // Non-admin staff may only read incidents they filed (reporter = Mongo userId).
+  if (!user.isAdminTier) {
+    const reporter = String((raw as { staffId?: string }).staffId ?? "")
+    if (reporter && reporter !== user.userId) {
+      return { kind: "forbidden" }
+    }
   }
   return { kind: "ok", incident: serializeIncident(raw) }
 }
@@ -582,6 +639,27 @@ export async function answerQuestion(
     })
   }
 
+  const idt = question.metadata?.idt === true
+  const idtTarget = (question.metadata?.idtTargetUserId as string | undefined) ?? undefined
+  if (idt && idtTarget && question.answer) {
+    await IncidentModel.updateOne(
+      { id: incidentId, facilityId, "idtTeam.userId": idtTarget },
+      {
+        $set: {
+          "idtTeam.$[m].status": "answered",
+          "idtTeam.$[m].response": question.answer.answerText,
+          "idtTeam.$[m].respondedAt": answeredAt,
+          updatedAt: new Date(),
+        },
+      },
+      { arrayFilters: [{ "m.userId": idtTarget }] },
+    )
+      .exec()
+      .catch((error) => {
+        console.error("[DB] idtTeam sync after answer (non-critical):", error)
+      })
+  }
+
   return serializeQuestion(question)
 }
 
@@ -621,6 +699,8 @@ export interface CreateIncidentFromReportInput {
   organizationId?: string
   title?: string
   narrative: string
+  /** When known (e.g. from resident search on staff report), links the incident to the facility resident record. */
+  residentId?: string
   residentName: string
   residentRoom: string
   residentState?: string
@@ -710,6 +790,7 @@ export async function createIncidentFromReport(input: CreateIncidentFromReportIn
     priority: input.priority || "medium",
     staffId: input.reportedById,
     staffName: input.reportedByName,
+    ...(input.residentId ? { residentId: input.residentId } : {}),
     residentName: input.residentName,
     residentRoom: input.residentRoom,
     createdAt: now,

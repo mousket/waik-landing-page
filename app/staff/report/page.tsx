@@ -1,23 +1,28 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { ArrowLeft, Bandage, Footprints, Loader2, Pill, Zap, type LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { PageHeader } from "@/components/ui/page-header"
 import VoiceInputScreen, { type VoiceInputScreenProps } from "@/components/voice-input-screen"
 import { WaikLogo } from "@/components/waik-logo"
 import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { useWaikUser } from "@/hooks/use-waik-user"
 import { postIncidentOrQueue } from "@/lib/offline-queue"
+import { StaffResidentSearch, type StaffResidentSearchOption } from "@/components/staff/resident-search"
+import { cn } from "@/lib/utils"
+
+const TEAL_HEADER = "w-full bg-[#0A3D40] px-4 py-4 text-white md:mx-auto md:max-w-lg md:rounded-b-2xl"
 
 // --- State machine (task-03e) — props for VoiceInputScreen are fixed in task-03d. ---
 
 export type ReportPhase =
-  | "splash"
+  | "type_select"
+  | "resident_splash"
   | "tier1_board"
   | "answering"
   | "gap_analysis"
@@ -64,11 +69,32 @@ const INCIDENT_TYPE_PRESETS: Array<{
   key: string
   title: string
   description: string
+  Icon: LucideIcon
 }> = [
-  { key: "fall", title: "Fall Incident", description: "A fall, slip, or transfer-related event." },
-  { key: "medication", title: "Medication Error", description: "Mar, late dose, or wrong med route." },
-  { key: "conflict", title: "Resident Conflict", description: "Behavioral or social incident." },
-  { key: "wound", title: "Wound or Injury", description: "New skin or tissue injury or worsening." },
+  {
+    key: "fall",
+    title: "Fall Incident",
+    description: "Resident fall — any location",
+    Icon: Footprints,
+  },
+  {
+    key: "medication",
+    title: "Medication Error",
+    description: "Wrong drug, dose, or missed medication",
+    Icon: Pill,
+  },
+  {
+    key: "conflict",
+    title: "Resident Conflict",
+    description: "Physical or verbal incident between residents",
+    Icon: Zap,
+  },
+  {
+    key: "wound",
+    title: "Wound or Injury",
+    description: "New wound, injury, or unexplained mark",
+    Icon: Bandage,
+  },
 ]
 
 function completionFromAnswers(answers: Record<string, string>): number {
@@ -76,33 +102,123 @@ function completionFromAnswers(answers: Record<string, string>): number {
   return Math.min(100, n * 18)
 }
 
-function SplashScreen({
-  onStart,
+function TypeSelectScreen({
+  onSelectType,
   disabled,
 }: {
-  onStart: (typeKey: string) => Promise<void>
+  onSelectType: (typeKey: string) => void
   disabled: boolean
 }) {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6">
-      <PageHeader
-        className="mb-6"
-        title="New incident report"
-        description="Select an incident type to begin."
-      />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {INCIDENT_TYPE_PRESETS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            disabled={disabled}
-            onClick={() => onStart(t.key)}
-            className="min-h-[48px] rounded-3xl border border-border bg-background p-4 text-left shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-2xl disabled:opacity-50"
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className={TEAL_HEADER}>
+        <div className="mb-1 flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            className="h-11 w-11 shrink-0 text-white hover:bg-white/10 hover:text-white"
           >
-            <p className="font-semibold text-foreground">{t.title}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
-          </button>
-        ))}
+            <Link href="/staff/dashboard" aria-label="Back to dashboard">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+        </div>
+        <h1 className="px-0 text-xl font-bold text-white">New Incident Report</h1>
+        <p className="mt-1 text-sm text-white/60">Select the type of incident</p>
+      </div>
+      <div className="grid flex-1 grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2 sm:pt-4">
+        {INCIDENT_TYPE_PRESETS.map((t) => {
+          const Icon = t.Icon
+          return (
+            <button
+              key={t.key}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelectType(t.key)}
+              className={cn(
+                "min-h-20 w-full cursor-pointer rounded-xl border border-border/80 bg-background p-5 text-left shadow-sm",
+                "flex items-start gap-3 transition-all hover:border-teal-500/50 hover:shadow-sm",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
+            >
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-[#0D7377]">
+                <Icon className="h-6 w-6" aria-hidden />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold text-[#0A3D40] dark:text-foreground">{t.title}</span>
+                <span className="mt-1 block text-sm text-muted-foreground">{t.description}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ResidentSplashScreen({
+  incidentTitle,
+  selectedResident,
+  onResidentChange,
+  onStart,
+  onBack,
+  disabled,
+  isStarting,
+}: {
+  incidentTitle: string
+  selectedResident: StaffResidentSearchOption | null
+  onResidentChange: (r: StaffResidentSearchOption | null) => void
+  onStart: () => void
+  onBack: () => void
+  disabled: boolean
+  isStarting: boolean
+}) {
+  return (
+    <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-0">
+      <div className={TEAL_HEADER}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onBack}
+          disabled={disabled}
+          className="mb-1 h-11 w-11 text-white hover:bg-white/10 hover:text-white"
+          aria-label="Back to incident type"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="text-xl font-bold text-white">New Incident Report</h1>
+        <p className="mt-0.5 text-sm text-white/60">{incidentTitle}</p>
+        <p className="mt-1 text-sm text-white/50">Link this report to a resident (required).</p>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-5">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-foreground" htmlFor="report-resident-search">
+            Resident
+          </label>
+          <StaffResidentSearch
+            inputId="report-resident-search"
+            value={selectedResident}
+            onChange={onResidentChange}
+            disabled={disabled || isStarting}
+          />
+        </div>
+        <Button
+          type="button"
+          className="min-h-12 w-full rounded-xl text-base font-semibold shadow-md"
+          onClick={onStart}
+          disabled={disabled || isStarting || !selectedResident}
+        >
+          {isStarting ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Starting…
+            </span>
+          ) : (
+            "Start report"
+          )}
+        </Button>
       </div>
     </div>
   )
@@ -112,7 +228,9 @@ export default function StaffReportPage() {
   const router = useRouter()
   const { userId, name, role } = useWaikUser()
 
-  const [phase, setPhase] = useState<ReportPhase>("splash")
+  const [phase, setPhase] = useState<ReportPhase>("type_select")
+  const [selectedTypeKey, setSelectedTypeKey] = useState<string | null>(null)
+  const [selectedResident, setSelectedResident] = useState<StaffResidentSearchOption | null>(null)
   const [activeQuestion, setActiveQuestion] = useState<ActiveQuestion | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [incidentId, setIncidentId] = useState<string | null>(null)
@@ -125,7 +243,9 @@ export default function StaffReportPage() {
   }, [answers])
 
   const resetToSplash = useCallback(() => {
-    setPhase("splash")
+    setPhase("type_select")
+    setSelectedTypeKey(null)
+    setSelectedResident(null)
     setActiveQuestion(null)
     setAnswers({})
     setIncidentId(null)
@@ -166,52 +286,67 @@ export default function StaffReportPage() {
     [],
   )
 
-  const handleSplashStart = useCallback(
-    async (typeKey: string) => {
-      if (!userId) {
-        toast.error("Sign in to create a report.")
+  const handleTypeSelect = useCallback((typeKey: string) => {
+    setSelectedTypeKey(typeKey)
+    setSelectedResident(null)
+    setPhase("resident_splash")
+  }, [])
+
+  const createDraftIncident = useCallback(async () => {
+    if (!userId) {
+      toast.error("Sign in to create a report.")
+      return
+    }
+    if (!selectedTypeKey || !selectedResident) {
+      toast.error("Select an incident type and resident.")
+      return
+    }
+    const preset = INCIDENT_TYPE_PRESETS.find((p) => p.key === selectedTypeKey) ?? INCIDENT_TYPE_PRESETS[0]!
+    const fullName = [selectedResident.firstName, selectedResident.lastName].filter(Boolean).join(" ")
+    setIsCreating(true)
+    try {
+      const payload = {
+        title: `${preset.title} — draft`,
+        description: `${preset.description} (draft — details to follow).`,
+        residentId: selectedResident.id,
+        residentName: fullName,
+        residentRoom: selectedResident.roomNumber,
+        staffId: userId,
+        staffName: name ?? "Staff",
+        reportedByRole: role ?? "staff",
+        priority: "medium" as const,
+      }
+      const result = await postIncidentOrQueue(payload)
+      if (result.ok) {
+        const incident = (await result.response.json()) as { id: string }
+        setIncidentId(incident.id)
+        setSessionId(null)
+        setPhase("tier1_board")
         return
       }
-      setIsCreating(true)
-      try {
-        const preset = INCIDENT_TYPE_PRESETS.find((p) => p.key === typeKey) ?? INCIDENT_TYPE_PRESETS[0]!
-        const payload = {
-          title: `${preset.title} — draft`,
-          description: `${preset.description} (draft — details to follow).`,
-          residentName: "Resident (pending)",
-          residentRoom: "TBD",
-          staffId: userId,
-          staffName: name ?? "Staff",
-          reportedByRole: role ?? "staff",
-          priority: "medium" as const,
-        }
-        const result = await postIncidentOrQueue(payload)
-        if (result.ok) {
-          const incident = (await result.response.json()) as { id: string }
-          setIncidentId(incident.id)
-          setSessionId(null)
-          setPhase("tier1_board")
-          return
-        }
-        if ("queued" in result && result.queued) {
-          toast.success("Saved offline. Your report will send when you reconnect.", {
-            duration: 5_000,
-          })
-          setIncidentId(null)
-          setSessionId(null)
-          setPhase("tier1_board")
-          return
-        }
-        toast.error("error" in result ? result.error : "Could not create incident.")
-      } catch (e) {
-        console.error(e)
-        toast.error("Something went wrong. Try again.")
-      } finally {
-        setIsCreating(false)
+      if ("queued" in result && result.queued) {
+        toast.success("Saved offline. Your report will send when you reconnect.", {
+          duration: 5_000,
+        })
+        setIncidentId(null)
+        setSessionId(null)
+        setPhase("tier1_board")
+        return
       }
-    },
-    [name, role, userId],
-  )
+      toast.error("error" in result ? result.error : "Could not create incident.")
+    } catch (e) {
+      console.error(e)
+      toast.error("Something went wrong. Try again.")
+    } finally {
+      setIsCreating(false)
+    }
+  }, [name, role, userId, selectedTypeKey, selectedResident])
+
+  const handleBackFromResident = useCallback(() => {
+    setSelectedResident(null)
+    setSelectedTypeKey(null)
+    setPhase("type_select")
+  }, [])
 
   const handleFinishDashboard = useCallback(() => {
     const destination = role === "admin" ? "/admin/dashboard" : "/staff/dashboard"
@@ -220,8 +355,24 @@ export default function StaffReportPage() {
 
   function renderPhase() {
     switch (phase) {
-      case "splash":
-        return <SplashScreen onStart={handleSplashStart} disabled={isCreating} />
+      case "type_select":
+        return <TypeSelectScreen onSelectType={handleTypeSelect} disabled={isCreating} />
+
+      case "resident_splash": {
+        const title =
+          INCIDENT_TYPE_PRESETS.find((p) => p.key === (selectedTypeKey ?? ""))?.title ?? "Incident"
+        return (
+          <ResidentSplashScreen
+            incidentTitle={title}
+            selectedResident={selectedResident}
+            onResidentChange={setSelectedResident}
+            onStart={createDraftIncident}
+            onBack={handleBackFromResident}
+            disabled={isCreating}
+            isStarting={isCreating}
+          />
+        )
+      }
 
       case "tier1_board": {
         return (
@@ -371,7 +522,7 @@ export default function StaffReportPage() {
               <WaikCardContent className="text-center">
                 <p className="font-semibold text-foreground">Report Card</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Score &amp; coaching — to be connected to live data (task-05+).
+                  Score and coaching — to be connected to live data (task-05+).
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {incidentId ? `Incident: ${incidentId}` : ""} · {Object.keys(answers).length} answers in
@@ -382,7 +533,7 @@ export default function StaffReportPage() {
                   className="mt-6 min-h-12 w-full min-w-[12rem] shadow-xl shadow-primary/30 sm:w-auto"
                   onClick={handleFinishDashboard}
                 >
-                  Finish &amp; return to dashboard
+                  Finish and return to dashboard
                 </Button>
               </WaikCardContent>
             </WaikCard>
@@ -405,7 +556,7 @@ export default function StaffReportPage() {
 
   return (
     <ErrorBoundary onReset={resetToSplash}>
-      <div className="relative flex flex-1 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
         {renderPhase()}
       </div>

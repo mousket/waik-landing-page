@@ -1,0 +1,71 @@
+---
+description: WAiK admin/staff UI patterns, layout, filters, and resident experience — accumulated from product iterations (do not re-litigate from scratch)
+alwaysApply: true
+---
+
+# WAiK UI / UX patterns (AI assistant guide)
+
+Conventions the team and user expect. **Prefer reusing** existing components and class patterns below instead of inventing new ones. When in doubt, match **resident detail**, **all-incidents page**, and **Command center (admin dashboard)** as references.
+
+## Layout and scrolling (do not break this)
+
+- **Root shell (`AdminAppShell`)** must bound the viewport: use **`h-dvh min-h-0 max-h-dvh overflow-hidden`** (or equivalent) on the shell root so the main column can scroll. **`min-h-[100dvh]` without a fixed height** allows content to grow past the screen and **`overflow-y-auto` on the child never scrolls**.
+- **Scrollable main column** keeps **`min-h-0`** on the flex child that has **`overflow-y-auto`**. Classic flex bug: default `min-height: auto` prevents the flex item from shrinking below content size.
+- **Long pages (resident, tables):** add **`min-w-0`** on width-constrained content wrappers so children don’t block horizontal/vertical flow.
+- **Tabs (`TabsContent`)** that sit inside a scrolling shell: add **`min-h-0`** where needed; don’t add unnecessary giant **`pb-*`** that only masks scroll bugs—fix the shell chain instead.
+
+## Tabs (Command center, resident, anywhere)
+
+- **Unified style:** `TabsList` — **`rounded-2xl`**, **`border border-border/50`**, **`bg-gradient-to-b from-muted/30 to-muted/5`**, padding **`p-1.5`**, gap **`1.5–2`**.
+- **`TabsTrigger`:** **`rounded-xl`**, active state with **light border** + **subtle primary gradient** + **shadow** (e.g. `data-[state=active]:border-primary/25` …). Avoid the old “underline only / flat bar” look unless explicitly requested.
+- Align with **landing “features”** tabs: **clear** active state, not ambiguous gray-on-gray.
+- **Notes tab** can use a **slight variant** of active styling but stay in the same **pill / gradient** family.
+
+## Incident and note lists — reuse before rewriting
+
+- **Pill appearance for metadata** (type, date, author, phase, etc.): **`residentRecordPillClass()`** from `components/admin/resident-incidents-section.tsx`.
+- **Resident “linked incidents” tab:** **`ResidentIncidentsList`**, **`useResidentIncidentFilters`**, **`ResidentIncidentsFilterStrip`**, and **`ResidentIncidentPillEvent`**. Don’t duplicate list row markup; export/share from this module.
+- **Resident “Notes” tab:** **`useResidentNoteFilters`** and **`ResidentNotesPanel`** in `components/admin/resident-notes-section.tsx` — filter “scopes” (all / flagged / team / admin) + **date** + **author**; list rows use the **same pill language** as incidents.
+- **Incident quick filters (type tiles) on resident:** only **“All” + up to 3 real top types** in the data. **No** empty placeholder tiles, **no** “—” or “more types will appear” filler to pad the grid. Grid column count follows **actual** `quickTiles.length` (1–2 / 3 / 4 columns as implemented).
+
+## All incidents page (`/admin/incidents`)
+
+- **Keep the table** for scanability and many rows; **do not** replace with only card list unless the user explicitly requests it.
+- Use **`AllIncidentsFilterBar`** (sleek, compact): **single** bordered/gradient **card**, small header + **Clear**, no huge **Filter incidents** h1 block.
+- **Filter order and UI:** (1) **Phase** as **FilterChip** row (short labels: **`displayIncidentPhaseShort`**), (2) **Type · quick** chips, (3) one compact **row** of type select + from/to date + reporter (`h-9` fields). Shared hook: **`useResidentIncidentFilters`**; type export **`ResidentIncidentFilters`**.
+- **Phase** is a **first-class** filter (P1 in progress, P1 complete, Phase 2, closed, then any other values present in data). Filtering uses **`ResidentIncidentRow.phase`**.
+
+## Resident detail — Overview
+
+- **Sections (care plan, MDS, recent incidents):** use **`OverviewCollapsibleSection`**. MDS is often long — **default collapsed** is OK if the product still defaults critical sections (e.g. care plan) **open**—follow existing behavior unless asked to change.
+- **Intervention line items:** **card + pills** (like incidents/notes), **not** flat bordered list. Use **ListChecks**-style icon treatment and **`residentRecordPillClass`**. Link to **related incident** when present.
+- **Recent incidents (last 3):** reuse **`ResidentIncidentPillEvent`** (same as Incidents tab), not a one-off list style.
+- **Collapsible section header (toggle row):** the header uses a **ghost** `Button`. **Override accent hover** — shadcn ghost uses **`hover:bg-accent`** which often reads as a **purple/lavender wash**. Required overrides include **`hover:!bg-transparent`**, **`dark:hover:!bg-transparent`**, **`hover:!text-foreground`**, and a **subtle focus ring** (border ring), **not** a filled purple hover. See `components/admin/overview-collapsible-section.tsx`.
+
+## Staff vs admin — incident *creation*
+
+- **Creating** a new incident report is a **staff** path: primary entry **`/staff/report`** (dashboard and staff nav point here). **Admin** is for **triage, investigation, lists, and follow-up** on **existing** reports—do not assume an **“admin creates blank incident”** flow unless the user requests it and backend rules allow it.
+
+## Copy and JSX (small but recurring)
+
+- User-visible “and”: write **`Observations & notes`**, not `&amp;` in text nodes.
+- **Avoid `§`** in product UI.
+- **Dialog** patterns: prefer **`DialogDescription`**, **labeled fields**, **`rounded-2xl`** on sheet where appropriate, **no** fragile negative-margin full-bleed hacks unless there is a strong reason.
+
+## When the user says “it doesn’t scroll”
+
+1. Check **shell** height: **`h-dvh` / `max-h-dvh` + `overflow-hidden`** on the flex column root.
+2. Check **main scroll area** has **`min-h-0` + `overflow-y-auto`**.
+3. Check **tabs / panels** for **`min-h-0`**, **`min-w-0`**.
+4. Only then adjust padding or one-off `overflow` on the page (last resort).
+
+## Reuse list (import paths)
+
+- `components/admin/admin-app-shell.tsx` — app chrome and scroll.
+- `components/admin/admin-dashboard-shell.tsx` — command center + tabs; match resident tab styling.
+- `components/admin/resident-incidents-section.tsx` — filters, pill class, `ResidentIncidentPillEvent`, `FilterChip`.
+- `components/admin/resident-notes-section.tsx` — notes panel + filter hook.
+- `components/admin/all-incidents-filter-bar.tsx` — all-incidents only.
+- `components/admin/overview-collapsible-section.tsx` — overview collapses + header hover fix.
+
+**Do not reintroduce** removed anti-patterns: unbounded `min-h` on the only flex parent, duplicate filter UIs, placeholder type tiles, or **purple accent hovers** on overview section headers.

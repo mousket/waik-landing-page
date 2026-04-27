@@ -24,6 +24,18 @@ type OverviewStats = {
   mostActiveOrganizationName: string | null
 }
 
+type FacilityRow = {
+  id: string
+  name: string
+  type: string
+  state: string
+  plan: string | null
+  staffCount: number
+  incidents30d: number
+  avgCompleteness30d: number
+  lastActivity: string | null
+}
+
 export default function WaikAdminHomePage() {
   const [orgs, setOrgs] = useState<OrgRow[]>([])
   const [stats, setStats] = useState<OverviewStats | null>(null)
@@ -31,6 +43,9 @@ export default function WaikAdminHomePage() {
   const [statsError, setStatsError] = useState<string | null>(null)
   const [orgsLoading, setOrgsLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [facilities, setFacilities] = useState<FacilityRow[]>([])
+  const [facilitiesError, setFacilitiesError] = useState<string | null>(null)
+  const [facilitiesLoading, setFacilitiesLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -87,8 +102,38 @@ export default function WaikAdminHomePage() {
         if (!cancelled) setStatsLoading(false)
       }
     }
+    async function loadFacilities() {
+      setFacilitiesError(null)
+      try {
+        const fRes = await fetch("/api/waik-admin/communities", { credentials: "include" })
+        if (!fRes.ok) {
+          if (!cancelled) {
+            setFacilitiesError(
+              fRes.status === 403
+                ? "Facilities could not load (forbidden)."
+                : fRes.status === 401
+                  ? "Sign in required."
+                  : "Could not load facilities list.",
+            )
+            setFacilities([])
+          }
+          return
+        }
+        const f = (await fRes.json()) as { facilities?: FacilityRow[] }
+        if (!cancelled) setFacilities(Array.isArray(f.facilities) ? f.facilities : [])
+      } catch {
+        if (!cancelled) {
+          setFacilitiesError("Could not load facilities list.")
+          setFacilities([])
+        }
+      } finally {
+        if (!cancelled) setFacilitiesLoading(false)
+      }
+    }
+
     void loadOrgs()
     void loadStats()
+    void loadFacilities()
     return () => {
       cancelled = true
     }
@@ -134,6 +179,67 @@ export default function WaikAdminHomePage() {
               </div>
             </div>
             {statsError ? <p className="text-sm text-amber-800 dark:text-amber-200">{statsError}</p> : null}
+          </WaikCardContent>
+        </WaikCard>
+
+        <PageHeader title="All facilities" description="Per-community usage and health (pilot and production)." />
+        {facilitiesError ? <p className="text-sm text-destructive">{facilitiesError}</p> : null}
+        <WaikCard>
+          <WaikCardContent className="space-y-0 p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="border-b border-border/50 bg-muted/40 text-xs font-semibold uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">State</th>
+                    <th className="px-4 py-3">Staff</th>
+                    <th className="px-4 py-3">Incidents (30d)</th>
+                    <th className="px-4 py-3">Avg completeness</th>
+                    <th className="px-4 py-3">Last activity</th>
+                    <th className="px-4 py-3">Plan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {facilitiesLoading && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                        Loading…
+                      </td>
+                    </tr>
+                  )}
+                  {!facilitiesLoading && facilities.length === 0 && !facilitiesError && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                        No active facilities in the database.
+                      </td>
+                    </tr>
+                  )}
+                  {!facilitiesLoading &&
+                    facilities.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="border-b border-border/40 transition-colors last:border-0 hover:bg-muted/30"
+                      >
+                        <td className="px-4 py-3 font-medium">
+                          <Link className="text-primary underline-offset-2 hover:underline" href={`/waik-admin/${row.id}`}>
+                            {row.name}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.type}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.state}</td>
+                        <td className="px-4 py-3 tabular-nums">{row.staffCount}</td>
+                        <td className="px-4 py-3 tabular-nums">{row.incidents30d}</td>
+                        <td className="px-4 py-3 tabular-nums">{row.avgCompleteness30d}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {row.lastActivity ? new Date(row.lastActivity).toLocaleString() : "—"}
+                        </td>
+                        <td className="px-4 py-3">{row.plan ?? "—"}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </WaikCardContent>
         </WaikCard>
 

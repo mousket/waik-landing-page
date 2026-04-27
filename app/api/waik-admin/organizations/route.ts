@@ -3,6 +3,7 @@ import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import OrganizationModel from "@/backend/src/models/organization.model"
 import UserModel from "@/backend/src/models/user.model"
+import { createClerkOrganizationForWaik, getClerkSecretKey } from "@/lib/clerk-organization"
 import { requireWaikSuperAdmin } from "@/lib/waik-admin-api"
 import { generateOrgId } from "@/lib/waik-admin-utils"
 
@@ -37,6 +38,7 @@ export async function GET() {
         facilityCount,
         staffCount,
         lastActivity,
+        clerkOrganizationId: (org as { clerkOrganizationId?: string }).clerkOrganizationId ?? null,
       }
     }),
   )
@@ -86,7 +88,31 @@ export async function POST(request: Request) {
     isActive: true,
   })
 
+  let clerkOrganizationId: string | null = null
+  let clerkSyncError: string | null = null
+  const sk = getClerkSecretKey()
+  if (sk) {
+    try {
+      const { id: coid } = await createClerkOrganizationForWaik({
+        name,
+        waikOrgId: id,
+        createdByClerkUserId: gate.clerkUserId,
+        secretKey: sk,
+      })
+      clerkOrganizationId = coid
+      await OrganizationModel.updateOne({ id }, { $set: { clerkOrganizationId: coid } }).exec()
+    } catch (e) {
+      console.error("[waik-admin] create Clerk organization failed:", e)
+      clerkSyncError = e instanceof Error ? e.message : "Clerk organization could not be created"
+    }
+  } else {
+    clerkSyncError = "CLERK_SECRET_KEY is not set — org exists in WAiK only; add key and re-sync."
+  }
+
   const o = doc.toJSON() as Record<string, unknown>
+  if (clerkOrganizationId) {
+    o.clerkOrganizationId = clerkOrganizationId
+  }
   return NextResponse.json({
     organization: {
       id: o.id,
@@ -98,6 +124,8 @@ export async function POST(request: Request) {
       isActive: o.isActive,
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
+      clerkOrganizationId,
+      clerkSyncError,
     },
   })
 }

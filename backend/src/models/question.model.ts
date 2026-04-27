@@ -15,6 +15,8 @@ export interface QuestionMetadata {
   reporterRole?: "staff" | "admin"
   assignedStaffIds?: string[]
   createdVia?: "voice" | "text" | "system"
+  idt?: boolean
+  idtTargetUserId?: string
 }
 
 // Phase tracking for the conversational interview flow
@@ -76,6 +78,8 @@ export const QuestionSchema = new Schema<QuestionDocument>(
       reporterRole: { type: String, enum: ["staff", "admin"] },
       assignedStaffIds: { type: [String], default: undefined },
       createdVia: { type: String, enum: ["voice", "text", "system"] },
+      idt: { type: Boolean },
+      idtTargetUserId: { type: String },
     },
     // Priority tracking for conversational interview flow
     priority: {

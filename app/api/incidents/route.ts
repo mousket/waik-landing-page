@@ -3,8 +3,9 @@ import connectMongo from "@/backend/src/lib/mongodb"
 import IncidentModel, { INCIDENT_PHASES } from "@/backend/src/models/incident.model"
 import { withAdminAuth } from "@/lib/api-handler"
 import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
+import { actorNameFromUser, logActivity } from "@/lib/activity-logger"
 import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
-import { createIncidentFromReport, addQuestionToIncident, getUserById } from "@/lib/db"
+import { createIncidentFromReport, addQuestionToIncident, getUserById, resolveUserBusinessIdForReport } from "@/lib/db"
 import { mapIncidentDocToSummary } from "@/lib/map-incident-summary"
 import { getQuestionEmbedding } from "@/lib/embeddings"
 import { isOpenAIConfigured } from "@/lib/openai"
@@ -35,6 +36,11 @@ export const GET = withAdminAuth(async (request, { currentUser }) => {
     await connectMongo()
 
     const filter: Record<string, unknown> = { facilityId: effectiveFacilityId }
+
+    const residentIdQ = (url.searchParams.get("residentId") ?? "").trim()
+    if (residentIdQ) {
+      filter.residentId = residentIdQ
+    }
 
     const phases = parsePhaseList(phaseRaw)
     if (phases) {
@@ -77,6 +83,7 @@ export async function POST(request: Request) {
     const {
       title,
       description,
+      residentId: residentIdBody,
       residentName,
       residentRoom,
       staffId,
@@ -97,26 +104,42 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create incident with questions and answers
-    const reporter = (await getUserById(staffId)) || undefined
-
     if (!sessionUser.facilityId) {
       return NextResponse.json({ error: "No facility assigned to user" }, { status: 400 })
     }
+
+    const reportedById = await resolveUserBusinessIdForReport(String(staffId))
+    const reporter = (await getUserById(reportedById)) || undefined
+
+    const residentId =
+      typeof residentIdBody === "string" && residentIdBody.trim() ? residentIdBody.trim() : undefined
 
     const incident = await createIncidentFromReport({
       facilityId: sessionUser.facilityId,
       organizationId: sessionUser.organizationId,
       title,
       narrative: description,
+      residentId,
       residentName,
       residentRoom,
       residentState: undefined,
       environmentNotes: undefined,
-      reportedById: staffId,
-      reportedByName: staffName || reporter?.name || staffId,
+      reportedById,
+      reportedByName: staffName || reporter?.name || reportedById,
       reportedByRole: reporter?.role || "staff",
       priority,
+    })
+
+    logActivity({
+      userId: sessionUser.userId,
+      userName: actorNameFromUser(sessionUser),
+      role: sessionUser.roleSlug,
+      facilityId: sessionUser.facilityId,
+      action: "incident_created",
+      resourceType: "incident",
+      resourceId: incident.id,
+      metadata: { title },
+      req: request,
     })
 
     console.log("[v0] Created incident:", incident.id, "with", questions.length, "Q&A pairs")
@@ -136,15 +159,15 @@ export async function POST(request: Request) {
             id: questionId,
             incidentId: incident.id,
             questionText: q.questionText,
-            askedBy: staffId,
+            askedBy: reportedById,
             askedByName: staffName || reporter?.name,
             askedAt: now,
             assignedTo: q.assignedTo,
             source: "voice-report" as const,
             generatedBy: "reporter-agent",
             metadata: {
-              reporterId: staffId,
-              reporterName: staffName || reporter?.name || staffId,
+              reporterId: reportedById,
+              reporterName: staffName || reporter?.name || reportedById,
               reporterRole: reporter?.role || "staff",
               createdVia: "voice" as const,
             },
@@ -152,7 +175,7 @@ export async function POST(request: Request) {
               id: answerId,
               questionId,
               answerText: q.answerText || "",
-              answeredBy: staffId,
+              answeredBy: reportedById,
               answeredAt: now,
               method: "voice" as const,
             },
@@ -175,8 +198,8 @@ export async function POST(request: Request) {
               },
               {
                 assignedTo: question.assignedTo,
-                reporterId: staffId,
-                reporterName: staffName || reporter?.name || staffId,
+                reporterId: reportedById,
+                reporterName: staffName || reporter?.name || reportedById,
                 reporterRole: reporter?.role || "staff",
                 source: question.source,
                 generatedBy: question.generatedBy,

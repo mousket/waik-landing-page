@@ -13,6 +13,7 @@ import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav"
 import { AdminFacilitySwitcher } from "@/components/admin/admin-facility-switcher"
 import { SuperAdminAdminEntryTelemetry } from "@/components/admin/super-admin-admin-entry-telemetry"
+import { ActivitySessionLogger } from "@/components/activity-session-logger"
 import { WaikLogo } from "@/components/waik-logo"
 
 const NAV_LINKS = [
@@ -30,6 +31,13 @@ function navActive(pathname: string, href: string): boolean {
   }
   if (href === "/admin/settings") {
     return pathname.startsWith("/admin/settings")
+  }
+  if (href === "/admin/residents") {
+    return (
+      pathname === "/admin/residents" ||
+      pathname.startsWith("/admin/residents/") ||
+      pathname.startsWith("/residents/")
+    )
   }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
@@ -56,17 +64,22 @@ export function AdminAppShell({
   const hideFacilitySwitcher =
     pathname.startsWith("/admin/incidents/") ||
     pathname.startsWith("/admin/residents/") ||
+    pathname.startsWith("/residents/") ||
     pathname.startsWith("/admin/assessments/")
 
+  /** Dashboard inlines the facility picker beside the Command center greeting. */
+  const facilitySwitcherInDashboardRow = pathname === "/admin/dashboard"
+
   const facilitySwitcher =
-    showFacilitySwitcher && !hideFacilitySwitcher ? (
+    showFacilitySwitcher && !hideFacilitySwitcher && !facilitySwitcherInDashboardRow ? (
       <AdminFacilitySwitcher defaultFacilityId={defaultFacilityId} />
     ) : null
 
   const dashboardHref = buildAdminPathWithContext("/admin/dashboard", searchParams)
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-brand-shell-bg text-brand-body">
+    <div className="flex h-dvh min-h-0 max-h-dvh flex-col overflow-hidden bg-brand-shell-bg text-brand-body">
+      <ActivitySessionLogger />
       <header
         className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center border-b border-border/20 bg-background/80 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 md:h-16"
       >
@@ -130,7 +143,7 @@ export function AdminAppShell({
       </header>
 
       <div
-        className="flex flex-1 flex-col overflow-y-auto overscroll-contain pt-14 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6 md:pt-16"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain pt-14 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6 md:pt-16"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         {isWaikSuperAdmin ? <SuperAdminAdminEntryTelemetry isWaikSuperAdmin /> : null}

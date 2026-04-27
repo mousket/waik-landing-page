@@ -5,14 +5,15 @@ import Link from "next/link"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
 import { buildAdminIncidentsApiPath, buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import { readApiErrorMessage } from "@/lib/read-api-error"
+import { ArrowUpRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { computeClock, type ClockState } from "@/lib/utils/incident-classification"
 import type { IncidentSummary } from "@/lib/types/incident-summary"
 
 type PhaseFilter = "all" | "phase_1_in_progress" | "phase_1_complete" | "phase_2_in_progress"
-import { computeClock, type ClockState } from "@/lib/utils/incident-classification"
 
 const RED = "#C0392B"
 const AMBER = "#E8A838"
@@ -61,8 +62,8 @@ function PhaseBadge({ phase }: { phase: IncidentSummary["phase"] }) {
   return <Badge variant="outline">{phase}</Badge>
 }
 
-function CompletenessRing({ pct, diameter = 40 }: { pct: number; diameter?: number }) {
-  const stroke = 3
+function CompletenessRing({ pct, diameter = 44 }: { pct: number; diameter?: number }) {
+  const stroke = 2
   const r = (diameter - stroke) / 2
   const cx = diameter / 2
   const cy = diameter / 2
@@ -86,7 +87,7 @@ function CompletenessRing({ pct, diameter = 40 }: { pct: number; diameter?: numb
           strokeLinecap="round"
         />
       </svg>
-      <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[10px] font-semibold tabular-nums text-primary sm:text-xs">
+      <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[11px] font-bold tabular-nums text-primary leading-none sm:text-sm">
         {clamped}%
       </span>
     </div>
@@ -228,19 +229,20 @@ export function ActiveInvestigationsTab({
     return (
       <div className="space-y-3">
         <div className="flex flex-wrap gap-2">
-          <Skeleton className="h-10 w-16 rounded-full" />
-          <Skeleton className="h-10 w-40 rounded-full" />
+          <Skeleton className="h-9 w-16 rounded-full" />
+          <Skeleton className="h-9 w-40 rounded-full" />
         </div>
-        <Skeleton className="h-10 w-48 rounded-md" />
-        {[0, 1, 2].map((k) => (
-          <Skeleton key={k} className="h-14 w-full rounded-lg" />
-        ))}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((k) => (
+            <Skeleton key={k} className="h-[148px] w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {!usesParentList && internalListError ? (
         <div
           className="rounded-lg border border-red-200/90 bg-red-50/90 p-3 text-sm text-red-900"
@@ -250,8 +252,8 @@ export function ActiveInvestigationsTab({
           <p className="mt-1 text-red-800/90">{internalListError}</p>
         </div>
       ) : null}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
+      <div className="sticky top-0 z-20 -mx-1 mb-1 flex flex-col gap-2 rounded-lg border border-border/60 bg-card/90 px-2 py-2 shadow-sm backdrop-blur-md sm:-mx-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-3">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {FILTERS.map(({ key, label }) => {
             const active = phaseFilter === key
             return (
@@ -260,8 +262,10 @@ export function ActiveInvestigationsTab({
                 type="button"
                 onClick={() => setPhaseFilter(key)}
                 className={cn(
-                  "min-h-[40px] rounded-full px-3 text-sm font-medium transition-colors sm:px-4",
-                  active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground ring-1 ring-border",
+                  "min-h-9 rounded-full px-2.5 text-xs font-medium transition-colors sm:min-h-9 sm:px-3 sm:text-sm",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-muted-foreground ring-1 ring-border hover:bg-muted/50",
                 )}
               >
                 {label}
@@ -269,12 +273,12 @@ export function ActiveInvestigationsTab({
             )
           })}
         </div>
-        <label className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Sort</span>
+        <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+          <span className="shrink-0 font-medium text-foreground">Sort</span>
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="min-h-[40px] rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm"
+            className="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-foreground shadow-sm sm:max-w-[220px] sm:text-sm"
           >
             <option value="date">Date (newest first)</option>
             <option value="completeness">Completeness (high first)</option>
@@ -283,92 +287,49 @@ export function ActiveInvestigationsTab({
         </label>
       </div>
 
-      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/40">
-              <th className="p-3 font-semibold">Room</th>
-              <th className="p-3 font-semibold">Type</th>
-              <th className="p-3 font-semibold">Phase</th>
-              <th className="p-3 font-semibold">Completeness</th>
-              <th className="p-3 font-semibold">48hr Clock</th>
-              <th className="p-3 font-semibold">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                  No incidents match this filter.
-                </td>
-              </tr>
-            ) : (
-              rows.map((inc) => {
-                const pct = Math.round(inc.completenessAtSignoff ?? inc.completenessScore ?? 0)
-                return (
-                  <tr key={inc.id} className="border-b border-border/80 last:border-0">
-                    <td className="p-3">
-                      <span className="font-semibold text-primary">{inc.residentRoom}</span>
-                    </td>
-                    <td className="p-3 text-foreground">{displayIncidentType(inc.incidentType)}</td>
-                    <td className="p-3">
-                      <PhaseBadge phase={inc.phase} />
-                    </td>
-                    <td className="p-3">
-                      <CompletenessRing pct={pct} diameter={40} />
-                    </td>
-                    <td className="p-3">
-                      <ClockDisplay clock={inc.clock} />
-                    </td>
-                    <td className="p-3">
-                      <Button size="sm" variant="outline" className="min-h-[40px] border-primary text-primary" asChild>
-                        <Link href={buildAdminPathWithContext(`/admin/incidents/${encodeURIComponent(inc.id)}`, searchParams)}>
-                            View
-                          </Link>
-                      </Button>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="space-y-3 md:hidden">
-        {rows.length === 0 ? (
-          <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-            No incidents match this filter.
-          </p>
-        ) : (
-          rows.map((inc) => {
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+          No incidents match this filter.
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map((inc) => {
             const pct = Math.round(inc.completenessAtSignoff ?? inc.completenessScore ?? 0)
             return (
-              <div key={inc.id} className="mb-3 rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-semibold text-foreground">
-                    Room <span className="text-primary">{inc.residentRoom}</span> —{" "}
-                    {displayIncidentType(inc.incidentType)}
-                  </p>
+              <div
+                key={inc.id}
+                className="group flex min-h-0 flex-col rounded-xl border border-border/80 bg-card p-3 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 text-sm font-semibold leading-tight text-primary">Rm {inc.residentRoom}</p>
                   <PhaseBadge phase={inc.phase} />
                 </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <CompletenessRing pct={pct} diameter={32} />
-                  <span className="text-sm font-medium text-foreground">{pct}% complete</span>
+                <p className="mt-1 line-clamp-2 text-xs text-foreground/90">
+                  {displayIncidentType(inc.incidentType)}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/50 pt-2">
+                  <div className="flex items-center gap-2">
+                    <CompletenessRing pct={pct} />
+                  </div>
+                  <div className="min-w-0 text-right text-xs">
+                    <ClockDisplay clock={inc.clock} />
+                  </div>
                 </div>
-                <div className="mt-2">
-                  <ClockDisplay clock={inc.clock} />
-                </div>
-                <Button asChild className="mt-4 w-full min-h-[48px] bg-primary font-semibold text-primary-foreground">
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-2.5 h-9 w-full min-h-0 gap-1 border border-primary/40 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10"
+                >
                   <Link href={buildAdminPathWithContext(`/admin/incidents/${encodeURIComponent(inc.id)}`, searchParams)}>
-                            View
-                          </Link>
+                    Open
+                    <ArrowUpRight className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" aria-hidden />
+                  </Link>
                 </Button>
               </div>
             )
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   )
 }

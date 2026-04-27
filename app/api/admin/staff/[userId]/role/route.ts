@@ -1,15 +1,21 @@
 import { createClerkClient } from "@clerk/backend"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import RoleModel from "@/backend/src/models/role.model"
 import UserModel from "@/backend/src/models/user.model"
+import { actorNameFromUser, logActivity } from "@/lib/activity-logger"
 import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
+import { isRoleAssignableByInviter } from "@/lib/role-assignment-permissions"
 import { requireCanInviteStaff } from "@/lib/permissions"
 import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 import type { WaikRoleSlug } from "@/lib/waik-roles"
 
-export async function PATCH(request: Request, { params }: { params: { userId: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ userId: string }> },
+) {
   try {
+    const { userId } = await context.params
     const user = await getCurrentUser()
     if (!user) return unauthorizedResponse()
     requireCanInviteStaff(user)
@@ -44,10 +50,16 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
       return NextResponse.json({ error: "Unknown role" }, { status: 400 })
     }
 
-    const target = await UserModel.findOne({ id: params.userId, facilityId }).exec()
+    const target = await UserModel.findOne({ id: userId, facilityId }).exec()
     if (!target) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
+
+    if (!isRoleAssignableByInviter(user.roleSlug, roleSlug)) {
+      return NextResponse.json({ error: "You cannot assign this role" }, { status: 403 })
+    }
+
+    const previousRole = String(target.roleSlug ?? "")
 
     target.roleSlug = roleSlug
     await target.save()
@@ -64,6 +76,18 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
       }
       await clerk.users.updateUser(target.clerkUserId, { publicMetadata: pm })
     }
+
+    logActivity({
+      userId: user.userId,
+      userName: actorNameFromUser(user),
+      role: user.roleSlug,
+      facilityId,
+      action: "role_changed",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { previousRole, newRole: roleSlug, targetEmail: target.email },
+      req: request,
+    })
 
     return NextResponse.json({ success: true })
   } catch (err) {

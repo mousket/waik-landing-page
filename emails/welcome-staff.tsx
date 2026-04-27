@@ -1,4 +1,10 @@
 import * as React from "react"
+import { emailBrand, emailFont, getEmailAppBaseUrl } from "./email-assets"
+import {
+  EmailCredentialPanel,
+  EmailNotePanel,
+  WaikEmailPage,
+} from "./waik-email-chrome"
 
 export interface WelcomeStaffEmailProps {
   firstName: string
@@ -9,18 +15,6 @@ export interface WelcomeStaffEmailProps {
   tempPassword: string
 }
 
-const teal = "#0D7377"
-const darkTeal = "#0A3D40"
-const amberBg = "#FEF3C7"
-
-function appUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "http://localhost:3000"
-  )
-}
-
 export function WelcomeStaffEmail({
   firstName,
   facilityName,
@@ -29,138 +23,134 @@ export function WelcomeStaffEmail({
   email,
   tempPassword,
 }: WelcomeStaffEmailProps) {
-  const base = appUrl().replace(/\/$/, "")
+  const base = getEmailAppBaseUrl()
   const signIn = `${base}/sign-in`
   const acceptInvite = `${base}/accept-invite?facility=${encodeURIComponent(facilityName)}`
 
   return (
-    <html lang="en">
-      <body style={{ margin: 0, padding: 0, backgroundColor: "#f4f4f5", fontFamily: "Arial, Helvetica, sans-serif" }}>
-        <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} style={{ backgroundColor: "#f4f4f5" }}>
-          <tbody>
-            <tr>
-              <td align="center" style={{ padding: "24px 12px" }}>
-                <table role="presentation" width="600" cellPadding={0} cellSpacing={0} style={{ maxWidth: 600, width: "100%" }}>
-                  <tbody>
-                    <tr>
-                      <td
-                        style={{
-                          backgroundColor: teal,
-                          padding: "20px 24px",
-                          textAlign: "center",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "#ffffff",
-                            fontSize: 28,
-                            fontWeight: 700,
-                            letterSpacing: "0.02em",
-                          }}
-                        >
-                          WAiK
-                        </span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={{ backgroundColor: "#ffffff", padding: "32px 28px" }}>
-                        <h1
-                          style={{
-                            color: darkTeal,
-                            fontSize: 22,
-                            fontWeight: 700,
-                            margin: "0 0 16px",
-                          }}
-                        >
-                          You have been invited to WAiK
-                        </h1>
-                        <p style={{ color: "#374151", fontSize: 16, lineHeight: 1.6, margin: "0 0 12px" }}>Hi {firstName},</p>
-                        <p style={{ color: "#374151", fontSize: 16, lineHeight: 1.6, margin: "0 0 20px" }}>
-                          <strong>{inviterName}</strong> ({inviterRole}) at <strong>{facilityName}</strong> has set up your WAiK
-                          account. WAiK helps you document incidents by voice — speak naturally about what happened and WAiK
-                          guides you through the rest.
-                        </p>
-                        <table
-                          role="presentation"
-                          width="100%"
-                          style={{
-                            backgroundColor: "#f0fdfa",
-                            border: `1px solid ${teal}`,
-                            borderRadius: 8,
-                            marginBottom: 16,
-                          }}
-                        >
-                          <tbody>
-                            <tr>
-                              <td style={{ padding: 16 }}>
-                                <p style={{ color: darkTeal, fontSize: 14, fontWeight: 700, margin: "0 0 12px" }}>
-                                  Your login credentials
-                                </p>
-                                <p style={{ color: "#374151", fontSize: 14, margin: "4px 0" }}>
-                                  <strong>Email:</strong> {email}
-                                </p>
-                                <p style={{ color: "#374151", fontSize: 14, margin: "4px 0" }}>
-                                  <strong>Temporary Password:</strong> {tempPassword}
-                                </p>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                        <table role="presentation" width="100%" style={{ backgroundColor: amberBg, borderRadius: 8, marginBottom: 24 }}>
-                          <tbody>
-                            <tr>
-                              <td style={{ padding: 14 }}>
-                                <p style={{ color: "#92400e", fontSize: 14, margin: 0, lineHeight: 1.5 }}>
-                                  <strong>Note:</strong> You will be asked to change your password when you first sign in.
-                                </p>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                        <table role="presentation" width="100%">
-                          <tbody>
-                            <tr>
-                              <td align="center">
-                                <a
-                                  href={signIn}
-                                  style={{
-                                    display: "inline-block",
-                                    backgroundColor: teal,
-                                    color: "#ffffff",
-                                    fontSize: 16,
-                                    fontWeight: 700,
-                                    textDecoration: "none",
-                                    padding: "14px 28px",
-                                    borderRadius: 6,
-                                    width: "100%",
-                                    textAlign: "center",
-                                    boxSizing: "border-box",
-                                  }}
-                                >
-                                  Sign in to WAiK
-                                </a>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                        <p style={{ color: "#6b7280", fontSize: 13, margin: "20px 0 8px", textAlign: "center" }}>
-                          <a href={acceptInvite} style={{ color: teal }}>
-                            What is WAiK? Open your welcome page
-                          </a>
-                        </p>
-                        <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "28px 0" }} />
-                        <p style={{ color: "#6b7280", fontSize: 13, margin: "0 0 6px", textAlign: "center" }}>
-                          WAiK — Conversations not Checkboxes
-                        </p>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </body>
-    </html>
+    <WaikEmailPage
+      headTitle="You have been invited to WAiK"
+      cta={{ href: signIn, label: "Sign in to WAiK" }}
+      secondaryLink={{ href: acceptInvite, label: "What is WAiK? Open your welcome page" }}
+    >
+      <h1
+        style={{
+          color: emailBrand.foreground,
+          fontSize: 20,
+          fontWeight: 600,
+          lineHeight: 1.3,
+          margin: "0 0 8px",
+          fontFamily: emailFont,
+        }}
+      >
+        You have been invited to WAiK
+      </h1>
+      <p
+        style={{
+          color: emailBrand.muted,
+          fontSize: 13,
+          lineHeight: 1.4,
+          margin: "0 0 20px",
+          fontFamily: emailFont,
+        }}
+      >
+        Voice-first documentation for your team
+      </p>
+      <p
+        style={{
+          color: "#334155",
+          fontSize: 16,
+          lineHeight: 1.65,
+          margin: "0 0 12px",
+          fontFamily: emailFont,
+        }}
+      >
+        Hi {firstName},
+      </p>
+      <p
+        style={{
+          color: "#334155",
+          fontSize: 16,
+          lineHeight: 1.65,
+          margin: "0 0 22px",
+          fontFamily: emailFont,
+        }}
+      >
+        <strong style={{ color: emailBrand.foreground, fontWeight: 600 }}>{inviterName}</strong> (
+        {inviterRole}) at <strong style={{ color: emailBrand.foreground, fontWeight: 600 }}>{facilityName}</strong>{" "}
+        has set up your account. WAiK helps you document incidents by voice — speak naturally and WAiK guides you
+        through a structured, compliant report.
+      </p>
+
+      <EmailCredentialPanel>
+        <p
+          style={{
+            color: emailBrand.primary,
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: "uppercase" as const,
+            letterSpacing: "0.06em",
+            margin: "0 0 10px",
+            fontFamily: emailFont,
+          }}
+        >
+          Your login credentials
+        </p>
+        <p
+          style={{
+            color: "#334155",
+            fontSize: 15,
+            margin: "0 0 6px",
+            lineHeight: 1.5,
+            fontFamily: emailFont,
+          }}
+        >
+          <span style={{ color: emailBrand.muted, fontSize: 13, marginRight: 6 }}>Email</span>
+          <br />
+          <span style={{ fontWeight: 500, color: emailBrand.foreground }}>{email}</span>
+        </p>
+        <p
+          style={{
+            color: "#334155",
+            fontSize: 15,
+            margin: "10px 0 0",
+            lineHeight: 1.5,
+            fontFamily: emailFont,
+          }}
+        >
+          <span style={{ color: emailBrand.muted, fontSize: 13, marginRight: 6 }}>Temporary password</span>
+          <br />
+          <code
+            style={{
+              display: "inline-block",
+              marginTop: 4,
+              backgroundColor: "rgba(13, 115, 119, 0.08)",
+              color: emailBrand.primaryDeep,
+              padding: "6px 10px",
+              borderRadius: 8,
+              fontSize: 14,
+              fontFamily: "ui-monospace, Menlo, Monaco, Consolas, monospace",
+              fontWeight: 600,
+            }}
+          >
+            {tempPassword}
+          </code>
+        </p>
+      </EmailCredentialPanel>
+
+      <EmailNotePanel>
+        <p
+          style={{
+            color: "#a16207",
+            fontSize: 14,
+            margin: 0,
+            lineHeight: 1.55,
+            fontFamily: emailFont,
+          }}
+        >
+          <strong>Heads up:</strong> you will be asked to change your password the first time you sign in.
+        </p>
+      </EmailNotePanel>
+    </WaikEmailPage>
   )
 }

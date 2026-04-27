@@ -34,6 +34,15 @@ export interface ClockState {
   label: string
 }
 
+function formatOverdueHours(overdueHours: number): string {
+  const whole = Math.floor(Math.max(0, overdueHours))
+  if (whole < 24) return `${whole}h`
+  const days = Math.floor(whole / 24)
+  const hours = whole % 24
+  if (hours === 0) return `${days}d`
+  return `${days}d ${hours}h`
+}
+
 export function computeClock(
   phase1SignedAt: string | null,
   goldStandardHours: number = 48,
@@ -50,7 +59,7 @@ export function computeClock(
     return {
       hoursRemaining,
       status: "overdue",
-      label: `Overdue by ${Math.floor(overdueHours)}h`,
+      label: `Overdue by ${formatOverdueHours(overdueHours)}`,
     }
   }
 

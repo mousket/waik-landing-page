@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
 import { useMemo } from "react"
+import { useHydrationSafeRelativeTime } from "@/hooks/use-hydration-safe-relative-time"
 import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
-import { formatDistanceToNow } from "date-fns"
 import Link from "next/link"
 import type { DashboardStats } from "@/lib/types/dashboard-stats"
 import { trendGlyph } from "@/lib/utils/dashboard-trends"
@@ -21,6 +21,11 @@ function TrendMark({ current, prev, higherIsBetter }: { current: number; prev: n
 
 function formatAssessmentLabel(type: string) {
   return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function AssessmentDueFromNow({ nextDueAt }: { nextDueAt: string }) {
+  const label = useHydrationSafeRelativeTime(nextDueAt)
+  return <>{label}</>
 }
 
 export function StatsSidebar({
@@ -131,13 +136,15 @@ export function StatsSidebar({
           <ul className="mt-3 space-y-2 text-sm text-foreground">
             {stats.upcomingAssessmentItems.map((row, idx) => {
               const due = row.nextDueAt ? new Date(row.nextDueAt) : null
-              const dueLabel =
-                due && !Number.isNaN(due.getTime())
-                  ? formatDistanceToNow(due, { addSuffix: true })
-                  : "Soon"
+              const hasValidDue = due && !Number.isNaN(due.getTime())
               return (
                 <li key={`${row.residentRoom}-${row.assessmentType}-${idx}`}>
-                  Room {row.residentRoom} — {formatAssessmentLabel(row.assessmentType)} — {dueLabel}
+                  Room {row.residentRoom} — {formatAssessmentLabel(row.assessmentType)} —{" "}
+                  {hasValidDue && row.nextDueAt ? (
+                    <AssessmentDueFromNow nextDueAt={row.nextDueAt} />
+                  ) : (
+                    "Soon"
+                  )}
                 </li>
               )
             })}

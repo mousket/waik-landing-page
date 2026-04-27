@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest"
-import { computeDaysToClose, generateClosedIncidentsCsv } from "@/lib/utils/csv-export"
+import {
+  computeDaysToClose,
+  generateAdminIncidentsExportCsv,
+  generateClosedIncidentsCsv,
+} from "@/lib/utils/csv-export"
 import type { IncidentSummary } from "@/lib/types/incident-summary"
 
 const minimalClosed = (over: Partial<IncidentSummary>): IncidentSummary => ({
   id: "inc-009",
   facilityId: "fac-1",
+  residentName: "Helen Thompson",
   residentRoom: "515",
   incidentType: "fall",
   hasInjury: false,
@@ -70,5 +75,30 @@ describe("generateClosedIncidentsCsv", () => {
     const inc = minimalClosed({ investigatorName: 'Dr. "SK" Kim' })
     const csv = generateClosedIncidentsCsv([inc])
     expect(csv).toContain('""SK""')
+  })
+})
+
+describe("generateAdminIncidentsExportCsv", () => {
+  it("defaults to room and reportedBy; omits residentName column", () => {
+    const inc = minimalClosed({})
+    const csv = generateAdminIncidentsExportCsv([inc], { includeResidentName: false })
+    const lines = csv.split("\n")
+    expect(lines[0]).toBe(
+      "roomNumber,incidentType,completenessAtSignoff,phase1SignedAt,phase2LockedAt,reportedBy",
+    )
+    expect(csv).toContain('"515"')
+    expect(csv).toContain('"Maria Torres"')
+    expect(csv).not.toContain("residentName")
+    expect(csv).not.toContain("Thompson")
+  })
+
+  it("includes residentName when requested", () => {
+    const inc = minimalClosed({})
+    const csv = generateAdminIncidentsExportCsv([inc], { includeResidentName: true })
+    const lines = csv.split("\n")
+    expect(lines[0]).toBe(
+      "roomNumber,residentName,incidentType,completenessAtSignoff,phase1SignedAt,phase2LockedAt,reportedBy",
+    )
+    expect(csv).toContain("Thompson")
   })
 })

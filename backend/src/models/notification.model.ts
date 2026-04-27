@@ -3,7 +3,14 @@ import { Schema, model, models, type Document } from "mongoose"
 export interface NotificationDocument extends Document {
   id: string
   incidentId: string
-  type: "incident-created" | "investigation-started" | "follow-up-required" | "investigation-completed"
+  type:
+    | "incident-created"
+    | "investigation-started"
+    | "follow-up-required"
+    | "investigation-completed"
+    | "phase2-all-sections-complete"
+    | "phase2-pending-signature"
+    | "investigation-reporter-closed"
   message: string
   createdAt: Date
   readAt?: Date
@@ -17,7 +24,15 @@ const NotificationSchema = new Schema<NotificationDocument>(
     type: {
       type: String,
       required: true,
-      enum: ["incident-created", "investigation-started", "follow-up-required", "investigation-completed"],
+      enum: [
+        "incident-created",
+        "investigation-started",
+        "follow-up-required",
+        "investigation-completed",
+        "phase2-all-sections-complete",
+        "phase2-pending-signature",
+        "investigation-reporter-closed",
+      ],
     },
     message: { type: String, required: true },
     createdAt: { type: Date, required: true, default: () => new Date() },

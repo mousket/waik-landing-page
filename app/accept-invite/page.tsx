@@ -4,8 +4,11 @@ import { Suspense } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
+import { SignUp } from "@clerk/nextjs"
 
 import { AuthPageFrame } from "@/components/ui/auth-background"
+import { clerkAppearance } from "@/lib/clerk-appearance"
+import { getClerkPostAuthUrl } from "@/lib/clerk-routes"
 
 function AcceptInviteContent() {
   const searchParams = useSearchParams()
@@ -13,28 +16,36 @@ function AcceptInviteContent() {
 
   return (
     <AuthPageFrame>
-      <div className="w-full max-w-lg">
-        <div className="space-y-8 rounded-3xl border border-border/20 bg-background/90 p-8 text-center shadow-xl backdrop-blur-sm">
+      <div className="w-full max-w-md">
+        <div className="mb-6 space-y-4 rounded-3xl border border-border/20 bg-background/90 p-6 text-center shadow-xl backdrop-blur-sm sm:p-8">
           <div className="flex justify-center">
             <Image src="/waik-logo.png" alt="WAiK" width={200} height={80} className="h-14 w-auto" priority />
           </div>
-          <div className="space-y-4">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Welcome to WAiK</h1>
-            <p className="text-lg text-foreground/80">
-              You&apos;ve been invited to <span className="font-semibold text-foreground">{facility}</span>.
-            </p>
-            <p className="text-sm text-muted-foreground sm:text-base">
-              Please sign in with the credentials from your welcome email.
-            </p>
-          </div>
-          <Link
-            href="/sign-in"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25"
-          >
-            Sign In
-          </Link>
-          <p className="text-xs text-muted-foreground sm:text-sm">Your password will need to be changed after first sign in.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Welcome to WAiK</h1>
+          <p className="text-base text-foreground/80">
+            You&apos;ve been invited to <span className="font-semibold text-foreground">{facility}</span>.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Create your account below. You&apos;ll be redirected to the right home screen, with a short tour the first
+            time. If you were told to use an email link only, you can also{" "}
+            <Link className="font-medium text-primary underline" href="/sign-in">
+              sign in
+            </Link>
+            .
+          </p>
         </div>
+        <div className="mx-auto w-full min-w-0 max-w-sm rounded-2xl border border-border/20 bg-card/50 p-4 shadow-lg">
+          <SignUp
+            routing="virtual"
+            appearance={clerkAppearance}
+            signInUrl="/sign-in"
+            signInForceRedirectUrl={getClerkPostAuthUrl()}
+            forceRedirectUrl={getClerkPostAuthUrl()}
+          />
+        </div>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Your team may require a password change after first sign-in.
+        </p>
       </div>
     </AuthPageFrame>
   )

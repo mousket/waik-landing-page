@@ -113,7 +113,14 @@ export const INCIDENT_PHASES = [
   "phase_2_in_progress",
   "closed",
 ] as const
-const AUDIT_ACTIONS = ["locked", "unlocked", "relocked", "phase_transitioned", "signed"] as const
+const AUDIT_ACTIONS = [
+  "locked",
+  "unlocked",
+  "relocked",
+  "phase_transitioned",
+  "signed",
+  "idt_roster_changed",
+] as const
 const DEPT_ENUM = ["nursing", "dietary", "therapy", "activities", "administration", "multiple"] as const
 const INTERVENTION_DEPT = DEPT_ENUM
 const INTERVENTION_KIND = ["temporary", "permanent"] as const
@@ -178,6 +185,11 @@ export interface IncidentDocument extends Document {
     phase1Signed?: Date
     phase2Claimed?: Date
     phase2Locked?: Date
+  }
+
+  /** De-dupes one-time “all sections complete” notifications (set when first sent). */
+  phase2NotificationFlags?: {
+    allSectionsCompleteNotifiedAt?: Date
   }
 
   phase2Sections?: {
@@ -427,6 +439,13 @@ const NewInterventionBlockSchema = new Schema(
   { _id: false },
 )
 
+const Phase2NotificationFlagsSchema = new Schema(
+  {
+    allSectionsCompleteNotifiedAt: { type: Date },
+  },
+  { _id: false },
+)
+
 const Phase2SectionsSchema = new Schema(
   {
     contributingFactors: {
@@ -495,6 +514,7 @@ const IncidentSchema = new Schema<IncidentDocument>(
     phaseTransitionTimestamps: { type: PhaseTransitionTimestampsSchema, default: undefined },
 
     phase2Sections: { type: Phase2SectionsSchema, default: undefined },
+    phase2NotificationFlags: { type: Phase2NotificationFlagsSchema, default: undefined },
     auditTrail: { type: [AuditTrailEntrySchema], default: [] },
 
     phase: {

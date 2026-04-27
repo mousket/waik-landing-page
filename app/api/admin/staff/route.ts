@@ -34,22 +34,31 @@ export async function GET(request: Request) {
       .exec()
     const roleNameBySlug = new Map(roleDocs.map((r) => [r.slug, r.name]))
 
-    const mapUser = (u: (typeof users)[number]) => ({
-      id: u.id,
-      clerkUserId: u.clerkUserId,
-      firstName: u.firstName ?? "",
-      lastName: u.lastName ?? "",
-      email: u.email,
-      roleSlug: u.roleSlug,
-      roleName: roleNameBySlug.get(u.roleSlug) ?? u.roleSlug,
-      isActive: u.isActive,
-      lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
-      mustChangePassword: Boolean(u.mustChangePassword),
-    })
+    const mapUser = (u: (typeof users)[number], extra?: { isPending: boolean }) => {
+      const created = (u as { createdAt?: Date }).createdAt
+      return {
+        id: u.id,
+        clerkUserId: u.clerkUserId,
+        firstName: u.firstName ?? "",
+        lastName: u.lastName ?? "",
+        email: u.email,
+        roleSlug: u.roleSlug,
+        roleName: roleNameBySlug.get(u.roleSlug) ?? u.roleSlug,
+        isActive: u.isActive,
+        lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+        mustChangePassword: Boolean(u.mustChangePassword),
+        invitedByName: (u as { invitedByName?: string }).invitedByName,
+        dateSent: extra?.isPending && created ? new Date(created).toISOString() : null,
+      }
+    }
 
-    const pending = users.filter((u) => u.isActive && u.lastLoginAt == null).map(mapUser)
-    const active = users.filter((u) => u.isActive && u.lastLoginAt != null).map(mapUser)
-    const deactivated = users.filter((u) => !u.isActive).map(mapUser)
+    const pending = users
+      .filter((u) => u.isActive && u.lastLoginAt == null)
+      .map((u) => mapUser(u, { isPending: true }))
+    const active = users
+      .filter((u) => u.isActive && u.lastLoginAt != null)
+      .map((u) => mapUser(u))
+    const deactivated = users.filter((u) => !u.isActive).map((u) => mapUser(u))
 
     return NextResponse.json({
       facilityId: qFacility,

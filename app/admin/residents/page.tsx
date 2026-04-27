@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
-import { getAdminContextQueryString } from "@/lib/admin-nav-context"
+import { getAdminContextQueryString, buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import { Button } from "@/components/ui/button"
 import { CardDescription, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Loader2, Plus, Search } from "lucide-react"
+import Link from "next/link"
 
 type Resident = {
   id: string
@@ -33,6 +34,11 @@ type Resident = {
   lastName: string
   roomNumber: string
   careLevel: string
+  status?: string
+  admissionDate?: string | null
+  incidents30d?: number
+  lastAssessmentAt?: string | null
+  nextDueAt?: string | null
 }
 
 const CARE_OPTIONS = [
@@ -55,11 +61,18 @@ export default function AdminResidentsPage() {
   const [careLevel, setCareLevel] = useState("assisted")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [statusF, setStatusF] = useState<"all" | "active" | "discharged" | "on-leave" | "inactive">("all")
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/residents${apiCtx}`)
+      const ctxQ = (apiCtx.startsWith("?") ? apiCtx.slice(1) : apiCtx) || ""
+      const s = new URLSearchParams(ctxQ)
+      if (statusF !== "all") {
+        s.set("status", statusF)
+      }
+      const qs = s.toString()
+      const res = await fetch(qs ? `/api/residents?${qs}` : "/api/residents", { credentials: "include" })
       if (!res.ok) {
         setResidents([])
         return
@@ -69,7 +82,7 @@ export default function AdminResidentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [apiCtx])
+  }, [apiCtx, statusF])
 
   useEffect(() => {
     void load()
@@ -131,16 +144,40 @@ export default function AdminResidentsPage() {
             <div className="flex flex-col gap-4 border-b border-border/50 p-6 sm:flex-row sm:items-end sm:justify-between">
               <div className="space-y-1">
                 <CardTitle>Directory</CardTitle>
-                <CardDescription>Search by name or room.</CardDescription>
+                <CardDescription>Search by name or room. Status filter reloads the list.</CardDescription>
               </div>
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-12 min-h-12 pl-9"
-                />
+              <div className="flex w-full flex-col gap-2 sm:max-w-md sm:flex-row sm:items-end">
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-12 min-h-12 pl-9"
+                  />
+                </div>
+                <div className="w-full min-w-0 sm:w-40">
+                  <Label className="sr-only">Status</Label>
+                  <Select
+                    value={statusF}
+                    onValueChange={(v) => {
+                      if (v === "all" || v === "active" || v === "discharged" || v === "on-leave" || v === "inactive") {
+                        setStatusF(v)
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-12 min-h-12">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="on-leave">On leave</SelectItem>
+                      <SelectItem value="discharged">Discharged</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <div className="p-0">
@@ -155,12 +192,16 @@ export default function AdminResidentsPage() {
                       <TableHead className="font-semibold">Name</TableHead>
                       <TableHead className="font-semibold">Room</TableHead>
                       <TableHead className="font-semibold">Care level</TableHead>
+                      <TableHead className="text-right font-semibold"># Inc (30d)</TableHead>
+                      <TableHead className="font-semibold">Last asmt</TableHead>
+                      <TableHead className="font-semibold">Next due</TableHead>
+                      <TableHead className="w-[90px] font-semibold" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
+                        <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                           No residents yet
                         </TableCell>
                       </TableRow>
@@ -172,6 +213,24 @@ export default function AdminResidentsPage() {
                           </TableCell>
                           <TableCell>{r.roomNumber || "—"}</TableCell>
                           <TableCell className="capitalize">{r.careLevel.replace(/_/g, " ")}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {r.incidents30d ?? 0}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {r.lastAssessmentAt ? r.lastAssessmentAt.slice(0, 10) : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {r.nextDueAt ? r.nextDueAt.slice(0, 10) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm" className="h-8 px-2" asChild>
+                              <Link
+                                href={buildAdminPathWithContext(`/residents/${r.id}`, searchParams)}
+                              >
+                                View
+                              </Link>
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}

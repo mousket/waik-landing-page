@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import { inviteStaffMember } from "@/lib/admin-staff-invite"
+import { actorNameFromUser, logActivity } from "@/lib/activity-logger"
 import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
 import { authErrorResponse } from "@/lib/auth"
@@ -26,8 +27,8 @@ export async function POST(request: Request) {
     const email = typeof b.email === "string" ? b.email.trim().toLowerCase() : ""
     const roleSlug = typeof b.roleSlug === "string" ? b.roleSlug.trim() : ""
 
-    if (!firstName || !lastName || !email || !roleSlug) {
-      return NextResponse.json({ error: "firstName, lastName, email, and roleSlug are required" }, { status: 400 })
+    if (!email || !roleSlug) {
+      return NextResponse.json({ error: "email and roleSlug are required" }, { status: 400 })
     }
 
     const resolved = await resolveEffectiveAdminFacility(request, user, {
@@ -59,6 +60,8 @@ export async function POST(request: Request) {
       roleSlug,
       inviterName,
       inviterRole,
+      inviterRoleSlug: user.roleSlug,
+      invitedByUserId: user.userId,
       sendWelcomeEmail: true,
     })
 
@@ -73,6 +76,18 @@ export async function POST(request: Request) {
               : 500
       return NextResponse.json({ error: result.message }, { status })
     }
+
+    logActivity({
+      userId: user.userId,
+      userName: actorNameFromUser(user),
+      role: user.roleSlug,
+      facilityId,
+      action: "user_invited",
+      resourceType: "user",
+      resourceId: result.clerkUserId,
+      metadata: { email, roleSlug, inviterName },
+      req: request,
+    })
 
     return NextResponse.json({ success: true })
   } catch (err) {

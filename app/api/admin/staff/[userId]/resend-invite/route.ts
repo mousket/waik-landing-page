@@ -1,5 +1,5 @@
 import { createClerkClient } from "@clerk/backend"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import UserModel from "@/backend/src/models/user.model"
@@ -9,8 +9,12 @@ import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/
 import { generateTempPassword } from "@/lib/waik-admin-utils"
 import { sendStaffWelcomeEmail } from "@/lib/send-welcome-email"
 
-export async function POST(request: Request, { params }: { params: { userId: string } }) {
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ userId: string }> },
+) {
   try {
+    const { userId } = await context.params
     const user = await getCurrentUser()
     if (!user) return unauthorizedResponse()
     requireCanInviteStaff(user)
@@ -25,7 +29,7 @@ export async function POST(request: Request, { params }: { params: { userId: str
     const { facilityId } = resolved
 
     await connectMongo()
-    const target = await UserModel.findOne({ id: params.userId, facilityId }).exec()
+    const target = await UserModel.findOne({ id: userId, facilityId }).exec()
     if (!target) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }

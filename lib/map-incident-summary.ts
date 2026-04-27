@@ -48,7 +48,7 @@ function defaultPhase2Sections(): IncidentSummary["phase2Sections"] {
 }
 
 /**
- * Maps a Mongo lean incident document to the admin GET /api/incidents contract (no resident name).
+ * Maps a Mongo lean incident document to the admin GET /api/incidents contract.
  */
 export function mapIncidentDocToSummary(doc: Record<string, unknown>): IncidentSummary {
   const initialReport = doc.initialReport as Record<string, unknown> | undefined
@@ -86,6 +86,7 @@ export function mapIncidentDocToSummary(doc: Record<string, unknown>): IncidentS
   return {
     id: String(doc.id),
     facilityId: String(doc.facilityId ?? ""),
+    residentName: String(doc.residentName ?? ""),
     residentRoom: String(doc.residentRoom ?? ""),
     incidentType,
     hasInjury,

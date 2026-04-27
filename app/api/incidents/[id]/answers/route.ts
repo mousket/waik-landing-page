@@ -13,6 +13,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!questionId || !answerText || !answeredBy) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
+    if (String(answeredBy) !== String(sessionUser.userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const scope = await getIncidentForUser(id, sessionUser)
     if (scope.kind === "not_found") {

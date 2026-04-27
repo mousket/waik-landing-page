@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
 import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import { CardDescription, CardTitle } from "@/components/ui/card"
@@ -44,6 +45,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { getDisplayNarrative, getRawNarrative } from "@/lib/utils/enhance-narrative"
+import { getAdminContextQueryString } from "@/lib/admin-nav-context"
+import { Phase2InvestigationShell } from "@/components/admin/phase2-investigation-shell"
 import { renderMarkdownOrHtml } from "@/lib/utils/markdown-to-html"
 
 function formatDate(dateString: string | undefined, formatString: string): string {
@@ -66,10 +69,12 @@ type IntelligenceMessage = {
   timestamp: Date
 }
 
-export default function AdminIncidentDetailPage({ params }: { params: { id: string } }) {
+export default function AdminIncidentDetailPage() {
   const router = useRouter()
   const searchParams = useAdminUrlSearchParams()
-  const { userId, role } = useWaikUser()
+  const routeParams = useParams<{ id: string }>()
+  const incidentId = routeParams?.id ? String(routeParams.id) : ""
+  const { userId, role, waikRole, isWaikSuperAdmin } = useWaikUser()
   const [incident, setIncident] = useState<Incident | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -114,6 +119,8 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   const hiddenPendingCount = Math.max(0, unansweredQuestions.length - visiblePendingQuestions.length)
 
   const canGenerateAIReport = answeredQuestions.length >= 5
+
+  const adminApiQ = useMemo(() => getAdminContextQueryString(searchParams), [searchParams])
 
   console.log("[v0] WAiK Agent Debug Info:", {
     role,
@@ -160,13 +167,16 @@ export default function AdminIncidentDetailPage({ params }: { params: { id: stri
   } | null>(null)
 
 useEffect(() => {
-  fetchIncident()
-  fetchStaffList()
-}, [params.id])
+  if (!incidentId) return
+  void fetchIncident()
+  void fetchStaffList()
+}, [incidentId, adminApiQ])
 
   const fetchIncident = async () => {
     try {
-      const response = await fetch(`/api/incidents/${params.id}`)
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}${adminApiQ}`, {
+        credentials: "include",
+      })
       if (response.ok) {
         const data = await response.json()
         setIncident(data)
@@ -187,7 +197,7 @@ useEffect(() => {
   
   const fetchDocumentationScore = async () => {
     try {
-      const response = await fetch(`/api/incidents/${params.id}/score`)
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}/score`)
       if (response.ok) {
         const data = await response.json()
         setDocumentationScore(data)
@@ -214,7 +224,7 @@ useEffect(() => {
 
     setIsSavingIncident(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -246,7 +256,7 @@ useEffect(() => {
 
     setIsClosingIncident(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "closed" }),
@@ -280,7 +290,7 @@ useEffect(() => {
 
     setIsGeneratingAIReport(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/ai-report`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}/ai-report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       })
@@ -304,7 +314,7 @@ useEffect(() => {
   const updateStatus = async (status: string) => {
     if (!incident) return
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -324,7 +334,7 @@ useEffect(() => {
   const updatePriority = async (priority: string) => {
     if (!incident) return
     try {
-      const response = await fetch(`/api/incidents/${params.id}`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ priority }),
@@ -346,7 +356,7 @@ useEffect(() => {
 
     setIsAddingQuestion(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/questions`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -375,7 +385,7 @@ useEffect(() => {
 
   const deleteQuestion = async (questionId: string) => {
     try {
-      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}/questions/${questionId}`, {
         method: "DELETE",
       })
 
@@ -406,7 +416,7 @@ useEffect(() => {
     setIsIntelligenceLoading(true)
 
     try {
-      const response = await fetch(`/api/incidents/${params.id}/intelligence`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}/intelligence`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: intelligenceInput }),
@@ -578,6 +588,22 @@ useEffect(() => {
     )
   }
 
+  const _phase2Ph = incident.phase
+  if (_phase2Ph === "phase_1_complete" || _phase2Ph === "phase_2_in_progress" || _phase2Ph === "closed") {
+    return (
+      <Phase2InvestigationShell
+        incident={incident}
+        incidentId={incidentId}
+        searchParams={searchParams}
+        onRefresh={async () => {
+          await fetchIncident()
+        }}
+        waikRole={waikRole}
+        isWaikSuperAdmin={isWaikSuperAdmin}
+      />
+    )
+  }
+
   console.log("[v0] Auth Store Values:", {
     userId,
     role,
@@ -602,7 +628,7 @@ useEffect(() => {
 
     setIsAddingQuestion(true)
     try {
-      const response = await fetch(`/api/incidents/${params.id}/questions/${questionId}/assign`, {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}/questions/${questionId}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

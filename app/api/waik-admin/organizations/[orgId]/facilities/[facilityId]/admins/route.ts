@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { createClerkClient } from "@clerk/backend"
 import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import OrganizationModel from "@/backend/src/models/organization.model"
 import UserModel from "@/backend/src/models/user.model"
+import { addClerkOrgMembership, getClerkSecretKey } from "@/lib/clerk-organization"
 import { sendWelcomeEmail } from "@/lib/send-welcome-email"
 import { requireWaikSuperAdmin } from "@/lib/waik-admin-api"
 import { generateTempPassword, generateUserId } from "@/lib/waik-admin-utils"
@@ -11,11 +12,14 @@ import { leanOne } from "@/lib/mongoose-lean"
 import type { FacilityDocument } from "@/backend/src/models/facility.model"
 import type { OrganizationDocument } from "@/backend/src/models/organization.model"
 
-export async function POST(request: Request, { params }: { params: { orgId: string; facilityId: string } }) {
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ orgId: string; facilityId: string }> },
+) {
   const gate = await requireWaikSuperAdmin()
   if (gate instanceof NextResponse) return gate
 
-  const { orgId, facilityId } = params
+  const { orgId, facilityId } = await context.params
 
   let body: unknown
   try {
@@ -116,6 +120,37 @@ export async function POST(request: Request, { params }: { params: { orgId: stri
     }
     console.error("[waik-admin] Mongo user create failed:", mongoErr)
     return NextResponse.json({ error: "Could not save user profile" }, { status: 500 })
+  }
+
+  const sk2 = getClerkSecretKey()
+  const coid = org.clerkOrganizationId
+  if (coid && sk2) {
+    try {
+      await addClerkOrgMembership(
+        { organizationId: coid, userId: clerkUserId, role: "org:admin" },
+        sk2,
+      )
+    } catch (e) {
+      console.error("[waik-admin] Clerk org membership failed:", e)
+      try {
+        await UserModel.deleteOne({ id: userDoc.id })
+      } catch {
+        /* best effort */
+      }
+      try {
+        await clerk.users.deleteUser(clerkUserId)
+      } catch {
+        /* best effort */
+      }
+      return NextResponse.json(
+        { error: "User was not added to the Clerk organization. Run the Clerk backfill, then try again." },
+        { status: 502 },
+      )
+    }
+  } else if (!coid) {
+    console.warn(
+      `[waik-admin] Organization ${orgId} has no clerkOrganizationId — run scripts/backfill-clerk-orgs.ts`,
+    )
   }
 
   try {

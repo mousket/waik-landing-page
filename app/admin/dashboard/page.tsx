@@ -12,8 +12,6 @@ export default async function AdminDashboardPage() {
       canAccessPhase2={canAccessPhase2}
       userDisplayName={userDisplayName}
       defaultFacilityId={defaultFacilityId}
-      showFacilityPicker
-      isWaikSuperAdmin={Boolean(user?.isWaikSuperAdmin)}
     />
   )
 }

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { render } from "@react-email/render"
 import { resend, isEmailConfigured } from "@/lib/email"
 import { WelcomeAdminEmail } from "@/emails/welcome-admin"
 import { WelcomeStaffEmail } from "@/emails/welcome-staff"
@@ -20,16 +21,20 @@ export async function sendWelcomeEmail({
   const from = process.env.EMAIL_FROM
   if (!from) throw new Error("EMAIL_FROM is not set")
 
-  await resend.emails.send({
-    from,
-    to,
-    subject: "Welcome to WAiK — Your administrator account is ready",
-    react: React.createElement(WelcomeAdminEmail, {
+  const html = await render(
+    React.createElement(WelcomeAdminEmail, {
       firstName,
       facilityName,
       email: to,
       tempPassword,
     }),
+  )
+
+  await resend.emails.send({
+    from,
+    to,
+    subject: "Welcome to WAiK — Your administrator account is ready",
+    html,
   })
 }
 
@@ -54,11 +59,8 @@ export async function sendStaffWelcomeEmail({
   const from = process.env.EMAIL_FROM
   if (!from) throw new Error("EMAIL_FROM is not set")
 
-  await resend.emails.send({
-    from,
-    to,
-    subject: `${inviterName} has invited you to WAiK at ${facilityName}`,
-    react: React.createElement(WelcomeStaffEmail, {
+  const html = await render(
+    React.createElement(WelcomeStaffEmail, {
       firstName,
       facilityName,
       inviterName,
@@ -66,5 +68,12 @@ export async function sendStaffWelcomeEmail({
       email: to,
       tempPassword,
     }),
+  )
+
+  await resend.emails.send({
+    from,
+    to,
+    subject: `${inviterName} has invited you to WAiK at ${facilityName}`,
+    html,
   })
 }

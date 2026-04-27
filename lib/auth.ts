@@ -69,8 +69,10 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const firstName = mongoUser.firstName ?? ""
   const lastName = mongoUser.lastName ?? ""
 
+  // Prefer business `id` (matches `Incident.staffId` in seed and most WAiK joins); fall back to ObjectId.
   const idRaw = (mongoUser as { _id?: unknown })._id
-  const userId = idRaw != null ? String(idRaw) : mongoUser.id
+  const businessId = typeof mongoUser.id === "string" && mongoUser.id.trim() ? mongoUser.id.trim() : ""
+  const userId = businessId || (idRaw != null ? String(idRaw) : String(mongoUser.id ?? ""))
 
   return {
     clerkUserId: clerkSessionId,

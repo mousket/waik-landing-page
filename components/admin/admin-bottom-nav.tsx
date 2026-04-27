@@ -30,6 +30,13 @@ function tabActive(pathname: string, href: string): boolean {
   if (href === "/admin/settings") {
     return pathname.startsWith("/admin/settings")
   }
+  if (href === "/admin/residents") {
+    return (
+      pathname === "/admin/residents" ||
+      pathname.startsWith("/admin/residents/") ||
+      pathname.startsWith("/residents/")
+    )
+  }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 

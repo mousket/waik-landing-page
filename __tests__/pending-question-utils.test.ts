@@ -6,6 +6,7 @@ function baseIncident(overrides: Partial<StaffIncidentSummary> = {}): StaffIncid
   return {
     id: "inc-1",
     facilityId: "fac-1",
+    residentName: "Sample Resident",
     residentRoom: "204",
     incidentType: "Fall",
     hasInjury: false,

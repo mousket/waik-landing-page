@@ -4,28 +4,34 @@ import type React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { UserButton } from "@clerk/nextjs"
-import { Bell, Home, ClipboardList, ClipboardCheck, Lightbulb } from "lucide-react"
+import { Bell } from "lucide-react"
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
 import { WaikLogo } from "@/components/waik-logo"
 import { cn } from "@/lib/utils"
 import { BadgePoller } from "@/components/staff/badge-poller"
-import { BadgeProvider, useBadges } from "@/components/staff/badge-context"
+import { ActivitySessionLogger } from "@/components/activity-session-logger"
+import { BadgeProvider } from "@/components/staff/badge-context"
+import { StaffBottomNav } from "@/components/staff/staff-bottom-nav"
 
-const tabs = [
-  { href: "/staff/dashboard", label: "Home", icon: Home },
-  { href: "/staff/incidents", label: "Incidents", icon: ClipboardList },
-  { href: "/staff/assessments", label: "Assessments", icon: ClipboardCheck },
-  { href: "/staff/intelligence", label: "Intelligence", icon: Lightbulb },
+const NAV_LINKS = [
+  { label: "Dashboard", href: "/staff/dashboard" },
+  { label: "Incidents", href: "/staff/incidents" },
+  { label: "Assessments", href: "/staff/assessments" },
+  { label: "Residents", href: "/staff/residents" },
+  { label: "Intelligence", href: "/staff/intelligence" },
 ] as const
 
-function tabActive(pathname: string, href: string): boolean {
+function navActive(pathname: string, href: string): boolean {
   if (href === "/staff/dashboard") {
     return (
       pathname === "/staff/dashboard" ||
       pathname === "/staff" ||
       pathname.startsWith("/staff/report")
     )
+  }
+  if (href === "/staff/residents") {
+    return pathname.startsWith("/staff/residents") || pathname.startsWith("/residents/")
   }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
@@ -45,104 +51,78 @@ export function StaffAppShell({
 
   return (
     <BadgeProvider>
+      <ActivitySessionLogger />
       <BadgePoller />
-      <ShellContents firstName={firstName} lastName={lastName} unitLabel={unitLabel} pathname={pathname}>
-        {children}
-      </ShellContents>
-    </BadgeProvider>
-  )
-}
+      <div className="flex h-dvh min-h-0 max-h-dvh flex-col overflow-hidden bg-brand-shell-bg text-brand-body">
+        <header
+          className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center border-b border-border/20 bg-background/80 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 md:h-16"
+        >
+          <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 md:gap-4">
+            <div className="flex min-w-0 shrink-0 items-center">
+              <span className="md:hidden">
+                <WaikLogo href="/staff/dashboard" size="md" />
+              </span>
+              <span className="hidden md:inline">
+                <WaikLogo href="/staff/dashboard" size="lg" />
+              </span>
+            </div>
 
-function Badge({ count }: { count: number }) {
-  if (!count || count <= 0) return null
-  return (
-    <span className="absolute -right-2 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-      {count > 99 ? "99+" : count}
-    </span>
-  )
-}
+            <nav
+              className="absolute left-1/2 top-1/2 hidden w-auto max-w-[min(100%,40rem)] -translate-x-1/2 -translate-y-1/2 md:block"
+              aria-label="Primary"
+            >
+              <ul className="flex flex-wrap items-center justify-center gap-5 lg:gap-7">
+                {NAV_LINKS.map(({ label, href }) => {
+                  const active = navActive(pathname, href)
+                  return (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        className={cn(
+                          "inline-block min-h-10 border-b-2 pb-0.5 text-sm font-medium transition-colors md:min-h-0",
+                          active
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {label}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </nav>
 
-function ShellContents({
-  firstName,
-  lastName,
-  unitLabel,
-  pathname,
-  children,
-}: {
-  firstName: string
-  lastName: string
-  unitLabel?: string | null
-  pathname: string
-  children: React.ReactNode
-}) {
-  const badges = useBadges()
-
-  return (
-    <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-      <header
-        className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border/20 bg-background/80 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"
-      >
-        <WaikLogo href="/staff/dashboard" size="md" />
-        <div className="flex items-center gap-3">
-          {unitLabel ? (
-            <span className="hidden rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary sm:inline-flex">
-              {unitLabel}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            className="flex h-12 w-12 min-h-[48px] min-w-[48px] items-center justify-center text-muted-foreground"
-            aria-label="Notifications"
-          >
-            <Bell className="h-6 w-6" strokeWidth={1.75} />
-          </button>
-          <div className="flex shrink-0 items-center [&_.cl-userButtonTrigger]:h-9 [&_.cl-userButtonTrigger]:w-9">
-            <span className="sr-only">{`Signed in as ${[firstName, lastName].filter(Boolean).join(" ")}`}</span>
-            <UserButton appearance={clerkAppearance} afterSignOutUrl={getClerkAfterSignOutUrl()} />
-          </div>
-        </div>
-      </header>
-
-      <main
-        className="flex flex-1 flex-col overflow-y-auto overscroll-contain pt-14 pb-[calc(5rem+env(safe-area-inset-bottom,0px))]"
-        style={{ WebkitOverflowScrolling: "touch" }}
-      >
-        {children}
-      </main>
-
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/20 bg-background/80 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"
-        aria-label="Staff navigation"
-      >
-        <div className="mx-auto flex min-h-[64px] max-w-lg items-stretch">
-          {tabs.map(({ href, label, icon: Icon }) => {
-            const active = tabActive(pathname, href)
-            const count =
-              href === "/staff/assessments"
-                ? badges.dueAssessments
-                : href === "/staff/dashboard" || href === "/staff/incidents"
-                  ? badges.pendingQuestions
-                  : 0
-
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "relative flex min-h-[48px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold transition-colors",
-                  active ? "text-primary" : "text-muted-foreground",
-                )}
-              >
-                <span className="relative">
-                  <Icon className="h-6 w-6 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
-                  <Badge count={count} />
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-3">
+              {unitLabel ? (
+                <span className="hidden max-w-[10rem] truncate rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary sm:inline-flex md:max-w-[14rem]">
+                  {unitLabel}
                 </span>
-                <span>{label}</span>
-              </Link>
-            )
-          })}
+              ) : null}
+              <button
+                type="button"
+                className="flex h-11 w-11 min-h-[48px] min-w-[48px] items-center justify-center text-muted-foreground md:h-12 md:w-12"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5 md:h-[22px] md:w-[22px]" strokeWidth={1.75} />
+              </button>
+              <div className="flex shrink-0 items-center [&_.cl-userButtonTrigger]:h-9 [&_.cl-userButtonTrigger]:w-9 md:[&_.cl-userButtonTrigger]:h-10 md:[&_.cl-userButtonTrigger]:w-10">
+                <span className="sr-only">{`Signed in as ${[firstName, lastName].filter(Boolean).join(" ")}`}</span>
+                <UserButton appearance={clerkAppearance} afterSignOutUrl={getClerkAfterSignOutUrl()} />
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain pt-14 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6 md:pt-16"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          {children}
         </div>
-      </nav>
-    </div>
+
+        <StaffBottomNav />
+      </div>
+    </BadgeProvider>
   )
 }

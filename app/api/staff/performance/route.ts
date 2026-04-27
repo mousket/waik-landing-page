@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import IncidentModel from "@/backend/src/models/incident.model"
 import { withAuth } from "@/lib/api-handler"
+import { staffIdMatch } from "@/lib/staff-identity"
 import getRedis from "@/lib/redis"
 
 type StaffPerformance = {
@@ -43,7 +44,7 @@ export const GET = withAuth(async (_request, { currentUser }) => {
 
   const allSigned = await IncidentModel.find({
     facilityId,
-    staffId: userId,
+    ...staffIdMatch(currentUser),
     completenessAtSignoff: { $gt: 0 },
   })
     .sort({ "phaseTransitionTimestamps.phase1Signed": -1 })

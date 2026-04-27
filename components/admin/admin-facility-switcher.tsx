@@ -28,7 +28,14 @@ function applyFacilityToUrl(
  * Top-of-layout facility picker: loads named facilities from the API, optionally scoped by organizationId.
  * Auto-selects when exactly one facility is available, or reuses a valid default / last selection.
  */
-export function AdminFacilitySwitcher({ defaultFacilityId }: { defaultFacilityId?: string }) {
+export function AdminFacilitySwitcher({
+  defaultFacilityId,
+  layout = "page",
+}: {
+  defaultFacilityId?: string
+  /** `dashboardInline` drops the full-width page wrapper; use next to the Command center greeting. */
+  layout?: "page" | "dashboardInline"
+}) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useAdminUrlSearchParams()
@@ -135,13 +142,21 @@ export function AdminFacilitySwitcher({ defaultFacilityId }: { defaultFacilityId
   const invalidUrlId = Boolean(facilityIdInUrl && options.length > 0 && !inList(facilityIdInUrl))
   const labelFor = (id: string) => options.find((f) => f.id === id)?.name ?? id
 
+  const outerClass =
+    layout === "dashboardInline" ? "w-full min-w-0" : "mx-auto w-full max-w-[1600px] px-4 pt-4 md:px-6"
+  const cardClass =
+    layout === "dashboardInline"
+      ? "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.06] via-background to-accent/[0.05] p-4 shadow-md"
+      : "rounded-xl border border-border bg-card p-4 shadow-sm"
+  const hintClass = layout === "dashboardInline" ? "mt-0.5 line-clamp-2 text-xs text-muted-foreground" : "mt-1 text-xs text-muted-foreground"
+
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-4 pt-4 md:px-6">
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className={outerClass}>
+      <div className={cardClass}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-primary">Facility</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className={hintClass}>
               {organizationId
                 ? "Data below is scoped to the facility you select in this organization."
                 : "Data below is scoped to the facility you select."}
@@ -185,7 +200,7 @@ export function AdminFacilitySwitcher({ defaultFacilityId }: { defaultFacilityId
                   </option>
                   {options.map((f) => (
                     <option key={f.id} value={f.id}>
-                      {f.name} ({f.id})
+                      {f.name}
                     </option>
                   ))}
                 </select>
@@ -228,7 +243,6 @@ export function AdminFacilitySwitcher({ defaultFacilityId }: { defaultFacilityId
         {value && inList(value) ? (
           <p className="mt-2 text-xs text-muted-foreground">
             Current: <span className="font-medium text-foreground">{labelFor(value)}</span>
-            <span className="tabular-nums text-muted-foreground"> · {value}</span>
           </p>
         ) : null}
       </div>

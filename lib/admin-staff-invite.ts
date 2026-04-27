@@ -1,8 +1,15 @@
 import { createClerkClient } from "@clerk/backend"
 import connectMongo from "@/backend/src/lib/mongodb"
+import OrganizationModel from "@/backend/src/models/organization.model"
 import RoleModel from "@/backend/src/models/role.model"
 import UserModel from "@/backend/src/models/user.model"
+import {
+  addClerkOrgMembership,
+  clerkOrgRoleForWaikRole,
+  getClerkSecretKey,
+} from "@/lib/clerk-organization"
 import { sendStaffWelcomeEmail } from "@/lib/send-welcome-email"
+import { isRoleAssignableByInviter } from "@/lib/role-assignment-permissions"
 import { generateTempPassword, generateUserId } from "@/lib/waik-admin-utils"
 import type { WaikRoleSlug } from "@/lib/waik-roles"
 
@@ -37,11 +44,13 @@ export async function inviteStaffMember(opts: {
   roleSlug: string
   inviterName: string
   inviterRole: string
+  inviterRoleSlug: string
+  invitedByUserId: string
   sendWelcomeEmail: boolean
 }): Promise<InviteStaffResult> {
   const email = opts.email.trim().toLowerCase()
-  const firstName = opts.firstName.trim()
-  const lastName = opts.lastName.trim()
+  const firstName = (opts.firstName ?? "").trim() || "Invited"
+  const lastName = (opts.lastName ?? "").trim() || "User"
   if (!isValidEmail(email)) {
     return { ok: false, code: "invalid_role", message: "Invalid email address" }
   }
@@ -56,6 +65,10 @@ export async function inviteStaffMember(opts: {
   const roleDoc = await RoleModel.findOne({ slug: opts.roleSlug }).lean().exec()
   if (!roleDoc || Array.isArray(roleDoc)) {
     return { ok: false, code: "invalid_role", message: "Unknown role" }
+  }
+
+  if (!isRoleAssignableByInviter(opts.inviterRoleSlug, opts.roleSlug)) {
+    return { ok: false, code: "invalid_role", message: "You cannot assign this role" }
   }
 
   const existingMongo = await UserModel.findOne({ email, facilityId: opts.facilityId }).lean().exec()
@@ -118,6 +131,8 @@ export async function inviteStaffMember(opts: {
     mustChangePassword: true,
     deviceType: "personal" as const,
     name: `${firstName} ${lastName}`.trim(),
+    invitedByUserId: opts.invitedByUserId,
+    invitedByName: opts.inviterName,
   }
 
   try {
@@ -130,6 +145,45 @@ export async function inviteStaffMember(opts: {
     }
     console.error("[admin-staff-invite] Mongo user create failed:", mongoErr)
     return { ok: false, code: "clerk_error", message: "Could not save user profile" }
+  }
+
+  const sk = getClerkSecretKey()
+  if (sk) {
+    const org = await OrganizationModel.findOne({ id: opts.organizationId }).lean().exec()
+    const clerkOrgId = org && !Array.isArray(org) ? (org as { clerkOrganizationId?: string }).clerkOrganizationId : undefined
+    if (clerkOrgId) {
+      try {
+        await addClerkOrgMembership(
+          {
+            organizationId: clerkOrgId,
+            userId: clerkUserId,
+            role: clerkOrgRoleForWaikRole(opts.roleSlug),
+          },
+          sk,
+        )
+      } catch (e) {
+        console.error("[admin-staff-invite] Clerk org membership failed:", e)
+        try {
+          await UserModel.deleteOne({ id: userDoc.id }).exec()
+        } catch {
+          /* best effort */
+        }
+        try {
+          await clerk.users.deleteUser(clerkUserId)
+        } catch {
+          /* best effort */
+        }
+        return {
+          ok: false,
+          code: "clerk_error",
+          message: "User was not added to the Clerk organization. Re-run the Clerk org backfill, then try again.",
+        }
+      }
+    } else {
+      console.warn(
+        `[admin-staff-invite] Organization ${opts.organizationId} has no clerkOrganizationId — run scripts/backfill-clerk-orgs.ts for Clerk sync.`,
+      )
+    }
   }
 
   if (opts.sendWelcomeEmail) {
