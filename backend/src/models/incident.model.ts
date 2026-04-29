@@ -261,6 +261,7 @@ export interface IncidentDocument extends Document {
   investigation?: IncidentInvestigationMetadata
   humanReport?: HumanReport
   aiReport?: AIReport
+  embedding?: number[] | null
 }
 
 // --- SCHEMAS ---
@@ -548,6 +549,7 @@ const IncidentSchema = new Schema<IncidentDocument>(
     investigation: { type: InvestigationSchema, default: undefined },
     humanReport: { type: HumanReportSchema, default: undefined },
     aiReport: { type: AIReportSchema, default: undefined },
+    embedding: { type: [Number], default: null, select: false },
   },
   {
     versionKey: false,

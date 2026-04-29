@@ -22,6 +22,7 @@ import {
   generateClinicalRecord,
   type ClinicalRecord,
 } from "@/lib/agents/clinical-record-generator"
+import { generateAndStoreEmbedding } from "@/lib/agents/embedding-service"
 import {
   deleteReportSession,
   getReportSession,
@@ -193,6 +194,21 @@ export async function POST(request: Request) {
     // 5. Phase 2 notifications — best effort, non-fatal
     await fireAdminNotifications(session).catch((err) => {
       console.error("[report/complete] Notification dispatch failed:", err)
+    })
+
+    // 5.5 Generate and store incident embedding — fire-and-forget,
+    // never blocks the user-facing sign-off path.
+    void generateAndStoreEmbedding({
+      incidentId: session.incidentId,
+      facilityId: session.facilityId,
+      clinicalRecord,
+      metadata: {
+        incidentType: session.incidentType,
+        residentName: session.residentName,
+        residentRoom: session.residentRoom,
+        location: session.location,
+        incidentDate: session.startedAt,
+      },
     })
 
     // 6. Delete Redis session
