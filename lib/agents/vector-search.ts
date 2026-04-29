@@ -18,6 +18,8 @@ export interface SearchFilters {
   dateTo?: string // ISO date
   residentId?: string
   phase?: string | string[]
+  /** Restrict results to incidents reported by this staff user (personal scope). */
+  staffId?: string
 }
 
 export interface SearchResult {
@@ -84,6 +86,7 @@ async function atlasVectorSearch(
   const preFilter: Record<string, unknown> = { facilityId }
   if (filters?.incidentType) preFilter.incidentType = filters.incidentType
   if (filters?.residentId) preFilter.residentId = filters.residentId
+  if (filters?.staffId) preFilter.staffId = filters.staffId
   if (filters?.phase) {
     preFilter.phase = Array.isArray(filters.phase)
       ? { $in: filters.phase }
@@ -177,6 +180,7 @@ async function inProcessSearch(
   }
   if (filters?.incidentType) query.incidentType = filters.incidentType
   if (filters?.residentId) query.residentId = filters.residentId
+  if (filters?.staffId) query.staffId = filters.staffId
   if (filters?.dateFrom || filters?.dateTo) {
     const range: Record<string, Date> = {}
     if (filters?.dateFrom) range.$gte = new Date(filters.dateFrom)

@@ -3,6 +3,7 @@ import IncidentModel from "@/backend/src/models/incident.model"
 import { getRedis } from "@/lib/redis"
 import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 import { AI_CONFIG } from "@/lib/openai"
+import { queryFacilityIncidentStats } from "@/lib/agents/vector-search"
 
 /**
  * **Canonical public HTTP paths** (prefer `/api/admin/...` for the web app; `/api/intelligence/...` are thin re-exports).
@@ -138,107 +139,85 @@ ${pack}
 }
 
 /**
- * Four insight cards + 1h Redis cache
+ * IR-2c — Auto-generated insight cards (4 cards, 1h Redis cache).
+ *
+ * Cards are derived from `queryFacilityIncidentStats` over a 7- and
+ * 30-day window:
+ *   - weekly-summary    (this week's total + average completeness)
+ *   - location-hotspot  (top incident location over the past 30 days,
+ *                        included only when a single location has ≥3)
+ *   - repeat-residents  (residents with ≥2 incidents over the past 30 days,
+ *                        included only when at least one such resident exists)
+ *   - completeness-trend (30-day average completeness + avg active minutes)
+ *
+ * `location-hotspot` and `repeat-residents` are conditional, so the
+ * total card count is between 2 and 4 (within the spec's 3–5 range
+ * once at least one optional pattern emerges).
  */
 export async function buildOrGetInsights(facilityId: string): Promise<InsightPayload> {
-  const c = await getCachedInsights(facilityId)
-  if (c?.cards?.length === 4) {
-    return c
+  const cached = await getCachedInsights(facilityId)
+  if (cached?.cards?.length) {
+    return cached
   }
+
   const now = new Date()
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-  const rows = await loadIncidents(facilityId)
-  const w = rows.filter((i) => i.createdAt && new Date(i.createdAt) >= weekAgo)
-  const m = rows.filter((i) => i.createdAt && new Date(i.createdAt) >= monthAgo)
-  const avgComp =
-    m.length > 0
-      ? m.reduce((s, i) => s + (i.completenessScore ?? 0), 0) / m.length
-      : 0
-  const attention = w.filter(
-    (i) => (i.hasInjury && i.priority === "urgent") || (i.completenessScore != null && i.completenessScore < 50),
-  ).length
-  const byReporter = new Map<string, number>()
-  for (const r of w) {
-    const k = (r.staffName ?? "Unknown").trim() || "Unknown"
-    byReporter.set(k, (byReporter.get(k) ?? 0) + 1)
-  }
-  let topReporter = "—"
-  let topN = 0
-  for (const [k, n] of byReporter) {
-    if (n > topN) {
-      topN = n
-      topReporter = k
-    }
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+  const [weekStats, monthStats] = await Promise.all([
+    queryFacilityIncidentStats(facilityId, sevenDaysAgo, now),
+    queryFacilityIncidentStats(facilityId, thirtyDaysAgo, now),
+  ])
+
+  const cards: InsightCard[] = []
+
+  cards.push({
+    id: "weekly-summary",
+    title: "This Week",
+    body: `${weekStats.total} incident${weekStats.total === 1 ? "" : "s"} reported this week. Average completeness: ${weekStats.avgCompleteness}%.`,
+  })
+
+  const topLocationEntry = Object.entries(monthStats.byLocation).sort(
+    ([, a], [, b]) => b - a,
+  )[0]
+  if (topLocationEntry && topLocationEntry[1] >= 3) {
+    const [loc, count] = topLocationEntry
+    cards.push({
+      id: "location-hotspot",
+      title: "Location Pattern",
+      body: `${loc} has had ${count} incidents in the past 30 days — highest in the facility.`,
+    })
   }
 
-  const thisWeek: InsightCard = {
-    id: "this_week",
-    title: "This week at a glance",
-    body: `${w.length} incident report(s) in the last 7 days in this community.`,
+  const repeatResidents = monthStats.byResident.filter((r) => r.count >= 2)
+  if (repeatResidents.length > 0) {
+    cards.push({
+      id: "repeat-residents",
+      title: "Residents with Multiple Incidents",
+      body: `${repeatResidents
+        .map(
+          (r) =>
+            `${r.residentName || "Unknown"}${
+              r.residentRoom ? ` (Room ${r.residentRoom})` : ""
+            }: ${r.count} incidents`,
+        )
+        .join(". ")}. Consider care plan review.`,
+    })
   }
-  const comp: InsightCard = {
-    id: "completeness",
-    title: "Completeness trend",
-    body: m.length
-      ? `Average documentation completeness in the last 30 days: ${Math.round(avgComp)}% (based on ${m.length} report(s)).`
-      : "Not enough incidents in the last 30 days to measure a trend.",
-  }
-  const att: InsightCard = {
-    id: "attention",
-    title: "Attention needed",
+
+  cards.push({
+    id: "completeness-trend",
+    title: "Documentation Quality",
     body:
-      attention > 0
-        ? `Rough signal: ${attention} recent report(s) with injury or low completeness in the 7-day window. Review the Needs Attention dashboard.`
-        : "No high-priority signals in the 7-day sample from the available fields.",
-  }
-  const staff: InsightCard = {
-    id: "staff",
-    title: "Staff performance",
-    body: topN > 0 ? `Most reports filed this week: ${topReporter} (${topN} in the sample).` : "Not enough data to rank reporters this week.",
-  }
-
-  if (isOpenAIConfigured() && rows.length) {
-    try {
-      const pol = await generateChatCompletion(
-        [
-          {
-            role: "system",
-            content:
-              "You polish one sentence each for four care ops insight cards. Output valid JSON: { thisWeek, completeness, attention, staff } string values. Stay conservative; the numbers in the user message are authoritative.",
-          },
-          {
-            role: "user",
-            content: `Draft sentences from these stats only:\nthisWeek: ${w.length} incidents (7d)\ncompleteness: avg ${Math.round(avgComp)}% over ${m.length} incidents (30d)\nattention: ${attention} flagged in sample\nstaff: top ${topReporter} with ${topN} (7d)`,
-          },
-        ],
-        { model: AI_CONFIG.model, maxTokens: 400, response_format: { type: "json_object" } },
-      )
-      const txt = pol.choices[0]?.message?.content
-      if (txt) {
-        const j = JSON.parse(txt) as { thisWeek?: string; completeness?: string; attention?: string; staff?: string }
-        if (j.thisWeek) {
-          thisWeek.body = j.thisWeek
-        }
-        if (j.completeness) {
-          comp.body = j.completeness
-        }
-        if (j.attention) {
-          att.body = j.attention
-        }
-        if (j.staff) {
-          staff.body = j.staff
-        }
-      }
-    } catch {
-      /* keep deterministic bodies */
-    }
-  }
+      monthStats.total > 0
+        ? `Average report completeness: ${monthStats.avgCompleteness}% (30-day, ${monthStats.total} report${monthStats.total === 1 ? "" : "s"}). Average data collection time: ${Math.round(monthStats.avgActiveSeconds / 60)} minutes per report.`
+        : "Not enough incidents in the last 30 days to measure a trend.",
+  })
 
   const out: InsightPayload = {
     facilityId,
     generatedAt: new Date().toISOString(),
-    cards: [thisWeek, comp, att, staff],
+    cards,
   }
   await getRedis().set(insKey(facilityId), JSON.stringify(out), "EX", INSIGHTS_TTL_SEC)
   return out
