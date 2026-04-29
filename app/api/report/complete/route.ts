@@ -23,6 +23,7 @@ import {
   type ClinicalRecord,
 } from "@/lib/agents/clinical-record-generator"
 import { generateAndStoreEmbedding } from "@/lib/agents/embedding-service"
+import { verifyClinicalRecord } from "@/lib/agents/verification-agent"
 import {
   deleteReportSession,
   getReportSession,
@@ -112,6 +113,24 @@ export async function POST(request: Request) {
 
     const enhancedNarrative = buildEnhancedNarrative(clinicalRecord)
 
+    // 2.5 Verify clinical record fidelity against the original narrative.
+    //     Best-effort; verifyClinicalRecord never throws and returns a
+    //     passing result if the LLM is unavailable.
+    const verification = await verifyClinicalRecord({
+      originalNarrative: session.fullNarrative,
+      clinicalRecord,
+    })
+    if (verification.fidelityScore < 80) {
+      console.warn(
+        `[report/complete] Low fidelity score (${verification.fidelityScore}) for incident ${session.incidentId}`,
+        {
+          additions: verification.additions,
+          omissions: verification.omissions,
+        },
+      )
+    }
+    const verifiedAt = new Date()
+
     // 3. Persist final state to MongoDB
     const now = new Date()
     const signedAt = new Date(signature.signedAt)
@@ -172,6 +191,14 @@ export async function POST(request: Request) {
             session.agentState?.sub_type_data ?? null,
           "investigation.score": session.completenessScore,
           "investigation.completenessScore": session.completenessScore,
+          "investigation.verificationResult": {
+            fidelityScore: verification.fidelityScore,
+            overallAssessment: verification.overallAssessment,
+            additions: verification.additions,
+            omissions: verification.omissions,
+            enhancements: verification.enhancements,
+            verifiedAt,
+          },
 
           "phaseTransitionTimestamps.phase1Signed": now,
 

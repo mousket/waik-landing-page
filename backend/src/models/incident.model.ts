@@ -103,6 +103,16 @@ interface IncidentInvestigationMetadata {
     don?: Signature              // Director of Nursing Sign-off
     admin?: Signature            // Administrator Sign-off
   }
+
+  /** IR-2d — clinical record fidelity audit attached at sign-off. */
+  verificationResult?: {
+    fidelityScore: number
+    overallAssessment: "faithful" | "minor_issues" | "significant_issues"
+    additions: string[]
+    omissions: string[]
+    enhancements: string[]
+    verifiedAt: Date
+  }
 }
 
 const PHASE2_SECTION_STATUS = ["not_started", "in_progress", "complete"] as const
@@ -354,6 +364,19 @@ const InvestigationSchema = new Schema<IncidentInvestigationMetadata>(
     signatures: {
       don: { type: SignatureSchema },
       admin: { type: SignatureSchema }
+    },
+
+    // IR-2d — fidelity audit captured at sign-off
+    verificationResult: {
+      fidelityScore: { type: Number },
+      overallAssessment: {
+        type: String,
+        enum: ["faithful", "minor_issues", "significant_issues"],
+      },
+      additions: { type: [String], default: [] },
+      omissions: { type: [String], default: [] },
+      enhancements: { type: [String], default: [] },
+      verifiedAt: { type: Date },
     }
   },
   { _id: false },
