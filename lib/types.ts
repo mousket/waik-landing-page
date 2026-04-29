@@ -241,7 +241,12 @@ export interface Incident {
   activeDataCollectionSeconds?: number
   completenessAtTier1Complete?: number
   completenessAtSignoff?: number
-  dataPointsPerQuestion?: Array<{ questionId: string; dataPointsCovered: number }>
+  dataPointsPerQuestion?: Array<{
+    questionId: string
+    questionText?: string
+    dataPointsCovered: number
+    fieldsCovered?: string[]
+  }>
   phaseTransitionTimestamps?: {
     phase1Started?: string
     tier1Complete?: string

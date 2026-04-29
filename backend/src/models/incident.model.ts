@@ -187,7 +187,12 @@ export interface IncidentDocument extends Document {
   activeDataCollectionSeconds?: number
   completenessAtTier1Complete?: number
   completenessAtSignoff?: number
-  dataPointsPerQuestion?: Array<{ questionId: string; dataPointsCovered: number }>
+  dataPointsPerQuestion?: Array<{
+    questionId: string
+    questionText?: string
+    dataPointsCovered: number
+    fieldsCovered?: string[]
+  }>
   phaseTransitionTimestamps?: {
     phase1Started?: Date
     tier1Complete?: Date
@@ -385,7 +390,9 @@ const InvestigationSchema = new Schema<IncidentInvestigationMetadata>(
 const DataPointRowSchema = new Schema(
   {
     questionId: { type: String, required: true },
+    questionText: { type: String, default: "" },
     dataPointsCovered: { type: Number, default: 0 },
+    fieldsCovered: { type: [String], default: [] },
   },
   { _id: false },
 )

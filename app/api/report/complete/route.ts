@@ -165,7 +165,9 @@ export async function POST(request: Request) {
           ),
           dataPointsPerQuestion: session.dataPointsPerQuestion.map((d) => ({
             questionId: d.questionId,
+            questionText: d.questionText,
             dataPointsCovered: d.dataPointsCovered,
+            fieldsCovered: d.fieldsCovered,
           })),
           summary: clinicalRecord.narrative.slice(0, 500),
           updatedAt: now,
