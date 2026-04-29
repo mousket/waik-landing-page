@@ -12,7 +12,6 @@ import VoiceInputScreen, { type VoiceInputScreenProps } from "@/components/voice
 import { WaikLogo } from "@/components/waik-logo"
 import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { useWaikUser } from "@/hooks/use-waik-user"
-import { postIncidentOrQueue } from "@/lib/offline-queue"
 import { StaffResidentSearch, type StaffResidentSearchOption } from "@/components/staff/resident-search"
 import { cn } from "@/lib/utils"
 
@@ -38,31 +37,45 @@ export type ActiveQuestion = {
   areaHint?: string
   tier: "tier1" | "tier2" | "closing"
   allowDefer: boolean
+  required?: boolean
 }
 
-const TIER1_SAMPLE: ActiveQuestion = {
-  id: "q1",
-  text: "Tell us what happened.",
-  label: "Q1",
-  tier: "tier1",
-  allowDefer: false,
+type ApiQuestion = {
+  id: string
+  text: string
+  label: string
+  areaHint?: string
+  tier: string
+  allowDefer: boolean
+  required?: boolean
 }
 
-const TIER2_SAMPLE: ActiveQuestion = {
-  id: "t2-q1",
-  text: "Describe the lighting conditions.",
-  label: "Tier 2",
-  areaHint: "Environment",
-  tier: "tier2",
-  allowDefer: true,
+type ReportCardData = {
+  completenessScore: number
+  facilityAverage: number
+  personalAverage: number
+  currentStreak: number
+  bestStreak: number
+  coachingTips: string[]
+  totalQuestionsAsked: number
+  totalActiveSeconds: number
+  dataPointsCaptured: number
 }
 
-const CLOSING_SAMPLE: ActiveQuestion = {
-  id: "c1",
-  text: "What immediate interventions did you put in place?",
-  label: "Closing",
-  tier: "closing",
-  allowDefer: false,
+function toActiveQuestion(q: ApiQuestion): ActiveQuestion {
+  const tier: ActiveQuestion["tier"] =
+    q.tier === "tier1" || q.tier === "tier2" || q.tier === "closing"
+      ? q.tier
+      : "tier1"
+  return {
+    id: q.id,
+    text: q.text,
+    label: q.label,
+    areaHint: q.areaHint,
+    tier,
+    allowDefer: q.allowDefer,
+    required: q.required,
+  }
 }
 
 const INCIDENT_TYPE_PRESETS: Array<{
@@ -233,13 +246,20 @@ export default function StaffReportPage() {
   const [selectedResident, setSelectedResident] = useState<StaffResidentSearchOption | null>(null)
   const [activeQuestion, setActiveQuestion] = useState<ActiveQuestion | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set())
+  const [tier1Questions, setTier1Questions] = useState<ActiveQuestion[]>([])
+  const [tier2Questions, setTier2Questions] = useState<ActiveQuestion[]>([])
+  const [closingQuestions, setClosingQuestions] = useState<ActiveQuestion[]>([])
   const [incidentId, setIncidentId] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [completionPercent, setCompletionPercent] = useState(0)
   const [isCreating, setIsCreating] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [currentQuestionStartMs, setCurrentQuestionStartMs] = useState(0)
+  const [reportCardData, setReportCardData] = useState<ReportCardData | null>(null)
 
   useEffect(() => {
-    setCompletionPercent(completionFromAnswers(answers))
+    setCompletionPercent((prev) => (prev > 0 ? prev : completionFromAnswers(answers)))
   }, [answers])
 
   const resetToSplash = useCallback(() => {
@@ -248,13 +268,19 @@ export default function StaffReportPage() {
     setSelectedResident(null)
     setActiveQuestion(null)
     setAnswers({})
+    setAnsweredIds(new Set())
+    setTier1Questions([])
+    setTier2Questions([])
+    setClosingQuestions([])
     setIncidentId(null)
     setSessionId(null)
     setCompletionPercent(0)
+    setReportCardData(null)
   }, [])
 
   const openQuestion = useCallback((q: ActiveQuestion) => {
     setActiveQuestion(q)
+    setCurrentQuestionStartMs(Date.now())
     setPhase("answering")
   }, [])
 
@@ -270,20 +296,183 @@ export default function StaffReportPage() {
   }, [])
 
   const handleAnswer = useCallback(
-    (question: ActiveQuestion, transcript: string) => {
-      setAnswers((prev) => ({ ...prev, [question.id]: transcript.trim() }))
-      returnToBoard(question.tier)
+    async (question: ActiveQuestion, transcript: string) => {
+      const trimmed = transcript.trim()
+      const activeMs = Math.max(0, Date.now() - currentQuestionStartMs)
+
+      // Local optimistic update so the UI reflects the answer immediately.
+      setAnswers((prev) => ({ ...prev, [question.id]: trimmed }))
+      setAnsweredIds((prev) => new Set(prev).add(question.id))
+
+      if (!sessionId) {
+        // No live session (offline draft). Fall back to local-only behaviour.
+        returnToBoard(question.tier)
+        return
+      }
+
+      setIsSubmitting(true)
+      try {
+        const res = await fetch("/api/report/answer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            questionId: question.id,
+            transcript: trimmed,
+            tier: question.tier,
+            activeMs,
+          }),
+        })
+
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(err.error || "Failed to submit answer")
+        }
+
+        const data = (await res.json()) as {
+          status: string
+          completenessScore?: number
+          tier2Questions?: ApiQuestion[]
+          remainingQuestions?: ApiQuestion[]
+          newQuestions?: ApiQuestion[]
+          questionsRemoved?: string[]
+          closingQuestions?: ApiQuestion[]
+          allClosingComplete?: boolean
+        }
+
+        if (typeof data.completenessScore === "number") {
+          setCompletionPercent(data.completenessScore)
+        }
+
+        // Drop questions the server says were implicitly answered.
+        if (data.questionsRemoved && data.questionsRemoved.length > 0) {
+          setAnsweredIds((prev) => {
+            const next = new Set(prev)
+            for (const id of data.questionsRemoved!) next.add(id)
+            return next
+          })
+        }
+
+        switch (data.status) {
+          case "tier1_updated":
+            returnToBoard("tier1")
+            break
+
+          case "gap_analysis_complete": {
+            // Brief loading beat so the nurse sees "Analyzing your report…"
+            setActiveQuestion(null)
+            setPhase("gap_analysis")
+            const next = (data.tier2Questions ?? []).map(toActiveQuestion)
+            setTimeout(() => {
+              setTier2Questions(next)
+              setPhase("tier2_board")
+            }, 1500)
+            break
+          }
+
+          case "tier2_updated": {
+            const remaining = (data.remainingQuestions ?? []).map(toActiveQuestion)
+            setTier2Questions(remaining)
+            returnToBoard("tier2")
+            break
+          }
+
+          case "closing_ready": {
+            const closing = (data.closingQuestions ?? []).map(toActiveQuestion)
+            setClosingQuestions(closing)
+            setActiveQuestion(null)
+            setPhase("closing")
+            break
+          }
+
+          case "closing_updated":
+            setActiveQuestion(null)
+            setPhase(data.allClosingComplete ? "signoff" : "closing")
+            break
+
+          default:
+            returnToBoard(question.tier)
+        }
+      } catch (e) {
+        console.error("[report] submit answer failed:", e)
+        toast.error(e instanceof Error ? e.message : "Could not submit answer.")
+        returnToBoard(question.tier)
+      } finally {
+        setIsSubmitting(false)
+      }
     },
-    [returnToBoard],
+    [currentQuestionStartMs, returnToBoard, sessionId],
   )
 
-  const handleDefer = useCallback(
-    (question: ActiveQuestion) => {
-      setAnswers((prev) => ({ ...prev, [question.id]: "__DEFERRED__" }))
-      setActiveQuestion(null)
-      setPhase("tier2_board")
+  const handleDeferAll = useCallback(async () => {
+    if (!sessionId) {
+      router.push("/staff/dashboard")
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      await fetch("/api/report/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          questionId: "__DEFER_ALL__",
+          transcript: "",
+          tier: "tier2",
+        }),
+      })
+      router.push("/staff/dashboard")
+    } catch (e) {
+      console.error("[report] defer-all failed:", e)
+      toast.error("Could not defer your follow-up questions. Try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [router, sessionId])
+
+  const handleSignOff = useCallback(
+    async (editedSections?: Partial<Record<string, string>>) => {
+      if (!sessionId) {
+        toast.error("No active session to sign off.")
+        return
+      }
+      setIsSubmitting(true)
+      try {
+        const res = await fetch("/api/report/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            editedSections,
+            signature: {
+              declaration:
+                "I confirm this report reflects my observations and actions.",
+              signedAt: new Date().toISOString(),
+            },
+          }),
+        })
+
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(err.error || "Failed to complete report")
+        }
+
+        const data = (await res.json()) as {
+          incidentId?: string
+          reportCard?: ReportCardData
+        }
+
+        if (data.incidentId) setIncidentId(data.incidentId)
+        if (data.reportCard) setReportCardData(data.reportCard)
+        setPhase("reportcard")
+      } catch (e) {
+        console.error("[report] sign-off failed:", e)
+        toast.error(e instanceof Error ? e.message : "Could not complete report.")
+      } finally {
+        setIsSubmitting(false)
+      }
     },
-    [],
+    [sessionId],
   )
 
   const handleTypeSelect = useCallback((typeKey: string) => {
@@ -301,42 +490,52 @@ export default function StaffReportPage() {
       toast.error("Select an incident type and resident.")
       return
     }
-    const preset = INCIDENT_TYPE_PRESETS.find((p) => p.key === selectedTypeKey) ?? INCIDENT_TYPE_PRESETS[0]!
-    const fullName = [selectedResident.firstName, selectedResident.lastName].filter(Boolean).join(" ")
+    const fullName = [selectedResident.firstName, selectedResident.lastName]
+      .filter(Boolean)
+      .join(" ")
+    const room = selectedResident.roomNumber
+    const now = new Date()
+
     setIsCreating(true)
     try {
-      const payload = {
-        title: `${preset.title} — draft`,
-        description: `${preset.description} (draft — details to follow).`,
-        residentId: selectedResident.id,
-        residentName: fullName,
-        residentRoom: selectedResident.roomNumber,
-        staffId: userId,
-        staffName: name ?? "Staff",
-        reportedByRole: role ?? "staff",
-        priority: "medium" as const,
+      const res = await fetch("/api/report/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          incidentType: selectedTypeKey,
+          residentId: selectedResident.id,
+          residentName: fullName,
+          residentRoom: room,
+          location: room ? `Room ${room}` : "Unknown",
+          incidentDate: now.toISOString().split("T")[0],
+          incidentTime: now.toTimeString().slice(0, 5),
+          hasInjury: null,
+          witnessesPresent: null,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(err.error || "Failed to start report")
       }
-      const result = await postIncidentOrQueue(payload)
-      if (result.ok) {
-        const incident = (await result.response.json()) as { id: string }
-        setIncidentId(incident.id)
-        setSessionId(null)
-        setPhase("tier1_board")
-        return
+
+      const data = (await res.json()) as {
+        sessionId: string
+        incidentId: string
+        tier1Questions: ApiQuestion[]
+        completenessScore?: number
       }
-      if ("queued" in result && result.queued) {
-        toast.success("Saved offline. Your report will send when you reconnect.", {
-          duration: 5_000,
-        })
-        setIncidentId(null)
-        setSessionId(null)
-        setPhase("tier1_board")
-        return
-      }
-      toast.error("error" in result ? result.error : "Could not create incident.")
+
+      setSessionId(data.sessionId)
+      setIncidentId(data.incidentId)
+      setTier1Questions(data.tier1Questions.map(toActiveQuestion))
+      setCompletionPercent(data.completenessScore ?? 0)
+      setAnsweredIds(new Set())
+      setAnswers({})
+      setPhase("tier1_board")
     } catch (e) {
-      console.error(e)
-      toast.error("Something went wrong. Try again.")
+      console.error("[report] start failed:", e)
+      toast.error(e instanceof Error ? e.message : "Could not create incident.")
     } finally {
       setIsCreating(false)
     }
@@ -375,31 +574,37 @@ export default function StaffReportPage() {
       }
 
       case "tier1_board": {
+        const next = tier1Questions.find((q) => !answeredIds.has(q.id))
         return (
           <div className="p-4">
             <WaikCard className="mx-auto max-w-lg">
               <WaikCardContent className="text-center">
                 <p className="mb-2 font-semibold text-foreground">Tier 1 Question Board</p>
-                <p className="mb-1 text-sm text-muted-foreground">Question board UI renders here (task-04b)</p>
+                <p className="mb-1 text-sm text-muted-foreground">
+                  {tier1Questions.length === 0
+                    ? "Question board UI renders here (task-IR-1g)"
+                    : `${answeredIds.size}/${tier1Questions.length} answered · ${completionPercent}% complete`}
+                </p>
                 <p className="mb-4 text-xs text-muted-foreground">
                   {incidentId ? `Incident: ${incidentId}` : ""}
-                  {sessionId ? ` · Session: ${sessionId}` : ""}
+                  {sessionId ? ` · Session: ${sessionId.slice(0, 8)}…` : ""}
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
                   <Button
                     type="button"
-                    onClick={() => openQuestion(TIER1_SAMPLE)}
+                    onClick={() => next && openQuestion(next)}
+                    disabled={!next || isSubmitting}
                     className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
                   >
-                    Answer first question
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-12 rounded-xl"
-                    onClick={() => setPhase("gap_analysis")}
-                  >
-                    All Tier 1 answered (next step)
+                    {isSubmitting ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
+                      </span>
+                    ) : next ? (
+                      `Answer: ${next.label}`
+                    ) : (
+                      "All Tier 1 answered"
+                    )}
                   </Button>
                 </div>
               </WaikCardContent>
@@ -420,8 +625,10 @@ export default function StaffReportPage() {
           allowDefer: activeQuestion.allowDefer,
           showEncouragement: activeQuestion.tier === "tier2",
           completionRingPercent: completionPercent,
-          onSubmit: (transcript) => handleAnswer(activeQuestion, transcript),
-          onDefer: activeQuestion.allowDefer ? () => handleDefer(activeQuestion) : undefined,
+          onSubmit: (transcript) => {
+            void handleAnswer(activeQuestion, transcript)
+          },
+          onDefer: activeQuestion.allowDefer ? () => void handleDeferAll() : undefined,
           onBack: () => returnToBoard(activeQuestion.tier),
         }
         return <VoiceInputScreen {...vi} />
@@ -438,63 +645,79 @@ export default function StaffReportPage() {
           </div>
         )
 
-      case "tier2_board":
+      case "tier2_board": {
+        const remaining = tier2Questions.filter((q) => !answeredIds.has(q.id))
+        const next = remaining[0]
         return (
           <div className="p-4">
             <WaikCard className="mx-auto max-w-lg">
               <WaikCardContent className="text-center">
                 <p className="mb-2 font-semibold text-foreground">Tier 2 Question Board</p>
-                <p className="mb-4 text-sm text-muted-foreground">Gap-fill questions — task-04b</p>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  {tier2Questions.length === 0
+                    ? "Gap-fill questions — task-IR-1g"
+                    : `${remaining.length} remaining · ${completionPercent}% complete`}
+                </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
                   <Button
                     type="button"
-                    onClick={() => openQuestion(TIER2_SAMPLE)}
+                    onClick={() => next && openQuestion(next)}
+                    disabled={!next || isSubmitting}
                     className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
                   >
-                    Answer next question
+                    {isSubmitting ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
+                      </span>
+                    ) : next ? (
+                      `Answer: ${next.label}`
+                    ) : (
+                      "Awaiting next gap"
+                    )}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     className="min-h-12 rounded-xl"
-                    onClick={() => setPhase("closing")}
+                    onClick={() => void handleDeferAll()}
+                    disabled={isSubmitting}
                   >
-                    Met threshold (next: closing)
+                    Answer Later
                   </Button>
                 </div>
               </WaikCardContent>
             </WaikCard>
           </div>
         )
+      }
 
-      case "closing":
+      case "closing": {
+        const next = closingQuestions.find((q) => !answeredIds.has(q.id))
         return (
           <div className="p-4">
             <WaikCard className="mx-auto max-w-lg">
               <WaikCardContent className="text-center">
                 <p className="mb-2 font-semibold text-foreground">Closing Questions</p>
-                <p className="mb-4 text-sm text-muted-foreground">Closing question board — task-04b</p>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  {closingQuestions.length === 0
+                    ? "Closing question board — task-IR-1g"
+                    : `${closingQuestions.length - answeredIds.size} of ${closingQuestions.length} remaining`}
+                </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
                   <Button
                     type="button"
-                    onClick={() => openQuestion(CLOSING_SAMPLE)}
+                    onClick={() => next && openQuestion(next)}
+                    disabled={!next || isSubmitting}
                     className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
                   >
-                    Answer closing question
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-12 rounded-xl"
-                    onClick={() => setPhase("signoff")}
-                  >
-                    All 3 closing answered (dev)
+                    {next ? `Answer: ${next.label}` : "All closing answered"}
                   </Button>
                 </div>
               </WaikCardContent>
             </WaikCard>
           </div>
         )
+      }
 
       case "signoff":
         return (
@@ -502,13 +725,22 @@ export default function StaffReportPage() {
             <WaikCard className="mx-auto max-w-lg">
               <WaikCardContent className="text-center">
                 <p className="font-semibold text-foreground">Sign-Off</p>
-                <p className="mt-2 text-sm text-muted-foreground">Implemented in a later task.</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Review and sign off your report. (Editable clinical record UI is a later task.)
+                </p>
                 <Button
                   type="button"
                   className="mt-6 min-h-12 w-full min-w-[12rem] sm:w-auto"
-                  onClick={() => setPhase("reportcard")}
+                  onClick={() => void handleSignOff()}
+                  disabled={isSubmitting}
                 >
-                  Continue to report card
+                  {isSubmitting ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Signing off…
+                    </span>
+                  ) : (
+                    "Sign off and complete"
+                  )}
                 </Button>
               </WaikCardContent>
             </WaikCard>
@@ -521,12 +753,35 @@ export default function StaffReportPage() {
             <WaikCard className="mx-auto max-w-lg">
               <WaikCardContent className="text-center">
                 <p className="font-semibold text-foreground">Report Card</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Score and coaching — to be connected to live data (task-05+).
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {incidentId ? `Incident: ${incidentId}` : ""} · {Object.keys(answers).length} answers in
-                  session
+                {reportCardData ? (
+                  <div className="mt-4 space-y-2 text-sm">
+                    <p className="text-3xl font-bold text-[#0D7377]">
+                      {reportCardData.completenessScore}%
+                    </p>
+                    <p className="text-muted-foreground">
+                      Facility avg: {reportCardData.facilityAverage}% · You:{" "}
+                      {reportCardData.personalAverage}%
+                    </p>
+                    <p className="text-muted-foreground">
+                      Streak: {reportCardData.currentStreak} ·{" "}
+                      {reportCardData.totalQuestionsAsked} questions ·{" "}
+                      {reportCardData.dataPointsCaptured} data points
+                    </p>
+                    {reportCardData.coachingTips.length > 0 && (
+                      <ul className="mt-4 space-y-1 text-left text-xs text-muted-foreground">
+                        {reportCardData.coachingTips.map((tip, i) => (
+                          <li key={i}>• {tip}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Score and coaching — to be connected to live data (task-05+).
+                  </p>
+                )}
+                <p className="mt-4 text-xs text-muted-foreground">
+                  {incidentId ? `Incident: ${incidentId}` : ""}
                 </p>
                 <Button
                   type="button"
@@ -544,15 +799,6 @@ export default function StaffReportPage() {
         return null
     }
   }
-
-  // Simulated gap analysis: auto-advance to Tier 2 board after a short delay
-  useEffect(() => {
-    if (phase !== "gap_analysis") {
-      return
-    }
-    const t = setTimeout(() => setPhase("tier2_board"), 2000)
-    return () => clearTimeout(t)
-  }, [phase])
 
   return (
     <ErrorBoundary onReset={resetToSplash}>
