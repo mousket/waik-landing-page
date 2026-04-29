@@ -13,6 +13,7 @@ import { WaikLogo } from "@/components/waik-logo"
 import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { useWaikUser } from "@/hooks/use-waik-user"
 import { StaffResidentSearch, type StaffResidentSearchOption } from "@/components/staff/resident-search"
+import { QuestionBoard } from "@/components/staff/question-board"
 import { cn } from "@/lib/utils"
 
 const TEAL_HEADER = "w-full bg-[#0A3D40] px-4 py-4 text-white md:mx-auto md:max-w-lg md:rounded-b-2xl"
@@ -574,42 +575,16 @@ export default function StaffReportPage() {
       }
 
       case "tier1_board": {
-        const next = tier1Questions.find((q) => !answeredIds.has(q.id))
         return (
-          <div className="p-4">
-            <WaikCard className="mx-auto max-w-lg">
-              <WaikCardContent className="text-center">
-                <p className="mb-2 font-semibold text-foreground">Tier 1 Question Board</p>
-                <p className="mb-1 text-sm text-muted-foreground">
-                  {tier1Questions.length === 0
-                    ? "Question board UI renders here (task-IR-1g)"
-                    : `${answeredIds.size}/${tier1Questions.length} answered · ${completionPercent}% complete`}
-                </p>
-                <p className="mb-4 text-xs text-muted-foreground">
-                  {incidentId ? `Incident: ${incidentId}` : ""}
-                  {sessionId ? ` · Session: ${sessionId.slice(0, 8)}…` : ""}
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button
-                    type="button"
-                    onClick={() => next && openQuestion(next)}
-                    disabled={!next || isSubmitting}
-                    className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
-                  >
-                    {isSubmitting ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
-                      </span>
-                    ) : next ? (
-                      `Answer: ${next.label}`
-                    ) : (
-                      "All Tier 1 answered"
-                    )}
-                  </Button>
-                </div>
-              </WaikCardContent>
-            </WaikCard>
-          </div>
+          <QuestionBoard
+            title="Initial Questions"
+            questions={tier1Questions}
+            answeredIds={answeredIds}
+            answers={answers}
+            completenessScore={completionPercent}
+            onQuestionTap={openQuestion}
+            isSubmitting={isSubmitting}
+          />
         )
       }
 
@@ -646,76 +621,31 @@ export default function StaffReportPage() {
         )
 
       case "tier2_board": {
-        const remaining = tier2Questions.filter((q) => !answeredIds.has(q.id))
-        const next = remaining[0]
         return (
-          <div className="p-4">
-            <WaikCard className="mx-auto max-w-lg">
-              <WaikCardContent className="text-center">
-                <p className="mb-2 font-semibold text-foreground">Tier 2 Question Board</p>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  {tier2Questions.length === 0
-                    ? "Gap-fill questions — task-IR-1g"
-                    : `${remaining.length} remaining · ${completionPercent}% complete`}
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button
-                    type="button"
-                    onClick={() => next && openQuestion(next)}
-                    disabled={!next || isSubmitting}
-                    className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
-                  >
-                    {isSubmitting ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
-                      </span>
-                    ) : next ? (
-                      `Answer: ${next.label}`
-                    ) : (
-                      "Awaiting next gap"
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-12 rounded-xl"
-                    onClick={() => void handleDeferAll()}
-                    disabled={isSubmitting}
-                  >
-                    Answer Later
-                  </Button>
-                </div>
-              </WaikCardContent>
-            </WaikCard>
-          </div>
+          <QuestionBoard
+            title="Follow-up Questions"
+            questions={tier2Questions}
+            answeredIds={answeredIds}
+            answers={answers}
+            completenessScore={completionPercent}
+            onQuestionTap={openQuestion}
+            onDeferAll={() => void handleDeferAll()}
+            isSubmitting={isSubmitting}
+          />
         )
       }
 
       case "closing": {
-        const next = closingQuestions.find((q) => !answeredIds.has(q.id))
         return (
-          <div className="p-4">
-            <WaikCard className="mx-auto max-w-lg">
-              <WaikCardContent className="text-center">
-                <p className="mb-2 font-semibold text-foreground">Closing Questions</p>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  {closingQuestions.length === 0
-                    ? "Closing question board — task-IR-1g"
-                    : `${closingQuestions.length - answeredIds.size} of ${closingQuestions.length} remaining`}
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button
-                    type="button"
-                    onClick={() => next && openQuestion(next)}
-                    disabled={!next || isSubmitting}
-                    className="min-h-12 rounded-xl px-6 shadow-xl shadow-primary/30"
-                  >
-                    {next ? `Answer: ${next.label}` : "All closing answered"}
-                  </Button>
-                </div>
-              </WaikCardContent>
-            </WaikCard>
-          </div>
+          <QuestionBoard
+            title="Closing Questions"
+            questions={closingQuestions}
+            answeredIds={answeredIds}
+            answers={answers}
+            completenessScore={completionPercent}
+            onQuestionTap={openQuestion}
+            isSubmitting={isSubmitting}
+          />
         )
       }
 
