@@ -1,30 +1,45 @@
 /**
  * POST /api/report/answer — incident reporting answer router.
  *
- * Dispatches by `tier`. This task (IR-1b) implements the **tier1** branch:
- * persist the transcript to the Redis session, grow `fullNarrative`,
- * accumulate `activeDataCollectionMs`, and — when every Tier 1 question is
- * answered — trigger gap analysis through the expert investigator pipeline
- * to produce the Tier 2 question board.
+ * Dispatches by `tier`:
+ *  - **tier1** (IR-1b): persist transcript, grow `fullNarrative`, and on
+ *    the final Tier 1 answer trigger gap analysis to produce the Tier 2
+ *    board.
+ *  - **tier2** (IR-1c): re-analyze the growing narrative with
+ *    `fillGapsWithAnswer`, remove implicitly answered questions,
+ *    optionally generate new gap questions, update completeness, and
+ *    transition to closing once the facility threshold is reached.
+ *  - **closing** (IR-1d): TBD.
  *
- * Tier 2 and closing branches are added by IR-1c and IR-1d. See
- * documentation/pilot_1_plan/incident_report/WAiK_Incident_Reporting_Blueprint.md §2.
+ * See documentation/pilot_1_plan/incident_report/WAiK_Incident_Reporting_Blueprint.md §2 + §3.
  */
 
 import { NextResponse } from "next/server"
 
 import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
-import { analyzeNarrativeAndScore } from "@/lib/agents/expert_investigator/analyze"
+import {
+  analyzeNarrativeAndScore,
+  computeCompleteness,
+} from "@/lib/agents/expert_investigator/analyze"
+import { fillGapsWithAnswer } from "@/lib/agents/expert_investigator/fill_gaps"
 import {
   generateGapQuestions,
   type MissingFieldDescriptor,
 } from "@/lib/agents/expert_investigator/gap_questions"
+import { CLOSING_QUESTIONS } from "@/lib/config/tier1-questions"
 import {
   getReportSession,
   updateReportSession,
+  type DataPointCoverageEntry,
   type ReportBoardQuestion,
   type ReportSession,
 } from "@/lib/config/report-session"
+
+/** Default facility-wide completeness threshold for closing transition (%). */
+const DEFAULT_CLOSING_THRESHOLD = 75
+
+/** Cap on auto-generated tier-2 follow-up questions per round. */
+const MAX_NEW_QUESTIONS_PER_ROUND = 3
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -85,7 +100,16 @@ export async function POST(request: Request) {
     )
   }
 
-  // tier2 / closing wired in IR-1c and IR-1d
+  if (tier === "tier2") {
+    return handleTier2Answer(
+      session,
+      questionId,
+      typeof transcript === "string" ? transcript : "",
+      Number.isFinite(activeMs) ? Number(activeMs) : 0,
+    )
+  }
+
+  // closing wired in IR-1d
   return NextResponse.json(
     { error: `Tier "${tier}" not yet implemented` },
     { status: 400 },
@@ -214,4 +238,175 @@ function stripInternal(q: ReportBoardQuestion) {
     allowDefer: q.allowDefer,
     required: q.required,
   }
+}
+
+// ─── Tier 2 handler (IR-1c) ──────────────────────────────────────────────
+
+async function handleTier2Answer(
+  session: ReportSession,
+  questionId: string,
+  transcript: string,
+  activeMs: number,
+): Promise<Response> {
+  const question = session.tier2Questions.find((q) => q.id === questionId)
+  if (!question) {
+    return NextResponse.json(
+      { error: `Invalid Tier 2 questionId: ${questionId}` },
+      { status: 400 },
+    )
+  }
+
+  if (!session.agentState) {
+    return NextResponse.json(
+      { error: "Session is not ready for Tier 2 answers (missing agentState)" },
+      { status: 409 },
+    )
+  }
+
+  const trimmed = transcript.trim()
+  const grownNarrative = trimmed.length > 0
+    ? (session.fullNarrative ? `${session.fullNarrative}\n\n${trimmed}` : trimmed)
+    : session.fullNarrative
+
+  // ─── Core intelligence: re-analyze narrative against Gold Standards ────
+  let fillResult
+  try {
+    fillResult = await fillGapsWithAnswer({
+      state: session.agentState,
+      answerText: trimmed,
+      questionText: question.text,
+    })
+  } catch (error) {
+    console.error("[report/answer] fillGapsWithAnswer error:", error)
+    return NextResponse.json(
+      { error: "Gap fill failed; please retry" },
+      { status: 502 },
+    )
+  }
+
+  // Recompute completeness from the freshly merged state for an authoritative
+  // score (the LLM tool path doesn't always update state.completenessScore).
+  const { completenessScore: newCompleteness } = computeCompleteness(
+    fillResult.state,
+  )
+
+  const updatedFields = fillResult.updatedFields
+  const remainingMissingKeys = new Set(
+    fillResult.remainingMissing.map((m) => m.key),
+  )
+
+  // Implicit removal: any unanswered Tier 2 question whose targetFields are
+  // all now filled (i.e., none remain in remainingMissingKeys) is dropped.
+  const questionsRemoved: string[] = []
+  for (const q of session.tier2Questions) {
+    if (q.id === questionId) continue
+    if (session.tier2Answers[q.id]) continue
+    if (!q.targetFields || q.targetFields.length === 0) continue
+    const allCovered = q.targetFields.every((f) => !remainingMissingKeys.has(f))
+    if (allCovered) questionsRemoved.push(q.id)
+  }
+
+  // Optionally generate fresh gap questions when only a few fields remain.
+  // Skip generation when the board already has plenty of unanswered items —
+  // we don't want to bloat the UI.
+  let newQuestions: ReportBoardQuestion[] = []
+  const unansweredCount = session.tier2Questions.filter(
+    (q) => !session.tier2Answers[q.id] && !questionsRemoved.includes(q.id),
+  ).length
+
+  if (
+    fillResult.remainingMissing.length > 0 &&
+    unansweredCount <= 2 &&
+    newCompleteness < DEFAULT_CLOSING_THRESHOLD
+  ) {
+    try {
+      const gap = await generateGapQuestions(fillResult.state, {
+        responderName: session.userName || undefined,
+        previousQuestions: session.tier2Questions.map((q) => q.text),
+        lastAnswer: trimmed || undefined,
+        maxQuestions: MAX_NEW_QUESTIONS_PER_ROUND,
+      })
+
+      const existingTexts = new Set(
+        session.tier2Questions.map((q) => q.text.toLowerCase().slice(0, 60)),
+      )
+      const baseIndex = session.tier2Questions.length
+      newQuestions = gap.questions
+        .filter(
+          (text) => !existingTexts.has(text.toLowerCase().slice(0, 60)),
+        )
+        .slice(0, MAX_NEW_QUESTIONS_PER_ROUND)
+        .map((text, i) =>
+          buildTier2Question(text, baseIndex + i, gap.missingFields[i]),
+        )
+    } catch (err) {
+      console.warn("[report/answer] Failed to generate new tier2 questions:", err)
+    }
+  }
+
+  const dpEntry: DataPointCoverageEntry = {
+    questionId,
+    questionText: question.text,
+    dataPointsCovered: updatedFields.length,
+    fieldsCovered: updatedFields,
+  }
+
+  const updated = await updateReportSession(session.sessionId, (s) => {
+    s.tier2Answers[questionId] = trimmed
+    s.fullNarrative = grownNarrative
+    s.agentState = fillResult.state
+    s.completenessScore = newCompleteness
+    s.activeDataCollectionMs += Math.max(0, activeMs)
+    s.dataPointsPerQuestion.push(dpEntry)
+    s.tier2Questions = s.tier2Questions.filter(
+      (q) => !questionsRemoved.includes(q.id),
+    )
+    if (newQuestions.length > 0) {
+      s.tier2Questions.push(...newQuestions)
+    }
+    return s
+  })
+
+  // Threshold check → transition to closing
+  if (newCompleteness >= DEFAULT_CLOSING_THRESHOLD) {
+    await updateReportSession(updated.sessionId, (s) => {
+      s.reportPhase = "closing"
+      return s
+    })
+
+    return NextResponse.json({
+      status: "closing_ready",
+      questionId,
+      updatedFields,
+      questionsRemoved,
+      closingQuestions: CLOSING_QUESTIONS.map((q) => ({
+        id: q.id,
+        text: q.text,
+        label: q.label,
+        areaHint: q.areaHint,
+        tier: q.tier,
+        allowDefer: q.allowDefer,
+        required: q.required,
+      })),
+      completenessScore: newCompleteness,
+      thresholdReached: true,
+      dataPointsCovered: updatedFields.length,
+    })
+  }
+
+  const remainingQuestions = updated.tier2Questions
+    .filter((q) => !updated.tier2Answers[q.id])
+    .map(stripInternal)
+
+  return NextResponse.json({
+    status: "tier2_updated",
+    questionId,
+    updatedFields,
+    questionsRemoved,
+    newQuestions: newQuestions.map(stripInternal),
+    remainingQuestions,
+    completenessScore: newCompleteness,
+    thresholdReached: false,
+    dataPointsCovered: updatedFields.length,
+  })
 }
