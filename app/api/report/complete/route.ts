@@ -24,6 +24,7 @@ import {
 } from "@/lib/agents/clinical-record-generator"
 import { generateAndStoreEmbedding } from "@/lib/agents/embedding-service"
 import { verifyClinicalRecord } from "@/lib/agents/verification-agent"
+import { generateCoachingTips } from "@/lib/agents/coaching-tips-generator"
 import {
   deleteReportSession,
   getReportSession,
@@ -299,6 +300,24 @@ function stripEmptyEdits(
   return out
 }
 
+/**
+ * Returns Gold Standard fields covered by Tier 1 questions (i.e. the
+ * fields the nurse captured in their opening narrative without being
+ * prompted by AI follow-ups). Source: dataPointsPerQuestion entries
+ * whose questionId matches a Tier 1 board question.
+ */
+function extractTier1CapturedFields(session: ReportSession): string[] {
+  const tier1Ids = new Set(session.tier1Questions.map((q) => q.id))
+  const captured = new Set<string>()
+  for (const entry of session.dataPointsPerQuestion) {
+    if (!tier1Ids.has(entry.questionId)) continue
+    for (const f of entry.fieldsCovered ?? []) {
+      if (f && f.trim().length > 0) captured.add(f)
+    }
+  }
+  return [...captured]
+}
+
 async function buildReportCard(
   session: ReportSession,
   dataPointsCaptured: number,
@@ -353,21 +372,17 @@ async function buildReportCard(
     }
   }
 
-  const coachingTips: string[] = []
-  if (session.completenessScore >= STREAK_THRESHOLD) {
-    coachingTips.push(
-      "Excellent report. Your narratives are thorough and clinically complete.",
-    )
-  }
-  if (session.completenessAtTier1 > 40) {
-    coachingTips.push(
-      "Strong opening — your Tier 1 narrative covered many data points before follow-up questions were needed.",
-    )
-  } else {
-    coachingTips.push(
-      "Next time, try to include details about the environment, footwear, and medication changes in your opening narrative — this reduces follow-up questions.",
-    )
-  }
+  const coachingTips = await generateCoachingTips({
+    completenessScore: session.completenessScore,
+    completenessAtTier1: session.completenessAtTier1,
+    missedFields: session.agentState?.missingFields ?? [],
+    capturedInTier1: extractTier1CapturedFields(session),
+    totalQuestionsAsked:
+      session.tier2Questions.length + session.closingQuestions.length,
+    personalAverage,
+    facilityAverage,
+    incidentType: session.incidentType,
+  })
 
   const totalQuestionsAsked =
     session.tier1Questions.length +
