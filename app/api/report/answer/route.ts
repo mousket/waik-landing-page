@@ -9,12 +9,19 @@
  *    `fillGapsWithAnswer`, remove implicitly answered questions,
  *    optionally generate new gap questions, update completeness, and
  *    transition to closing once the facility threshold is reached.
- *  - **closing** (IR-1d): TBD.
+ *  - **closing** (IR-1d): persist closing answers, transition to `signoff`
+ *    when all three are collected.
+ *  - **defer** (IR-1d): sentinel `questionId === "__DEFER_ALL__"` saves
+ *    remaining Tier 2 questions for later and writes a partial state
+ *    snapshot to MongoDB.
  *
  * See documentation/pilot_1_plan/incident_report/WAiK_Incident_Reporting_Blueprint.md §2 + §3.
  */
 
 import { NextResponse } from "next/server"
+
+import connectMongo from "@/backend/src/lib/mongodb"
+import IncidentModel from "@/backend/src/models/incident.model"
 
 import { getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import {
@@ -40,6 +47,9 @@ const DEFAULT_CLOSING_THRESHOLD = 75
 
 /** Cap on auto-generated tier-2 follow-up questions per round. */
 const MAX_NEW_QUESTIONS_PER_ROUND = 3
+
+/** Sentinel questionId for the "Answer Later" deferral flow. */
+const DEFER_ALL_SENTINEL = "__DEFER_ALL__"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -90,6 +100,11 @@ export async function POST(request: Request) {
     )
   }
 
+  // Deferral sentinel — bypass tier dispatch and questionId validation.
+  if (questionId === DEFER_ALL_SENTINEL) {
+    return handleDeferAll(session)
+  }
+
   if (tier === "tier1") {
     return handleTier1Answer(
       session,
@@ -109,7 +124,15 @@ export async function POST(request: Request) {
     )
   }
 
-  // closing wired in IR-1d
+  if (tier === "closing") {
+    return handleClosingAnswer(
+      session,
+      questionId,
+      typeof transcript === "string" ? transcript : "",
+      Number.isFinite(activeMs) ? Number(activeMs) : 0,
+    )
+  }
+
   return NextResponse.json(
     { error: `Tier "${tier}" not yet implemented` },
     { status: 400 },
@@ -408,5 +431,99 @@ async function handleTier2Answer(
     completenessScore: newCompleteness,
     thresholdReached: false,
     dataPointsCovered: updatedFields.length,
+  })
+}
+
+// ─── Closing handler (IR-1d) ─────────────────────────────────────────────
+
+async function handleClosingAnswer(
+  session: ReportSession,
+  questionId: string,
+  transcript: string,
+  activeMs: number,
+): Promise<Response> {
+  const exists = session.closingQuestions.some((q) => q.id === questionId)
+  if (!exists) {
+    return NextResponse.json(
+      { error: `Invalid closing questionId: ${questionId}` },
+      { status: 400 },
+    )
+  }
+
+  const trimmed = transcript.trim()
+
+  let updated = await updateReportSession(session.sessionId, (s) => {
+    s.closingAnswers[questionId] = trimmed
+    if (trimmed.length > 0) {
+      s.fullNarrative = s.fullNarrative
+        ? `${s.fullNarrative}\n\n${trimmed}`
+        : trimmed
+    }
+    s.activeDataCollectionMs += Math.max(0, activeMs)
+    return s
+  })
+
+  const allIds = updated.closingQuestions.map((q) => q.id)
+  const answeredIds = allIds.filter(
+    (id) => (updated.closingAnswers[id] ?? "").trim().length > 0,
+  )
+  const remaining = allIds.filter((id) => !answeredIds.includes(id))
+  const allClosingComplete = remaining.length === 0
+
+  if (allClosingComplete) {
+    updated = await updateReportSession(updated.sessionId, (s) => {
+      s.reportPhase = "signoff"
+      return s
+    })
+  }
+
+  return NextResponse.json({
+    status: "closing_updated",
+    questionId,
+    answered: answeredIds,
+    remaining,
+    allClosingComplete,
+  })
+}
+
+// ─── Deferral handler (IR-1d) ────────────────────────────────────────────
+
+async function handleDeferAll(session: ReportSession): Promise<Response> {
+  const unansweredIds = session.tier2Questions
+    .map((q) => q.id)
+    .filter((id) => !(session.tier2Answers[id]?.trim().length))
+
+  const updated = await updateReportSession(session.sessionId, (s) => {
+    const next = new Set([...s.tier2DeferredIds, ...unansweredIds])
+    s.tier2DeferredIds = Array.from(next)
+    return s
+  })
+
+  // Best-effort partial snapshot to MongoDB. Redis remains the source of
+  // truth during the live session, so a Mongo failure is non-fatal.
+  try {
+    await connectMongo()
+    await IncidentModel.updateOne(
+      { id: session.incidentId, facilityId: session.facilityId },
+      {
+        $set: {
+          completenessScore: updated.completenessScore,
+          questionsDeferred: updated.tier2DeferredIds.length,
+          questionsAnswered: Object.keys(updated.tier2Answers).filter(
+            (id) => (updated.tier2Answers[id] ?? "").trim().length > 0,
+          ).length,
+          updatedAt: new Date(),
+        },
+      },
+    )
+  } catch (err) {
+    console.error("[report/answer] Failed to save deferred state to Mongo:", err)
+  }
+
+  return NextResponse.json({
+    status: "deferred",
+    deferredQuestionIds: updated.tier2DeferredIds,
+    completenessScore: updated.completenessScore,
+    message: "Your progress has been saved. We will remind you in 2 hours.",
   })
 }
