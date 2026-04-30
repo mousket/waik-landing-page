@@ -47,8 +47,37 @@ export const FALL_TIER1_QUESTIONS: Tier1Question[] = [
   },
   {
     id: "t1-q5",
-    text: "Why do you think the incident occurred, and how could it have been prevented?",
+    text:
+      "What footwear was the resident wearing at the time of the fall — for example slippers, socks, shoes, non-slip footwear, or barefoot?",
     label: "Q5",
+    areaHint: "Footwear",
+    tier: "tier1",
+    allowDefer: false,
+    required: true,
+  },
+  {
+    id: "t1-q6",
+    text:
+      "Did the resident report any dizziness, weakness, pain, or other symptoms before the fall — or indicate they felt fine beforehand?",
+    label: "Q6",
+    areaHint: "Pre-fall symptoms",
+    tier: "tier1",
+    allowDefer: false,
+    required: true,
+  },
+  {
+    id: "t1-q7",
+    text: "Was the call light within reach from where the resident was before they moved or attempted to stand?",
+    label: "Q7",
+    areaHint: "Call light",
+    tier: "tier1",
+    allowDefer: false,
+    required: true,
+  },
+  {
+    id: "t1-q8",
+    text: "Why do you think the incident occurred, and how could it have been prevented?",
+    label: "Q8",
     areaHint: "Root Cause",
     tier: "tier1",
     allowDefer: false,

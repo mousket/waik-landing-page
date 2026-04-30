@@ -49,7 +49,7 @@ export function QuestionBoard({
 
   return (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", className)}>
-      <div className="px-3 pt-3 sm:px-4 sm:pt-4 md:mx-auto md:max-w-lg md:w-full">
+      <div className="px-3 pt-3 sm:px-4 sm:pt-4 md:mx-auto md:w-full md:max-w-4xl lg:max-w-5xl">
         <ReportStepHeader
           eyebrow="Voice reporting"
           title={title}
@@ -58,8 +58,8 @@ export function QuestionBoard({
         />
       </div>
 
-      <div className="mx-auto min-h-0 w-full max-w-lg flex-1 overflow-y-auto px-3 py-3 pb-32 sm:px-4 sm:py-4 sm:pb-36">
-        <div className="flex flex-col gap-2 sm:gap-2.5">
+      <div className="mx-auto min-h-0 w-full max-w-lg flex-1 overflow-y-auto px-3 py-3 pb-32 sm:px-4 sm:py-4 sm:pb-36 md:max-w-4xl md:pb-28 lg:max-w-5xl">
+        <div className="grid grid-cols-1 gap-2 sm:gap-2.5 md:grid-cols-2 md:gap-3">
           {questions.map((q) => {
             const isAnswered = answeredIds.has(q.id)
             const isRemoved = removed.has(q.id)
@@ -74,7 +74,7 @@ export function QuestionBoard({
                 onClick={() => !isSubmitting && !isRemoved && onQuestionTap(q)}
                 disabled={isSubmitting || isRemoved}
                 className={cn(
-                  "flex min-h-[3.75rem] w-full items-start gap-2.5 rounded-xl border border-primary/10 bg-gradient-to-br from-primary/[0.03] via-background to-accent/[0.02] p-3.5 text-left shadow-sm transition-all duration-300 sm:min-h-16 sm:gap-3 sm:p-4",
+                  "flex h-full min-h-[3.75rem] w-full items-start gap-2.5 rounded-xl border border-primary/10 bg-gradient-to-br from-primary/[0.03] via-background to-accent/[0.02] p-3.5 text-left shadow-sm transition-all duration-300 sm:min-h-16 sm:gap-3 sm:p-4 md:min-h-[4.5rem]",
                   "touch-manipulation",
                   isRemoved && "pointer-events-none scale-95 opacity-0",
                   isNew && "animate-in fade-in slide-in-from-bottom-2 duration-300",
@@ -121,7 +121,7 @@ export function QuestionBoard({
       </div>
 
       {onDeferAll ? (
-        <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-border/60 bg-background/90 px-3 py-2.5 backdrop-blur-md supports-[backdrop-filter]:bg-background/75 dark:bg-card/90 md:mx-auto md:max-w-lg md:rounded-t-xl md:border-x md:border-t">
+        <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-border/60 bg-background/90 px-3 py-2.5 backdrop-blur-md supports-[backdrop-filter]:bg-background/75 dark:bg-card/90 md:mx-auto md:max-w-4xl md:rounded-t-xl md:border-x md:border-t lg:max-w-5xl">
           <button
             type="button"
             onClick={onDeferAll}

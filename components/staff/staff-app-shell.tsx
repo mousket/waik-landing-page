@@ -115,7 +115,7 @@ export function StaffAppShell({
         </header>
 
         <div
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain pt-14 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6 md:pt-16"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain pt-14 pb-[calc(6.25rem+env(safe-area-inset-bottom,0px))] md:pb-6 md:pt-16"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           {children}

@@ -4,7 +4,14 @@ import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import OrganizationModel from "@/backend/src/models/organization.model"
 import UserModel from "@/backend/src/models/user.model"
-import { addClerkOrgMembership, getClerkSecretKey } from "@/lib/clerk-organization"
+import {
+  addClerkOrgMembership,
+  ensureClerkOrganizationForWaikOrg,
+  getClerkErrorDetails,
+  getClerkErrorStatus,
+  getClerkSecretKey,
+  isClerkNotFoundError,
+} from "@/lib/clerk-organization"
 import { sendWelcomeEmail } from "@/lib/send-welcome-email"
 import { requireWaikSuperAdmin } from "@/lib/waik-admin-api"
 import { generateTempPassword, generateUserId } from "@/lib/waik-admin-utils"
@@ -131,21 +138,47 @@ export async function POST(
         sk2,
       )
     } catch (e) {
-      console.error("[waik-admin] Clerk org membership failed:", e)
-      try {
-        await UserModel.deleteOne({ id: userDoc.id })
-      } catch {
-        /* best effort */
+      let err: unknown = e
+      console.error("[waik-admin] Clerk org membership failed details:", {
+        status: getClerkErrorStatus(err),
+        errors: getClerkErrorDetails(err),
+      })
+      if (isClerkNotFoundError(err) || getClerkErrorStatus(err) === 403) {
+        try {
+          const ensured = await ensureClerkOrganizationForWaikOrg({
+            waikOrgId: orgId,
+            name: org.name,
+            secretKey: sk2,
+            createdByClerkUserId: org.createdBySuperId,
+          })
+          await OrganizationModel.updateOne({ id: orgId }, { $set: { clerkOrganizationId: ensured.id } }).exec()
+          await addClerkOrgMembership({ organizationId: ensured.id, userId: clerkUserId, role: "org:admin" }, sk2)
+          err = null
+        } catch (repairErr) {
+          console.error("[waik-admin] Clerk org repair failed:", repairErr)
+          err = repairErr
+        }
       }
-      try {
-        await clerk.users.deleteUser(clerkUserId)
-      } catch {
-        /* best effort */
+      if (err) {
+        console.error("[waik-admin] Clerk org membership failed:", err)
+        try {
+          await UserModel.deleteOne({ id: userDoc.id })
+        } catch {
+          /* best effort */
+        }
+        try {
+          await clerk.users.deleteUser(clerkUserId)
+        } catch {
+          /* best effort */
+        }
+        return NextResponse.json(
+          {
+            error:
+              "User was not added to the Clerk organization. The organization may need to be re-synced with Clerk and then retried.",
+          },
+          { status: 502 },
+        )
       }
-      return NextResponse.json(
-        { error: "User was not added to the Clerk organization. Run the Clerk backfill, then try again." },
-        { status: 502 },
-      )
     }
   } else if (!coid) {
     console.warn(

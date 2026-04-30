@@ -27,11 +27,13 @@ import {
   goldFieldDisplayKeys,
   supplementTier2Questions,
 } from "@/lib/report/tier2-board"
+import { normalizeExtractionFromNarrative } from "@/lib/agents/expert_investigator/extraction-normalizer"
 import {
   buildTier1Narrative,
   tier1AnsweredIds,
   tier1ProgressScore,
 } from "@/lib/report/tier1-narrative"
+import { tier1PromptTextsForGapAnalysis } from "@/lib/report/tier1-gap-prompts"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -179,6 +181,8 @@ async function handleTier1Answer(
         const gapResult = await generateGapQuestions(analysisResult.state, {
           maxQuestions: 15,
           responderName: updatedSession.userName || undefined,
+          previousQuestions: tier1PromptTextsForGapAnalysis(updatedSession),
+          subtypeLabel: formatSubtypeLabel(analysisResult.state.sub_type),
         })
         return { analysisResult, gapResult }
       })(),
@@ -381,6 +385,9 @@ async function handleTier2Answer(
       staff_narrative: newFullNarrative,
     },
   }
+
+  // Conservative deterministic normalization before generating the next gap-driven board.
+  mergedState = normalizeExtractionFromNarrative(newFullNarrative, mergedState)
   const tracked = computeCompleteness(mergedState)
   mergedState = {
     ...mergedState,
@@ -394,8 +401,9 @@ async function handleTier2Answer(
     .filter((q) => q.id !== questionId && session.tier2Answers[q.id]?.trim())
     .map((q) => q.text)
 
+  const tier1Texts = tier1PromptTextsForGapAnalysis(session)
   const gapNext = await generateGapQuestions(mergedState, {
-    previousQuestions: [...priorAskedQuestionTexts, question.text],
+    previousQuestions: [...tier1Texts, ...priorAskedQuestionTexts, question.text],
     lastAnswer: transcript.trim(),
     maxQuestions: 12,
     responderName: session.userName || undefined,

@@ -19,12 +19,10 @@ export function useAdminUrlSearchParams(): URLSearchParams {
   const fromNext = useSearchParams()
   const pathname = usePathname()
   const fromNextStr = fromNext.toString()
-  const [bar, setBar] = useState(() => {
-    if (typeof window === "undefined" || !window.location.pathname.startsWith("/admin")) {
-      return ""
-    }
-    return window.location.search.slice(1)
-  })
+  // Important: do NOT read `window.location.search` during initial render.
+  // This hook runs in a Client Component that still SSRs, and reading the address bar
+  // here will cause server HTML to disagree with the first client render (hydration mismatch).
+  const [bar, setBar] = useState("")
   useLayoutEffect(() => {
     if (typeof window === "undefined" || !pathname.startsWith("/admin")) {
       setBar("")

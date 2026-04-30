@@ -8,8 +8,17 @@ import { REPORT_SESSION_PREFIX, REPORT_SESSION_TTL_SEC } from "@/lib/config/repo
 
 describe("task IR-1a tier 1 config", () => {
   it("exports five fall Tier 1 questions with fixed ids", () => {
-    expect(FALL_TIER1_QUESTIONS).toHaveLength(5)
-    expect(FALL_TIER1_QUESTIONS.map((q) => q.id)).toEqual(["t1-q1", "t1-q2", "t1-q3", "t1-q4", "t1-q5"])
+    expect(FALL_TIER1_QUESTIONS).toHaveLength(8)
+    expect(FALL_TIER1_QUESTIONS.map((q) => q.id)).toEqual([
+      "t1-q1",
+      "t1-q2",
+      "t1-q3",
+      "t1-q4",
+      "t1-q5",
+      "t1-q6",
+      "t1-q7",
+      "t1-q8",
+    ])
     for (const q of FALL_TIER1_QUESTIONS) {
       expect(q.tier).toBe("tier1")
       expect(q.allowDefer).toBe(false)

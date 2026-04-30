@@ -42,12 +42,40 @@ const BACK_CONFIRM =
   "Leave without saving? Your answer will be lost."
 const CLEAR_CONFIRM = "Clear your answer and start over?"
 
-function buildSpeechText(event: { results: ArrayLike<SpeechRecognitionResult> }): string {
+/**
+ * WebKit / iOS often emits **cumulative** phrases per result index (each slot repeats
+ * and extends the previous). Concatenating every `results[i]` duplicates text. We keep
+ * one string per finalized index and merge by preferring extensions.
+ */
+function mergeCumulativeFinalChunks(chunks: string[]): string {
   let out = ""
-  for (let i = 0; i < event.results.length; i++) {
-    out += (event.results[i] as SpeechRecognitionResult)[0]!.transcript
+  for (const raw of chunks) {
+    const piece = raw
+    const c = piece.trimStart()
+    if (!c) continue
+    const o = out.trimEnd()
+    if (!o) {
+      out = piece
+      continue
+    }
+    const oTrim = o.trim()
+    if (c.startsWith(oTrim) || c.toLowerCase().startsWith(oTrim.toLowerCase())) {
+      out = piece
+      continue
+    }
+    const joiner = o.endsWith(" ") || piece.startsWith(" ") ? "" : " "
+    out = o + joiner + piece
   }
   return out
+}
+
+function joinTranscriptSegments(base: string, addition: string): string {
+  const a = base.trimEnd()
+  const b = addition.trim()
+  if (!b) return a
+  if (!a) return b
+  const joiner = a.endsWith(" ") || b.startsWith(" ") ? "" : " "
+  return (a + joiner + b).trim()
 }
 
 const PRIMARY_CTA =
@@ -77,6 +105,8 @@ export function VoiceInputScreen({
   const [appendBuffer, setAppendBuffer] = useState("")
 
   const preVoiceTranscriptRef = useRef(initialTranscript)
+  /** Final transcripts keyed by `results` index — avoids iOS/WebKit cumulative duplication. */
+  const finalTranscriptByIndexRef = useRef<Record<number, string>>({})
   const recognitionRef = useRef<SpeechRecognitionType | null>(null)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   const consecutiveNoSpeechRef = useRef(0)
@@ -88,9 +118,15 @@ export function VoiceInputScreen({
   const isPausedRef = useRef(false)
   const onVisibilityResumeRef = useRef<() => void>(() => {})
   const appendInputId = React.useId()
+  /** Latest transcript for recognition.onend restarts (iOS re-starts sessions without a React render). */
+  const transcriptSnapshotRef = useRef(transcript)
 
   isRecordingRef.current = isRecording
   isPausedRef.current = isPaused
+
+  useEffect(() => {
+    transcriptSnapshotRef.current = transcript
+  }, [transcript])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -143,6 +179,7 @@ export function VoiceInputScreen({
       return
     }
     preVoiceTranscriptRef.current = transcript.trimEnd()
+    finalTranscriptByIndexRef.current = {}
     setShowTextFallbackPrompt(false)
     setIsPaused(false)
     isPausedRef.current = false
@@ -163,15 +200,37 @@ export function VoiceInputScreen({
     recognition.interimResults = true
     recognition.lang = "en-US"
 
-    recognition.onresult = (event: { results: ArrayLike<SpeechRecognitionResult> }) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       consecutiveNoSpeechRef.current = 0
-      const t = buildSpeechText(event)
-      if (!t.trim()) {
-        return
+      const results = event.results
+
+      let interim = ""
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i]
+        if (!r.isFinal) {
+          interim += r[0]?.transcript ?? ""
+        }
       }
-      const pre = preVoiceTranscriptRef.current
-      const next = (pre + (pre && t ? (pre.endsWith(" ") || t.startsWith(" ") ? "" : " ") : "") + t).trim()
-      setTranscript(next)
+
+      for (let i = event.resultIndex; i < results.length; i++) {
+        const r = results[i]
+        if (r.isFinal) {
+          const text = r[0]?.transcript ?? ""
+          if (text) {
+            finalTranscriptByIndexRef.current[i] = text
+          }
+        }
+      }
+
+      const indices = Object.keys(finalTranscriptByIndexRef.current)
+        .map(Number)
+        .sort((x, y) => x - y)
+      const chunks = indices.map((k) => finalTranscriptByIndexRef.current[k]).filter(Boolean)
+      const mergedFinals = mergeCumulativeFinalChunks(chunks)
+      const spoken = joinTranscriptSegments(mergedFinals, interim)
+
+      if (!spoken.trim()) return
+      setTranscript(joinTranscriptSegments(preVoiceTranscriptRef.current, spoken))
     }
 
     recognition.onerror = (event: { error: string }) => {
@@ -186,6 +245,8 @@ export function VoiceInputScreen({
 
     recognition.onend = () => {
       if (isRecordingRef.current && !isPausedRef.current && recognitionRef.current) {
+        preVoiceTranscriptRef.current = transcriptSnapshotRef.current.trimEnd()
+        finalTranscriptByIndexRef.current = {}
         try {
           recognition.start()
         } catch {
@@ -230,6 +291,7 @@ export function VoiceInputScreen({
     }
     if (isPaused) {
       preVoiceTranscriptRef.current = transcript.trimEnd()
+      finalTranscriptByIndexRef.current = {}
       setIsPaused(false)
       isPausedRef.current = false
       try {
@@ -268,6 +330,7 @@ export function VoiceInputScreen({
     }
     setTranscript("")
     preVoiceTranscriptRef.current = ""
+    finalTranscriptByIndexRef.current = {}
     consecutiveNoSpeechRef.current = 0
   }
 
@@ -343,8 +406,8 @@ export function VoiceInputScreen({
   }, [transcript, isRecording, isPaused])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mx-auto flex w-full max-w-[min(26rem,calc(100vw-1.5rem))] flex-1 flex-col min-h-0 px-2 pb-2.5 pt-1 sm:max-w-[min(28rem,calc(100vw-1.75rem))] sm:px-2.5 sm:pb-3 sm:pt-1.5">
+    <div className="flex min-h-0 flex-1 flex-col pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:pb-0">
+      <div className="mx-auto flex w-full max-w-[min(26rem,calc(100vw-1.5rem))] flex-1 flex-col min-h-0 px-2 pb-3 pt-1 sm:max-w-[min(28rem,calc(100vw-1.75rem))] sm:px-2.5 sm:pb-3 sm:pt-1.5">
         <div
           className={cn(
             "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#0D7377]/25 bg-background shadow-2xl shadow-[#0A3D40]/20 duration-300 dark:border-[#0D7377]/35 dark:shadow-black/35",
@@ -382,7 +445,7 @@ export function VoiceInputScreen({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
               <div
                 className={cn(
-                  "space-y-3 px-3 pb-3 pt-3 sm:space-y-3.5 sm:px-4 sm:pb-4 sm:pt-4",
+                  "space-y-3 px-3 pb-28 pt-3 sm:space-y-3.5 sm:px-4 sm:pb-4 sm:pt-4 md:pb-4",
                   "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-safe:fill-mode-both motion-safe:[animation-delay:80ms] motion-reduce:animate-none",
                 )}
               >
@@ -437,7 +500,7 @@ export function VoiceInputScreen({
                 ) : null}
 
                 {!voiceUnavailable ? (
-                  <div className="rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.05] via-background to-accent/[0.03] px-2 py-1.5 shadow-sm sm:px-2.5 sm:py-2">
+                  <div className="space-y-2 rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.05] via-background to-accent/[0.03] px-2 py-2 shadow-sm sm:px-2.5 sm:py-2 md:py-2">
                     <div className="flex min-h-[3rem] flex-nowrap items-center justify-between gap-2 sm:min-h-[3.25rem]">
                       <span className="w-12 shrink-0 text-[0.55rem] font-bold uppercase leading-tight tracking-wide text-primary/75 sm:w-14 sm:text-[0.6rem]">
                         Record
@@ -542,12 +605,46 @@ export function VoiceInputScreen({
                     </div>
                   ) : null}
                 </div>
+
+                {!voiceUnavailable ? (
+                  <div
+                    className={cn(
+                      "sticky bottom-0 z-[5] -mx-3 mt-2 border-t border-border/45 bg-gradient-to-t from-muted/25 to-background px-3 pt-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/92 md:hidden",
+                      "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
+                    )}
+                  >
+                    <Button
+                      type="button"
+                      disabled={!isDoneActive}
+                      aria-label="Save answer"
+                      className={cn(
+                        "h-12 w-full shrink-0 rounded-xl text-base font-semibold shadow-md",
+                        !isDoneActive && "cursor-not-allowed bg-muted text-muted-foreground shadow-none ring-0 hover:scale-100",
+                        isDoneActive && PRIMARY_CTA,
+                      )}
+                      onClick={handleDone}
+                    >
+                      {isDoneActive ? (
+                        <span className="relative inline-flex w-full items-center justify-center gap-2">
+                          Save answer
+                          <ArrowRight className="h-4 w-4" aria-hidden />
+                        </span>
+                      ) : (
+                        <span className="inline-flex w-full items-center justify-center gap-2 text-muted-foreground">
+                          Save answer (10+ characters)
+                          <ArrowRight className="h-4 w-4 opacity-50" aria-hidden />
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </div>
 
             <div
               className={cn(
-                "shrink-0 space-y-2 border-t border-border/50 bg-background/95 px-3 pb-3 pt-2.5 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 sm:px-4 sm:pb-3.5 sm:pt-3",
+                "shrink-0 space-y-2 border-t border-border/50 bg-background/95 px-3 pt-2.5 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 sm:px-4 sm:pb-3.5 sm:pt-3",
+                "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]",
                 "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 motion-safe:fill-mode-both motion-safe:[animation-delay:140ms] motion-reduce:animate-none",
               )}
             >
@@ -555,6 +652,9 @@ export function VoiceInputScreen({
                 type="button"
                 disabled={!isDoneActive}
                 className={cn(
+                  "w-full",
+                  !voiceUnavailable && "hidden md:inline-flex",
+                  voiceUnavailable && "inline-flex",
                   !isDoneActive && "cursor-not-allowed bg-muted text-muted-foreground shadow-none ring-0 hover:scale-100",
                   isDoneActive && PRIMARY_CTA,
                 )}

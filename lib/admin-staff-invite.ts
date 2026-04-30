@@ -6,7 +6,11 @@ import UserModel from "@/backend/src/models/user.model"
 import {
   addClerkOrgMembership,
   clerkOrgRoleForWaikRole,
+  ensureClerkOrganizationForWaikOrg,
+  getClerkErrorDetails,
+  getClerkErrorStatus,
   getClerkSecretKey,
+  isClerkNotFoundError,
 } from "@/lib/clerk-organization"
 import { sendStaffWelcomeEmail } from "@/lib/send-welcome-email"
 import { isRoleAssignableByInviter } from "@/lib/role-assignment-permissions"
@@ -150,39 +154,87 @@ export async function inviteStaffMember(opts: {
   const sk = getClerkSecretKey()
   if (sk) {
     const org = await OrganizationModel.findOne({ id: opts.organizationId }).lean().exec()
-    const clerkOrgId = org && !Array.isArray(org) ? (org as { clerkOrganizationId?: string }).clerkOrganizationId : undefined
+    const orgName =
+      org && !Array.isArray(org) ? String((org as { name?: string }).name ?? opts.facilityName ?? "WAiK") : "WAiK"
+    const clerkOrgId =
+      org && !Array.isArray(org) ? (org as { clerkOrganizationId?: string }).clerkOrganizationId : undefined
+    const createdByClerkUserId =
+      org && !Array.isArray(org) ? String((org as { createdBySuperId?: string }).createdBySuperId ?? "") : ""
+
+    const desiredRole = clerkOrgRoleForWaikRole(opts.roleSlug)
+    const tryAdd = async (organizationId: string) =>
+      await addClerkOrgMembership({ organizationId, userId: clerkUserId, role: desiredRole }, sk)
+
     if (clerkOrgId) {
       try {
-        await addClerkOrgMembership(
-          {
-            organizationId: clerkOrgId,
-            userId: clerkUserId,
-            role: clerkOrgRoleForWaikRole(opts.roleSlug),
-          },
-          sk,
-        )
+        await tryAdd(clerkOrgId)
       } catch (e) {
-        console.error("[admin-staff-invite] Clerk org membership failed:", e)
-        try {
-          await UserModel.deleteOne({ id: userDoc.id }).exec()
-        } catch {
-          /* best effort */
+        let err: unknown = e
+        console.error("[admin-staff-invite] Clerk org membership failed details:", {
+          status: getClerkErrorStatus(err),
+          errors: getClerkErrorDetails(err),
+        })
+        // If the org id is stale (wrong Clerk instance / deleted org), self-heal by re-syncing org mapping.
+        const status = getClerkErrorStatus(err)
+        if (isClerkNotFoundError(err) || status === 403) {
+          try {
+            const ensured = await ensureClerkOrganizationForWaikOrg({
+              waikOrgId: opts.organizationId,
+              name: orgName,
+              secretKey: sk,
+              createdByClerkUserId,
+            })
+            await OrganizationModel.updateOne(
+              { id: opts.organizationId },
+              { $set: { clerkOrganizationId: ensured.id } },
+            ).exec()
+            await tryAdd(ensured.id)
+            err = null
+          } catch (repairErr) {
+            console.error("[admin-staff-invite] Clerk org repair failed:", repairErr)
+            err = repairErr
+          }
         }
-        try {
-          await clerk.users.deleteUser(clerkUserId)
-        } catch {
-          /* best effort */
-        }
-        return {
-          ok: false,
-          code: "clerk_error",
-          message: "User was not added to the Clerk organization. Re-run the Clerk org backfill, then try again.",
+        if (err) {
+          console.error("[admin-staff-invite] Clerk org membership failed:", err)
+          try {
+            await UserModel.deleteOne({ id: userDoc.id }).exec()
+          } catch {
+            /* best effort */
+          }
+          try {
+            await clerk.users.deleteUser(clerkUserId)
+          } catch {
+            /* best effort */
+          }
+          return {
+            ok: false,
+            code: "clerk_error",
+            message:
+              "User was not added to the Clerk organization. The organization may need to be re-synced with Clerk (run backfill-clerk-orgs) and then retry.",
+          }
         }
       }
     } else {
-      console.warn(
-        `[admin-staff-invite] Organization ${opts.organizationId} has no clerkOrganizationId — run scripts/backfill-clerk-orgs.ts for Clerk sync.`,
-      )
+      // If we’re missing a mapping, best-effort create/link the org now (avoids requiring manual backfill).
+      try {
+        const ensured = await ensureClerkOrganizationForWaikOrg({
+          waikOrgId: opts.organizationId,
+          name: orgName,
+          secretKey: sk,
+          createdByClerkUserId,
+        })
+        await OrganizationModel.updateOne(
+          { id: opts.organizationId },
+          { $set: { clerkOrganizationId: ensured.id } },
+        ).exec()
+        await tryAdd(ensured.id)
+      } catch (e) {
+        console.warn(
+          `[admin-staff-invite] Organization ${opts.organizationId} has no clerkOrganizationId and auto-sync failed — run scripts/backfill-clerk-orgs.ts`,
+          e,
+        )
+      }
     }
   }
 

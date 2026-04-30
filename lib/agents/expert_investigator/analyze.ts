@@ -8,6 +8,7 @@ import {
   FallSlipStandards,
   FallLiftStandards,
 } from "@/lib/gold_standards"
+import { normalizeExtractionFromNarrative } from "@/lib/agents/expert_investigator/extraction-normalizer"
 
 const SCORE_PRECISION = 1
 
@@ -349,9 +350,15 @@ function applyHeuristicExtraction(narrative: string, state: AgentState) {
   }
 
   if (standards.assistive_device_in_use.trim().length === 0) {
-    const assistiveMatch = ASSISTIVE_KEYWORDS.find((keyword) => lower.includes(keyword))
-    if (assistiveMatch) {
-      standards.assistive_device_in_use = toTitleCase(assistiveMatch)
+    // Policy: do not mark "in use" just because a device is mentioned.
+    // Only fill on explicit usage ("ambulating with walker") or explicit non-use ("without device").
+    if (
+      /(using|ambulating with|walking with|with the help of)\s+(?:a\s+)?(walker|cane)/i.test(lower) ||
+      /(in (?:a\s+)?wheelchair|from (?:a\s+)?wheelchair|while in (?:a\s+)?wheelchair)/i.test(lower)
+    ) {
+      if (/\bwalker\b/i.test(lower)) standards.assistive_device_in_use = "Walker"
+      else if (/\bcane\b/i.test(lower)) standards.assistive_device_in_use = "Cane"
+      else if (/\bwheelchair\b/i.test(lower)) standards.assistive_device_in_use = "Wheelchair"
     } else if (/without an? assistive device|without (?:any )?device|no assistive device/i.test(lower)) {
       standards.assistive_device_in_use = "None reported"
     }
@@ -404,6 +411,9 @@ function applyHeuristicExtraction(narrative: string, state: AgentState) {
       standards.was_care_plan_followed = false
     }
   }
+
+  // Final conservative normalization pass (subtype + booleans + high-signal cues).
+  normalizeExtractionFromNarrative(narrative, state)
 }
 
 function clampScore(value: number): number {
