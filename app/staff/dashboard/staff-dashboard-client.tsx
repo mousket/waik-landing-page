@@ -24,9 +24,12 @@ import { StaffIncidentPill } from "@/components/staff/staff-incident-pill"
 const RED = "#C0392B"
 const AMBER = "#D97706"
 
-/** Scroll the pill grid only; no second card (border/bg) under the tab bar. */
+/**
+ * Pill list: on mobile, avoid a nested scroll (iOS won’t chain to the shell — feels like you must drag at the edge).
+ * From md up, cap height and scroll inside the queue card.
+ */
 const TAB_PANEL_LIST_SCROLL =
-  "scrollbar-thin min-h-[8rem] max-h-[min(64dvh,720px)] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain pt-0.5 pb-14 [scrollbar-gutter:stable] sm:pb-20"
+  "touch-pan-y overscroll-contain pt-0.5 pb-14 sm:pb-20 max-md:overflow-visible max-md:max-h-none md:scrollbar-thin md:min-h-[8rem] md:max-h-[min(64dvh,720px)] md:overflow-y-auto md:overflow-x-hidden md:[scrollbar-gutter:stable]"
 
 function incidentInDateRange(iso: string, from: string, to: string): boolean {
   if (!from && !to) return true

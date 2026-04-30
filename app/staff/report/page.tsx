@@ -602,7 +602,7 @@ export default function StaffReportPage() {
           onBack: () => returnToBoard(activeQuestion.tier),
         }
         return (
-          <div className="relative min-h-0 flex-1">
+          <div className="relative w-full max-md:flex-none md:min-h-0 md:flex-1">
             <VoiceInputScreen {...vi} />
             {isSubmitting ? (
               <div

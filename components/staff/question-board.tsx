@@ -48,7 +48,7 @@ export function QuestionBoard({
   const remaining = questions.filter((q) => !answeredIds.has(q.id)).length
 
   return (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", className)}>
+    <div className={cn("flex min-h-0 min-w-0 max-md:flex-none flex-1 flex-col", className)}>
       <div className="px-3 pt-3 sm:px-4 sm:pt-4 md:mx-auto md:w-full md:max-w-4xl lg:max-w-5xl">
         <ReportStepHeader
           eyebrow="Voice reporting"
@@ -58,7 +58,7 @@ export function QuestionBoard({
         />
       </div>
 
-      <div className="mx-auto min-h-0 w-full max-w-lg flex-1 overflow-y-auto px-3 py-3 pb-32 sm:px-4 sm:py-4 sm:pb-36 md:max-w-4xl md:pb-28 lg:max-w-5xl">
+      <div className="mx-auto w-full max-w-lg max-md:flex-none max-md:overflow-visible px-3 py-3 pb-28 sm:px-4 sm:py-4 sm:pb-32 md:min-h-0 md:max-w-4xl md:flex-1 md:overflow-y-auto md:overscroll-contain md:pb-28 lg:max-w-5xl">
         <div className="grid grid-cols-1 gap-2 sm:gap-2.5 md:grid-cols-2 md:gap-3">
           {questions.map((q) => {
             const isAnswered = answeredIds.has(q.id)

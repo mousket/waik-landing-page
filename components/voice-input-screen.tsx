@@ -406,17 +406,17 @@ export function VoiceInputScreen({
   }, [transcript, isRecording, isPaused])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:pb-0">
-      <div className="mx-auto flex w-full max-w-[min(26rem,calc(100vw-1.5rem))] flex-1 flex-col min-h-0 px-2 pb-3 pt-1 sm:max-w-[min(28rem,calc(100vw-1.75rem))] sm:px-2.5 sm:pb-3 sm:pt-1.5">
+    <div className="flex min-h-0 w-full max-md:flex-none flex-col pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:flex-1 md:pb-0">
+      <div className="mx-auto flex w-full max-w-[min(26rem,calc(100vw-1.5rem))] max-md:flex-none flex-col max-md:min-h-0 min-h-0 flex-1 px-2 pb-3 pt-1 sm:max-w-[min(28rem,calc(100vw-1.75rem))] sm:px-2.5 sm:pb-3 sm:pt-1.5">
         <div
           className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#0D7377]/25 bg-background shadow-2xl shadow-[#0A3D40]/20 duration-300 dark:border-[#0D7377]/35 dark:shadow-black/35",
+            "flex min-h-0 min-w-0 max-md:flex-none flex-1 flex-col max-md:overflow-visible overflow-hidden rounded-2xl border border-[#0D7377]/25 bg-background shadow-2xl shadow-[#0A3D40]/20 duration-300 dark:border-[#0D7377]/35 dark:shadow-black/35",
             "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-300 motion-reduce:animate-none",
           )}
         >
           <WaikTealHeroStrip heightClassName="h-[72px] sm:h-20" />
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 max-md:flex-none flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-2.5 py-1.5 sm:px-3 sm:py-2">
               <Button
                 type="button"
@@ -442,10 +442,10 @@ export function VoiceInputScreen({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+            <div className="min-h-0 flex-1 max-md:flex-none max-md:overflow-visible md:min-h-0 md:overflow-y-auto md:overscroll-contain md:[scrollbar-gutter:stable]">
               <div
                 className={cn(
-                  "space-y-3 px-3 pb-28 pt-3 sm:space-y-3.5 sm:px-4 sm:pb-4 sm:pt-4 md:pb-4",
+                  "space-y-3 px-3 pb-10 pt-3 sm:space-y-3.5 sm:px-4 sm:pt-4 md:pb-28",
                   "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-safe:fill-mode-both motion-safe:[animation-delay:80ms] motion-reduce:animate-none",
                 )}
               >
