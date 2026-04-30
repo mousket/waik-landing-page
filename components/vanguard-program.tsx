@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
 import { Check, CheckCircle, AlertCircle } from "lucide-react"
-import { submitToGoogleSheets } from "@/lib/public-forms"
 
 export function VanguardProgram() {
   const [formData, setFormData] = useState({
@@ -31,18 +30,23 @@ export function VanguardProgram() {
     setSubmitStatus({ type: null, message: "" })
 
     try {
-      const result = await submitToGoogleSheets({
-        formType: "vanguard",
-        fullName: formData.fullName,
-        role: formData.role,
-        facilityName: formData.facilityName,
-        email: formData.email,
-        phone: formData.phone,
-        honeypot: formData.honeypot,
+      const res = await fetch("/api/public/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "vanguard",
+          fullName: formData.fullName,
+          role: formData.role,
+          facilityName: formData.facilityName,
+          email: formData.email,
+          phone: formData.phone,
+          honeypot: formData.honeypot,
+        }),
       })
+      const result = (await res.json()) as { success?: boolean; message?: string; error?: string }
 
-      if (result.success) {
-        setSubmitStatus({ type: "success", message: result.message })
+      if (res.ok && result.success) {
+        setSubmitStatus({ type: "success", message: result.message ?? "Thank you! We'll be in touch soon." })
         // Reset form after success
         setFormData({
           fullName: "",
@@ -53,7 +57,10 @@ export function VanguardProgram() {
           honeypot: "",
         })
       } else {
-        setSubmitStatus({ type: "error", message: result.message })
+        setSubmitStatus({
+          type: "error",
+          message: result.error ?? result.message ?? "Something went wrong. Please try again.",
+        })
       }
     } catch {
       setSubmitStatus({

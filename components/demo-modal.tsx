@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { X, CheckCircle, AlertCircle } from "lucide-react"
-import { submitToGoogleSheets } from "@/lib/public-forms"
 
 interface DemoModalProps {
   isOpen: boolean
@@ -53,18 +52,23 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
     setSubmitStatus({ type: null, message: "" })
 
     try {
-      const result = await submitToGoogleSheets({
-        formType: "demo",
-        fullName: formData.fullName,
-        role: formData.role,
-        email: formData.email,
-        facilityName: formData.facilityName,
-        phone: formData.phone,
-        honeypot: formData.honeypot,
+      const res = await fetch("/api/public/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "demo",
+          fullName: formData.fullName,
+          role: formData.role,
+          email: formData.email,
+          facilityName: formData.facilityName,
+          phone: formData.phone,
+          honeypot: formData.honeypot,
+        }),
       })
+      const result = (await res.json()) as { success?: boolean; message?: string; error?: string }
 
-      if (result.success) {
-        setSubmitStatus({ type: "success", message: result.message })
+      if (res.ok && result.success) {
+        setSubmitStatus({ type: "success", message: result.message ?? "Thank you! We'll be in touch soon." })
         // Reset form after 2 seconds and close modal
         timeoutRef.current = setTimeout(() => {
           setFormData({
@@ -80,7 +84,10 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
           timeoutRef.current = null
         }, 2000)
       } else {
-        setSubmitStatus({ type: "error", message: result.message })
+        setSubmitStatus({
+          type: "error",
+          message: result.error ?? result.message ?? "Something went wrong. Please try again.",
+        })
       }
     } catch {
       setSubmitStatus({

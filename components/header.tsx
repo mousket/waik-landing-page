@@ -1,13 +1,11 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
+import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 import { DemoModal } from "@/components/demo-modal"
 
-import { clerkAppearance } from "@/lib/clerk-appearance"
-import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
-import { SignedOutHeaderSignIn } from "@/components/signed-out-header-sign-in"
+import { LandingUserButton } from "@/components/landing-user-button"
 import { WaikLogo } from "@/components/waik-logo"
 
 export function Header() {
@@ -46,24 +44,32 @@ export function Header() {
             </Link>
           </nav>
 
-          <div className="flex items-center gap-4">
-            <Link href="#vanguard">
-              <Button variant="ghost" size="lg" className="hidden md:inline-flex font-medium">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            <Link href="#vanguard" className="hidden md:inline-flex">
+              <Button variant="ghost" size="lg" className="font-medium text-foreground/80 hover:text-foreground">
                 Apply for Pilot
               </Button>
             </Link>
             <Button
               size="lg"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shadow-lg shadow-primary/20"
+              variant="outline"
+              className="border-2 border-primary/35 bg-background font-semibold text-primary shadow-sm hover:bg-primary/[0.06]"
               onClick={() => setIsDemoModalOpen(true)}
             >
               Request a Demo
             </Button>
             <SignedIn>
-              <UserButton appearance={clerkAppearance} afterSignOutUrl={getClerkAfterSignOutUrl()} />
+              <LandingUserButton />
             </SignedIn>
             <SignedOut>
-              <SignedOutHeaderSignIn />
+              <SignInButton mode="modal">
+                <Button
+                  size="lg"
+                  className="min-h-12 min-w-[6.5rem] bg-primary px-6 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 ring-2 ring-primary/20 hover:bg-primary/90 sm:min-w-[7.5rem]"
+                >
+                  Sign in
+                </Button>
+              </SignInButton>
             </SignedOut>
           </div>
         </div>
