@@ -368,20 +368,44 @@ const InvestigationSchema = new Schema<IncidentInvestigationMetadata>(
       admin: { type: SignatureSchema }
     },
     verificationResult: {
-      fidelityScore: { type: Number, required: true },
+      fidelityScore: { type: Number, default: null },
       overallAssessment: {
         type: String,
         enum: ["faithful", "minor_issues", "significant_issues"],
-        required: true,
+        default: null,
       },
       additions: [{ type: String }],
       omissions: [{ type: String }],
       enhancements: [{ type: String }],
-      verifiedAt: { type: Date, required: true },
+      verifiedAt: { type: Date, default: null },
     },
   },
   { _id: false },
 )
+
+InvestigationSchema.pre("validate", function (next) {
+  const investigation = this as unknown as {
+    status?: string
+    verificationResult?: { fidelityScore?: unknown; overallAssessment?: unknown; verifiedAt?: unknown } | undefined
+    invalidate?: (path: string, errorMsg: string) => void
+  }
+
+  if (investigation.status !== "completed") return next()
+
+  const vr = investigation.verificationResult ?? {}
+  const invalidate = typeof investigation.invalidate === "function" ? investigation.invalidate.bind(investigation) : null
+  if (!invalidate) return next()
+
+  const fidelityOk = typeof vr.fidelityScore === "number" && Number.isFinite(vr.fidelityScore)
+  const assessmentOk = typeof vr.overallAssessment === "string" && vr.overallAssessment.trim().length > 0
+  const verifiedAtOk = vr.verifiedAt instanceof Date && !Number.isNaN(vr.verifiedAt.getTime())
+
+  if (!fidelityOk) invalidate("verificationResult.fidelityScore", "Path `verificationResult.fidelityScore` is required.")
+  if (!assessmentOk) invalidate("verificationResult.overallAssessment", "Path `verificationResult.overallAssessment` is required.")
+  if (!verifiedAtOk) invalidate("verificationResult.verifiedAt", "Path `verificationResult.verifiedAt` is required.")
+
+  return next()
+})
 
 const DataPointRowSchema = new Schema(
   {

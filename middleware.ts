@@ -6,6 +6,10 @@ import type { NextFetchEvent, NextRequest } from "next/server"
  * Public routes — no Clerk session required.
  * Everything else runs `auth.protect()` (redirect to sign-in for pages, 401 for APIs).
  * `/auth/redirect` is NOT public — it requires a session for role-based routing after sign-in.
+ *
+ * Static exclusions (see `matcher` below): `public/manifest.json` must bypass Clerk —
+ * excluding only `webmanifest` leaves `.json` on the middleware chain, which breaks
+ * fetches/service-worker precaching (often surfaced as manifest 404 or bad precache).
  */
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -134,7 +138,7 @@ export default async function middleware(request: NextRequest, event: NextFetchE
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
 }

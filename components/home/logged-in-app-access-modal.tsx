@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Clock, KeyRound, Sparkles } from "lucide-react"
 
@@ -26,6 +27,23 @@ function StatusGlyph({
 }: {
   entry: PromptEntry
 }) {
+  if (entry.status === "ready") {
+    return (
+      <div
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white/70 to-white/20 shadow-lg shadow-[#0D7377]/15 ring-2 ring-[#0D7377]/15 dark:from-white/15 dark:to-white/5 dark:ring-white/10 motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-500 motion-reduce:animate-none"
+        aria-hidden
+      >
+        <Image
+          src="/waik-logo.png"
+          alt=""
+          width={36}
+          height={36}
+          className="h-9 w-9 object-contain drop-shadow-sm"
+          priority
+        />
+      </div>
+    )
+  }
   const wrap =
     "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0D7377] to-[#0A3D40] text-white shadow-lg shadow-[#0D7377]/30 ring-2 ring-white/40 dark:ring-white/10 motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-500 motion-reduce:animate-none"
   if (entry.status === "must_change_password") {
