@@ -1,5 +1,5 @@
 # WAiK Pilot 1 — Build Plan
-## 17 Tasks · 7 Phases · 30 Days
+## 21 Tasks · 8 Phases · 30+ Days
 
 This folder contains every task required to take WAiK from its current state
 to a pilot-ready PWA. Each task file is self-contained and can be given directly
@@ -29,6 +29,7 @@ to a Cursor agent or Claude Code agent as a build instruction.
 | 5 | phase_5/ | 23–26 | Admin Settings & User Management | task-10, task-11 |
 | 6 | phase_6/ | 27–30 | Push Notifications & Pilot Hardening | task-12, task-13 |
 | 7 | phase_7/ | ongoing | Navigation, Intelligence & Imports | task-14, task-15, task-16, task-17 |
+| 8 | [phase_8/](./phase_8/README.md) | ongoing | **Staff–admin operational surface parity** (incidents, residents, assessments) | [task-18 … task-21](./phase_8/README.md) |
 
 ---
 

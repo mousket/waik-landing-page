@@ -2,8 +2,11 @@
 
 import * as React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ArrowLeft, Mic, Pause, Play, Square } from "lucide-react"
+import { ArrowLeft, ArrowRight, Mic, Pause, Play, Square } from "lucide-react"
 
+import { CompletionRing } from "@/components/shared/completion-ring"
+import { Button } from "@/components/ui/button"
+import { WaikTealHeroStrip } from "@/components/ui/waik-teal-hero-strip"
 import { cn } from "@/lib/utils"
 
 type SpeechRecognitionType = {
@@ -47,33 +50,11 @@ function buildSpeechText(event: { results: ArrayLike<SpeechRecognitionResult> })
   return out
 }
 
-function CompletionRing({ percent }: { percent: number }) {
-  const p = Math.max(0, Math.min(100, percent))
-  const r = 16
-  const c = 2 * Math.PI * r
-  const offset = c - (p / 100) * c
-  return (
-    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center text-primary">
-      <svg width="40" height="40" viewBox="0 0 40 40" className="block -rotate-90" aria-hidden>
-        <circle cx="20" cy="20" r={r} fill="none" className="stroke-muted" strokeWidth="4" />
-        <circle
-          cx="20"
-          cy="20"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="4"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-        />
-      </svg>
-      <span className="absolute text-[10px] font-medium text-foreground" aria-hidden>
-        {Math.round(p)}
-      </span>
-    </div>
-  )
-}
+const PRIMARY_CTA =
+  "group relative h-12 w-full overflow-hidden rounded-xl bg-gradient-to-r from-[#0D7377] to-[#0b6569] text-base font-semibold text-white shadow-lg shadow-[#0D7377]/30 ring-1 ring-[#0D7377]/30 transition-all hover:from-[#0f858a] hover:to-[#0D7377] hover:shadow-xl hover:shadow-[#0D7377]/35 motion-safe:active:scale-[0.99] motion-safe:hover:scale-[1.01] motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
+
+const MIC_GLYPH =
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0D7377] to-[#0A3D40] text-white shadow-lg shadow-[#0D7377]/30 ring-2 ring-white/40 dark:ring-white/10 sm:h-12 sm:w-12"
 
 export function VoiceInputScreen({
   question,
@@ -92,6 +73,8 @@ export function VoiceInputScreen({
   const [isPaused, setIsPaused] = useState(false)
   const [showTextFallbackPrompt, setShowTextFallbackPrompt] = useState(false)
   const [voiceUnavailable, setVoiceUnavailable] = useState(false)
+  /** Draft typed while recording; flushed in one go so we never insert spaces between single characters. */
+  const [appendBuffer, setAppendBuffer] = useState("")
 
   const preVoiceTranscriptRef = useRef(initialTranscript)
   const recognitionRef = useRef<SpeechRecognitionType | null>(null)
@@ -99,6 +82,7 @@ export function VoiceInputScreen({
   const consecutiveNoSpeechRef = useRef(0)
   const awaitingAnswerRef = useRef(true)
   const textFallbackBlockRef = useRef<HTMLDivElement | null>(null)
+  const mainTranscriptRef = useRef<HTMLTextAreaElement | null>(null)
   const needResumeAfterVisibilityRef = useRef(false)
   const isRecordingRef = useRef(false)
   const isPausedRef = useRef(false)
@@ -295,15 +279,24 @@ export function VoiceInputScreen({
     onSubmit(t)
   }
 
-  const handleAppendInput: React.FormEventHandler<HTMLTextAreaElement> = (e) => {
-    const el = e.currentTarget
-    const v = el.value
-    if (!v) {
-      return
-    }
-    setTranscript((prev) => prev + (prev ? (prev.endsWith(" ") || v.startsWith(" ") ? "" : " ") : "") + v)
-    el.value = ""
-  }
+  const flushAppendToTranscript = useCallback(() => {
+    const chunk = appendBuffer.trim()
+    if (!chunk) return
+    setTranscript((prev) => {
+      const t = prev.trimEnd()
+      const join = t.length === 0 ? "" : t.endsWith(" ") || chunk.startsWith(" ") ? "" : " "
+      return `${t}${join}${chunk}`
+    })
+    setAppendBuffer("")
+    requestAnimationFrame(() => {
+      const main = mainTranscriptRef.current
+      if (main) main.scrollTop = main.scrollHeight
+    })
+  }, [appendBuffer])
+
+  useEffect(() => {
+    if (!isRecording) setAppendBuffer("")
+  }, [isRecording])
 
   const trimmedLen = transcript.trim().length
   const isDoneActive = trimmedLen >= 10
@@ -339,173 +332,268 @@ export function VoiceInputScreen({
     }
   }, [stopSession])
 
+  /** While the mic is actively capturing (not paused), keep the main field pinned to the latest STT / append text. */
+  useEffect(() => {
+    if (!isRecording || isPaused) return
+    const el = mainTranscriptRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight
+    })
+  }, [transcript, isRecording, isPaused])
+
   return (
-    <div
-      className="flex min-h-0 min-h-[100dvh] flex-1 flex-col bg-gradient-to-br from-primary/5 via-background to-accent/5"
-    >
-      {/* Top bar */}
-      <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/30 bg-background/80 px-4 backdrop-blur-sm">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-full text-foreground hover:bg-muted/80"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-6 w-6" />
-        </button>
-        {questionLabel ? (
-          <span className="line-clamp-1 flex-1 text-center text-sm font-medium text-muted-foreground">
-            {questionLabel}
-          </span>
-        ) : (
-          <span className="flex-1" />
-        )}
-        <div className="relative h-10 w-10">
-          {completionRingPercent != null ? (
-            <div className="relative flex h-10 w-10 items-center justify-center">
-              <CompletionRing percent={completionRingPercent} />
-            </div>
-          ) : (
-            <span className="inline-block w-10" />
-          )}
-        </div>
-      </div>
-
-      {/* Question */}
-      <div className="shrink-0 px-4 py-6">
-        <h1 className="text-lg font-semibold text-foreground">{question}</h1>
-        {areaHint ? <p className="mt-1 text-sm italic text-muted-foreground">{areaHint}</p> : null}
-        {showEncouragement ? (
-          <p className="mt-2 text-sm italic text-muted-foreground">
-            Feel free to include any other details — the more you share, the fewer questions remain.
-          </p>
-        ) : null}
-      </div>
-
-      {/* Transcript */}
-      <div className="min-h-0 flex-1 px-4">
-        <textarea
-          value={transcript}
-          onChange={(e) => handleTranscriptChange(e.target.value)}
-          placeholder="Your answer will appear here as you speak..."
-          readOnly={!voiceUnavailable && isRecording && !isPaused}
-          className="min-h-[160px] w-full resize-none rounded-xl border border-border bg-card p-3 text-base text-foreground shadow-sm"
-        />
-      </div>
-
-      {voiceUnavailable ? (
-        <p className="px-4 pb-2 text-sm text-muted-foreground">
-          Voice input is not available on this device. Please type your answer.
-        </p>
-      ) : null}
-
-      {/* Voice row */}
-      {!voiceUnavailable ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-3 px-4 py-4">
-          <button
-            type="button"
-            onClick={toggleRecordPress}
-            className={cn(
-              "inline-flex h-16 w-16 min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-full text-primary-foreground shadow-md",
-              isRecording
-                ? isPaused
-                  ? "bg-rose-600"
-                  : "animate-pulse bg-rose-600"
-                : "bg-primary hover:opacity-95",
-            )}
-            aria-pressed={isRecording}
-            aria-label={isRecording ? "Stop recording" : "Start recording"}
-          >
-            {isRecording ? <Square className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-          </button>
-          {isRecording ? (
-            <button
-              type="button"
-              onClick={togglePause}
-              className="inline-flex min-h-10 min-w-[4.5rem] items-center justify-center rounded-md border-2 border-primary px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5"
-            >
-              {isPaused ? (
-                <>
-                  <Play className="mr-1 h-4 w-4" />
-                  Resume
-                </>
-              ) : (
-                <>
-                  <Pause className="mr-1 h-4 w-4" />
-                  Pause
-                </>
-              )}
-            </button>
-          ) : null}
-          {transcript.length > 0 ? (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="inline-flex min-h-10 min-w-[4rem] items-center justify-center rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/80"
-            >
-              Clear
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* Text append fallback (always for speech devices; for no-voice, main textarea is enough) */}
-      <div
-        ref={textFallbackBlockRef}
-        className="shrink-0 space-y-1 px-4 pb-2"
-        id={`append-fallback-${appendInputId}`}
-      >
-        {showTextFallbackPrompt ? (
-          <p className="text-sm text-foreground">Having trouble with voice? Type your answer below.</p>
-        ) : null}
-        {!voiceUnavailable ? (
-          <>
-            <label htmlFor={appendInputId} className="sr-only">
-              Or type to add to your answer
-            </label>
-            <textarea
-              id={appendInputId}
-              onInput={handleAppendInput as unknown as React.FormEventHandler<HTMLTextAreaElement>}
-              className="min-h-[64px] w-full rounded-md border border-border bg-card p-2 text-sm"
-              placeholder="Or type your answer here..."
-            />
-          </>
-        ) : null}
-      </div>
-
-      {/* Done */}
-      <div className="mt-auto space-y-2 px-4 pb-4">
-        <button
-          type="button"
-          onClick={handleDone}
-          disabled={!isDoneActive}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mx-auto flex w-full max-w-[min(26rem,calc(100vw-1.5rem))] flex-1 flex-col min-h-0 px-2 pb-2.5 pt-1 sm:max-w-[min(28rem,calc(100vw-1.75rem))] sm:px-2.5 sm:pb-3 sm:pt-1.5">
+        <div
           className={cn(
-            "w-full min-h-12 rounded-xl py-4 text-center text-base font-semibold text-primary-foreground",
-            isDoneActive
-              ? "cursor-pointer bg-primary hover:opacity-95"
-              : "cursor-not-allowed bg-muted text-muted-foreground",
+            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#0D7377]/25 bg-background shadow-2xl shadow-[#0A3D40]/20 duration-300 dark:border-[#0D7377]/35 dark:shadow-black/35",
+            "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-300 motion-reduce:animate-none",
           )}
         >
-          Done
-        </button>
-        {brief ? (
-          <p className="text-center text-sm text-amber-700">
-            This answer is brief — more detail makes for a stronger report.
-          </p>
-        ) : null}
-      </div>
+          <WaikTealHeroStrip heightClassName="h-[72px] sm:h-20" />
 
-      {allowDefer && onDefer ? (
-        <div className="px-4 pb-6 text-center">
-          <button
-            type="button"
-            onClick={() => onDefer()}
-            className="text-sm text-muted-foreground underline decoration-muted-foreground underline-offset-2 hover:text-foreground"
-          >
-            I cannot answer this right now — save for later
-          </button>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-2.5 py-1.5 sm:px-3 sm:py-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl text-foreground hover:bg-muted/80"
+                onClick={handleBack}
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              {questionLabel ? (
+                <span className="line-clamp-1 flex-1 text-center text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-primary/80 sm:text-xs sm:tracking-[0.2em]">
+                  {questionLabel}
+                </span>
+              ) : (
+                <span className="flex-1" />
+              )}
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                {completionRingPercent != null ? (
+                  <CompletionRing percent={completionRingPercent} size={34} strokeWidth={3} showLabel />
+                ) : null}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+              <div
+                className={cn(
+                  "space-y-3 px-3 pb-3 pt-3 sm:space-y-3.5 sm:px-4 sm:pb-4 sm:pt-4",
+                  "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-safe:fill-mode-both motion-safe:[animation-delay:80ms] motion-reduce:animate-none",
+                )}
+              >
+                <div className="flex gap-2.5 sm:gap-3">
+                  <div className={cn(MIC_GLYPH, isRecording && !isPaused && "motion-safe:animate-pulse")} aria-hidden>
+                    <Mic className="h-5 w-5 opacity-95 sm:h-6 sm:w-6" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <h1 className="text-lg font-semibold leading-snug tracking-tight text-[#0A3D40] dark:text-foreground sm:text-xl">
+                      {question}
+                    </h1>
+                    <div
+                      className="h-px w-full max-w-[180px] bg-gradient-to-r from-[#0D7377] via-[#44DAD2]/80 to-transparent opacity-90"
+                      aria-hidden
+                    />
+                    {areaHint ? (
+                      <p className="text-sm leading-relaxed text-muted-foreground">{areaHint}</p>
+                    ) : null}
+                    {showEncouragement ? (
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        Extra detail now means fewer follow-up questions later.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Your answer
+                  </label>
+                  <textarea
+                    ref={mainTranscriptRef}
+                    value={transcript}
+                    onChange={(e) => handleTranscriptChange(e.target.value)}
+                    placeholder={
+                      voiceUnavailable
+                        ? "Type your answer…"
+                        : "Speak or type — your words appear here…"
+                    }
+                    readOnly={!voiceUnavailable && isRecording && !isPaused}
+                    className={cn(
+                      "min-h-[9rem] w-full max-h-[min(36vh,17rem)] resize-none overflow-y-auto rounded-xl border border-primary/15 bg-muted/25 p-2.5 font-sans text-sm leading-relaxed tracking-normal text-foreground antialiased shadow-inner scrollbar-thin scrollbar-track-transparent scrollbar-thumb-primary/20 sm:min-h-[10rem] sm:max-h-[min(40vh,19rem)] sm:p-3 sm:text-[0.9375rem]",
+                      !voiceUnavailable && isRecording && !isPaused && "cursor-default opacity-95",
+                    )}
+                  />
+                </div>
+
+                {voiceUnavailable ? (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Voice is not available on this device — use the field above.
+                  </p>
+                ) : null}
+
+                {!voiceUnavailable ? (
+                  <div className="rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.05] via-background to-accent/[0.03] px-2 py-1.5 shadow-sm sm:px-2.5 sm:py-2">
+                    <div className="flex min-h-[3rem] flex-nowrap items-center justify-between gap-2 sm:min-h-[3.25rem]">
+                      <span className="w-12 shrink-0 text-[0.55rem] font-bold uppercase leading-tight tracking-wide text-primary/75 sm:w-14 sm:text-[0.6rem]">
+                        Record
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleRecordPress}
+                        className={cn(
+                          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-md ring-2 ring-white/25 transition-transform motion-safe:active:scale-[0.98] sm:h-12 sm:w-12 sm:shadow-lg",
+                          isRecording
+                            ? isPaused
+                              ? "bg-rose-600 shadow-rose-600/20"
+                              : "animate-pulse bg-rose-600 shadow-rose-600/25"
+                            : "bg-gradient-to-br from-[#0D7377] to-[#0A3D40] shadow-[#0D7377]/30",
+                        )}
+                        aria-pressed={isRecording}
+                        aria-label={isRecording ? "Stop recording" : "Start recording"}
+                      >
+                        {isRecording ? <Square className="h-5 w-5 sm:h-5 sm:w-5" /> : <Mic className="h-5 w-5" />}
+                      </button>
+                      <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5">
+                        {isRecording ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 shrink-0 rounded-lg border-primary/35 bg-background/90 px-2.5 text-xs font-medium text-primary hover:bg-primary/[0.06] sm:h-9 sm:px-3 sm:text-sm"
+                            onClick={togglePause}
+                          >
+                            {isPaused ? (
+                              <>
+                                <Play className="mr-1 h-3.5 w-3.5 sm:mr-1.5 sm:h-4 sm:w-4" />
+                                Resume
+                              </>
+                            ) : (
+                              <>
+                                <Pause className="mr-1 h-3.5 w-3.5 sm:mr-1.5 sm:h-4 sm:w-4" />
+                                Pause
+                              </>
+                            )}
+                          </Button>
+                        ) : null}
+                        {transcript.length > 0 ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 shrink-0 rounded-lg px-2 text-xs text-muted-foreground hover:bg-muted/80 hover:text-foreground sm:px-2.5 sm:text-sm"
+                            onClick={handleClear}
+                          >
+                            Clear
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div ref={textFallbackBlockRef} className="space-y-2" id={`append-fallback-${appendInputId}`}>
+                  {showTextFallbackPrompt ? (
+                    <p className="text-sm font-medium text-foreground">Having trouble with voice? Add text below.</p>
+                  ) : null}
+                  {!voiceUnavailable ? (
+                    <div className="w-full min-w-0">
+                      <label
+                        htmlFor={appendInputId}
+                        className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                      >
+                        Add while recording
+                      </label>
+                      <p className="mb-1.5 text-[0.7rem] leading-snug text-muted-foreground sm:text-xs">
+                        Type a phrase, then <span className="font-medium text-foreground/80">Add</span> or{" "}
+                        <span className="font-medium text-foreground/80">Enter</span> — it joins your answer as normal
+                        text. Pause the mic to edit the main box.
+                      </p>
+                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch sm:gap-2">
+                        <textarea
+                          id={appendInputId}
+                          value={appendBuffer}
+                          onChange={(e) => setAppendBuffer(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault()
+                              flushAppendToTranscript()
+                            }
+                          }}
+                          className="min-h-[3.25rem] min-w-0 flex-1 resize-none rounded-xl border border-border/80 bg-background px-2.5 py-2 font-sans text-sm leading-normal tracking-normal text-foreground antialiased shadow-sm placeholder:text-muted-foreground/70 sm:min-h-[3.5rem] sm:px-3 sm:py-2 sm:text-[0.9375rem]"
+                          placeholder="Phrase to add…"
+                          rows={2}
+                          disabled={!isRecording || isPaused}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="h-9 shrink-0 rounded-xl px-3 text-xs font-semibold sm:h-auto sm:self-stretch sm:px-4 sm:text-sm"
+                          disabled={!appendBuffer.trim() || !isRecording || isPaused}
+                          onClick={flushAppendToTranscript}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "shrink-0 space-y-2 border-t border-border/50 bg-background/95 px-3 pb-3 pt-2.5 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 sm:px-4 sm:pb-3.5 sm:pt-3",
+                "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 motion-safe:fill-mode-both motion-safe:[animation-delay:140ms] motion-reduce:animate-none",
+              )}
+            >
+              <Button
+                type="button"
+                disabled={!isDoneActive}
+                className={cn(
+                  !isDoneActive && "cursor-not-allowed bg-muted text-muted-foreground shadow-none ring-0 hover:scale-100",
+                  isDoneActive && PRIMARY_CTA,
+                )}
+                onClick={handleDone}
+              >
+                {isDoneActive ? (
+                  <>
+                    <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                    <span className="relative inline-flex w-full items-center justify-center gap-2">
+                      Save answer
+                      <ArrowRight className="h-4 w-4 motion-safe:group-hover:translate-x-0.5" aria-hidden />
+                    </span>
+                  </>
+                ) : (
+                  <span className="inline-flex w-full items-center justify-center gap-2">
+                    Save answer
+                    <ArrowRight className="h-4 w-4 opacity-50" aria-hidden />
+                  </span>
+                )}
+              </Button>
+              {brief ? (
+                <p className="text-center text-xs leading-snug text-amber-800 dark:text-amber-200/90 sm:text-sm">
+                  Brief answers are ok — a bit more detail strengthens the chart.
+                </p>
+              ) : null}
+              {allowDefer && onDefer ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 w-full rounded-xl font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  onClick={() => onDefer()}
+                >
+                  Save for later — I can’t answer now
+                </Button>
+              ) : null}
+            </div>
+          </div>
         </div>
-      ) : null}
+      </div>
     </div>
   )
 }

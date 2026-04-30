@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server"
 import { getCurrentUser } from "@/lib/auth"
+import { redirectPathFromResolution, resolveWaikApplicationEntry } from "@/lib/post-auth-destination"
 import { PostAuthRedirectClient } from "./post-auth-redirect-client"
 
 /**
@@ -18,19 +19,7 @@ import { PostAuthRedirectClient } from "./post-auth-redirect-client"
 export default async function AuthRedirectPage() {
   const { userId } = await auth()
   const currentUser = await getCurrentUser()
-
-  let to: string
-  if (!currentUser) {
-    to = userId ? "/auth/account-pending" : "/sign-in"
-  } else if (currentUser.mustChangePassword) {
-    to = "/change-password"
-  } else if (currentUser.isWaikSuperAdmin) {
-    to = "/waik-admin"
-  } else if (currentUser.isAdminTier) {
-    to = "/admin/dashboard"
-  } else {
-    to = "/staff/dashboard"
-  }
+  const to = redirectPathFromResolution(resolveWaikApplicationEntry(userId ?? null, currentUser))
 
   return <PostAuthRedirectClient to={to} />
 }

@@ -103,6 +103,16 @@ interface IncidentInvestigationMetadata {
     don?: Signature              // Director of Nursing Sign-off
     admin?: Signature            // Administrator Sign-off
   }
+
+  /** Phase-1 sign-off: LLM audit of clinical record vs original narrative (IR-2d). */
+  verificationResult?: {
+    fidelityScore: number
+    overallAssessment: "faithful" | "minor_issues" | "significant_issues"
+    additions: string[]
+    omissions: string[]
+    enhancements: string[]
+    verifiedAt: Date
+  }
 }
 
 const PHASE2_SECTION_STATUS = ["not_started", "in_progress", "complete"] as const
@@ -261,6 +271,9 @@ export interface IncidentDocument extends Document {
   investigation?: IncidentInvestigationMetadata
   humanReport?: HumanReport
   aiReport?: AIReport
+
+  /** text-embedding-3-small vector (1536 dims); excluded from default queries. */
+  embedding?: number[] | null
 }
 
 // --- SCHEMAS ---
@@ -353,7 +366,19 @@ const InvestigationSchema = new Schema<IncidentInvestigationMetadata>(
     signatures: {
       don: { type: SignatureSchema },
       admin: { type: SignatureSchema }
-    }
+    },
+    verificationResult: {
+      fidelityScore: { type: Number, required: true },
+      overallAssessment: {
+        type: String,
+        enum: ["faithful", "minor_issues", "significant_issues"],
+        required: true,
+      },
+      additions: [{ type: String }],
+      omissions: [{ type: String }],
+      enhancements: [{ type: String }],
+      verifiedAt: { type: Date, required: true },
+    },
   },
   { _id: false },
 )
@@ -548,6 +573,12 @@ const IncidentSchema = new Schema<IncidentDocument>(
     investigation: { type: InvestigationSchema, default: undefined },
     humanReport: { type: HumanReportSchema, default: undefined },
     aiReport: { type: AIReportSchema, default: undefined },
+
+    embedding: {
+      type: [Number],
+      default: null,
+      select: false,
+    },
   },
   {
     versionKey: false,

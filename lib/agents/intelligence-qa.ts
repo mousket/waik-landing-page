@@ -1,7 +1,9 @@
 import { ChatOpenAI } from "@langchain/openai"
 import { PromptTemplate, ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts"
 import type { Incident } from "../types"
-import { AI_CONFIG, isOpenAIConfigured } from "../openai"
+import { AI_CONFIG, generateChatCompletion, isOpenAIConfigured } from "../openai"
+import { queryFacilityIncidentStats, searchFacilityIncidents } from "./vector-search"
+import type { SearchResponse } from "./vector-search"
 import { searchSimilarQuestions } from "../embeddings"
 import { getUserById } from "../db"
 
@@ -303,6 +305,179 @@ Enhanced Answer:`)
     }
 
     return parts.join("\n")
+  }
+}
+
+/** Cross-incident Q&A (`Incident.staffId` matches WAiK `userId` for personal scope). */
+export type FacilityIntelligenceScope = "personal" | "facility"
+
+export type FacilityCitation = {
+  incidentId: string
+  residentName: string
+  incidentDate: string
+  snippet: string
+  similarityScore: number
+}
+
+export type CrossFacilityIntelligenceResult = {
+  answer: string
+  citations: FacilityCitation[]
+  scope: FacilityIntelligenceScope
+  timestamp: string
+  searchMethod: "atlas_vector" | "in_process_cosine"
+}
+
+/**
+ * Facility-wide semantic Q&A plus 30‑day rollup stats — single LLM synthesis.
+ */
+export async function answerCrossFacilityIntelligence(opts: {
+  facilityId: string
+  queryingUserId: string
+  question: string
+  scope: FacilityIntelligenceScope
+  /** Max retrieved incidents wired into citations + prompt context */
+  searchLimit?: number
+}): Promise<CrossFacilityIntelligenceResult> {
+  const trimmed = opts.question.trim()
+  const timestamp = new Date().toISOString()
+  const staffOnly = opts.scope === "personal"
+
+  const searchFilters = staffOnly ? { staffId: opts.queryingUserId } : undefined
+
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const statsOpts = staffOnly ? { staffId: opts.queryingUserId } : undefined
+
+  const statsPromise = queryFacilityIncidentStats(opts.facilityId, thirtyDaysAgo, now, undefined, statsOpts)
+
+  let searchResults: SearchResponse = {
+    results: [],
+    totalSearched: 0,
+    searchMethod: "in_process_cosine",
+  }
+
+  if (trimmed && isOpenAIConfigured()) {
+    try {
+      searchResults = await searchFacilityIncidents(
+        opts.facilityId,
+        trimmed,
+        opts.searchLimit ?? 10,
+        searchFilters,
+      )
+    } catch (e) {
+      console.warn("[IntelligenceQA] Facility vector search failed:", e)
+    }
+  }
+
+  const stats = await statsPromise
+
+  const incidentContext =
+    trimmed && searchResults.results.length === 0
+      ? ""
+      : searchResults.results
+          .map((r, i) =>
+            [
+              `[Incident ${i + 1}] ${r.incidentType} — ${r.residentName} (Room ${r.residentRoom})`,
+              `Date: ${r.incidentDate ? r.incidentDate.split("T")[0] : "unknown"} | Location: ${r.location}`,
+              `Completeness score: ${r.completenessScore}% | Phase: ${r.phase}`,
+              `Clinical snippet: ${r.snippet}`,
+            ].join("\n"),
+          )
+          .join("\n\n")
+
+  const statsLabel =
+    opts.scope === "personal"
+      ? "YOUR STATS (reports you filed — last 30 days)"
+      : "FACILITY STATS (last 30 days)"
+  const topResidents = stats.byResident.slice(0, 3)
+
+  const statsContext = [
+    `${statsLabel}:`,
+    `Total incidents (signed phases): ${stats.total}`,
+    `By type: ${Object.entries(stats.byType)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ") || "(none)"}`,
+    `By location: ${Object.entries(stats.byLocation)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ") || "(none)"}`,
+    `Average completeness score: ${stats.avgCompleteness}%`,
+    `Residents with most incidents: ${topResidents.map((x) => `${x.residentName} (${x.count})`).join(", ") || "none"}`,
+  ].join("\n")
+
+  if (!trimmed) {
+    return {
+      answer: "Please enter a question.",
+      citations: [],
+      scope: opts.scope,
+      timestamp,
+      searchMethod: searchResults.searchMethod,
+    }
+  }
+
+  if (!isOpenAIConfigured()) {
+    const parts = [
+      "OpenAI API is not configured, so semantic search is unavailable.",
+      statsContext.replace(/\n/g, " • "),
+    ]
+    return {
+      answer: parts.join(" "),
+      citations: [],
+      scope: opts.scope,
+      timestamp,
+      searchMethod: searchResults.searchMethod,
+    }
+  }
+
+  const systemPrompt = [
+    "You are WAiK Intelligence — an institutional memory system for one senior-care facility.",
+    "Answer ONLY from the retrieved incident excerpts and aggregate statistics supplied below.",
+    "If nothing relevant is present, say so clearly.",
+    "Do not invent residents, incidents, or metrics.",
+    "Use plain-language, professional wording. When referencing details, cite by resident name and date when available.",
+    opts.scope === "personal"
+      ? "SCOPE: You may only rely on excerpts from this staff member's own incident reports plus their personal rollup stats."
+      : "SCOPE: You may summarize across all incidents in this facility.",
+  ].join("\n")
+
+  const userPrompt = [
+    `QUESTION: ${trimmed}`,
+    "",
+    "═══ RELEVANT INCIDENT EXCERPTS (semantic retrieval) ═══",
+    incidentContext.trim() ? incidentContext : "No sufficiently similar incident embeddings were retrieved.",
+    "",
+    "═══ ROLL‑UP STATISTICS ═══",
+    statsContext,
+    "",
+    "Answer concisely.",
+  ].join("\n")
+
+  const res = await generateChatCompletion(
+    [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    {
+      temperature: 0.3,
+      maxTokens: 900,
+      model: AI_CONFIG.model,
+    },
+  )
+  const answer = res.choices[0]?.message?.content?.trim() ?? ""
+
+  const citations: FacilityCitation[] = searchResults.results.slice(0, 5).map((r) => ({
+    incidentId: r.incidentId,
+    residentName: r.residentName,
+    incidentDate: r.incidentDate,
+    snippet: r.snippet.slice(0, 400),
+    similarityScore: r.similarityScore,
+  }))
+
+  return {
+    answer,
+    citations,
+    scope: opts.scope,
+    timestamp,
+    searchMethod: searchResults.searchMethod,
   }
 }
 

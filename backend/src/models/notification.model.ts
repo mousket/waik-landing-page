@@ -6,6 +6,7 @@ export interface NotificationDocument extends Document {
   type:
     | "incident-created"
     | "investigation-started"
+    | "investigation-ready"
     | "follow-up-required"
     | "investigation-completed"
     | "phase2-all-sections-complete"
@@ -27,6 +28,7 @@ const NotificationSchema = new Schema<NotificationDocument>(
       enum: [
         "incident-created",
         "investigation-started",
+        "investigation-ready",
         "follow-up-required",
         "investigation-completed",
         "phase2-all-sections-complete",

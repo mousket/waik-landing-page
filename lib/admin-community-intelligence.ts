@@ -1,6 +1,8 @@
 import connectMongo from "@/backend/src/lib/mongodb"
 import IncidentModel from "@/backend/src/models/incident.model"
+import { answerCrossFacilityIntelligence } from "@/lib/agents/intelligence-qa"
 import { getRedis } from "@/lib/redis"
+import { queryFacilityIncidentStats } from "@/lib/agents/vector-search"
 import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 import { AI_CONFIG } from "@/lib/openai"
 
@@ -9,17 +11,33 @@ import { AI_CONFIG } from "@/lib/openai"
  * **Redis cache (TTL 1h = 3600s)**:
  * | key pattern | value |
  * |---|---|
- * | `waik:intel:insights:<facilityId>` | JSON insight card bundle |
+ * | `waik:insights:<facilityId>` | JSON insight card bundle (IR-2c canonical; also mirrored to legacy key) |
+ * | `waik:intel:insights:<facilityId>` | legacy Redis key |
  * | `waik:admin:daily-brief:<facilityId>` | JSON daily brief |
  */
 const INSIGHTS_TTL_SEC = 60 * 60
 const BRIEF_TTL_SEC = 60 * 60
-const insKey = (f: string) => `waik:intel:insights:${f}`
+const insKey = (f: string) => `waik:insights:${f}`
+const insKeyLegacy = (f: string) => `waik:intel:insights:${f}`
 const brKey = (f: string) => `waik:admin:daily-brief:${f}`
 
 export type InsightCard = { id: string; title: string; body: string; hint?: string }
 
-type InsightPayload = { cards: InsightCard[]; generatedAt: string; facilityId: string }
+/** IR-2c auto-generated insight rows (pattern / alert / summary). */
+export type InsightMetaCard = {
+  id: string
+  type: string
+  title: string
+  body: string
+  priority?: "high" | "normal"
+}
+
+type InsightPayload = {
+  cards: InsightCard[]
+  generatedAt: string
+  facilityId: string
+  insights?: InsightMetaCard[]
+}
 
 type BriefPayload = { text: string; generatedAt: string; facilityId: string }
 
@@ -35,11 +53,20 @@ function parseJsonOr<T>(raw: string | null, fallback: T): T {
 }
 
 export async function getCachedInsights(facilityId: string): Promise<InsightPayload | null> {
-  const raw = await getRedis().get(insKey(facilityId))
+  const redis = getRedis()
+  const raw =
+    (await redis.get(insKey(facilityId))) ?? (await redis.get(insKeyLegacy(facilityId)))
   if (!raw) {
     return null
   }
   return parseJsonOr(raw, null)
+}
+
+async function setCachedInsights(payload: InsightPayload): Promise<void> {
+  const s = JSON.stringify(payload)
+  const redis = getRedis()
+  await redis.set(insKey(payload.facilityId), s, "EX", INSIGHTS_TTL_SEC)
+  await redis.set(insKeyLegacy(payload.facilityId), s, "EX", INSIGHTS_TTL_SEC)
 }
 
 export async function getCachedDailyBrief(facilityId: string): Promise<BriefPayload | null> {
@@ -85,13 +112,18 @@ async function loadIncidents(
 }
 
 /**
- * Community-level Q&A: LLM over facility incident snippets only. Never pass another facility.
+ * Community-level Q&A: vector search + 30‑day stats + LLM (facility-wide; admin console).
  */
 export async function answerCommunityQuery(
   facilityId: string,
   userQuestion: string,
-  facilityLabel = "this facility",
+  _facilityLabel = "this facility",
 ): Promise<string> {
+  const q = userQuestion.trim()
+  if (!q) {
+    return "Please enter a question."
+  }
+
   const rows = await loadIncidents(facilityId)
   if (rows.length === 0) {
     return isOpenAIConfigured()
@@ -99,42 +131,13 @@ export async function answerCommunityQuery(
       : "No incident data in this community yet. Configure OPENAI_API_KEY for full AI answers."
   }
 
-  const pack = rows
-    .map((i, n) => {
-      const t = (i.title ?? "Incident").slice(0, 200)
-      const d = (i.description ?? "").slice(0, 500)
-      const c = i.createdAt ? new Date(i.createdAt).toISOString().slice(0, 10) : ""
-      return `[${n + 1}] id=${i.id} date=${c} phase=${i.phase ?? "?"} completeness=${i.completenessScore ?? 0} priority=${i.priority ?? "?"} inj=${i.hasInjury ? "yes" : "no"}\n staff=${i.staffName ?? ""}\n${t}\n${d}\n---`
-    })
-    .join("\n")
-
-  if (!isOpenAIConfigured()) {
-    return [
-      "OpenAI is not configured, so this is a numeric snapshot only (facility-scoped):",
-      `• Incidents in sample: ${rows.length}`,
-      `• With injury flag: ${rows.filter((i) => i.hasInjury).length}`,
-      "Add OPENAI_API_KEY to enable full natural-language answers from this data.",
-    ].join(" ")
-  }
-
-  const res = await generateChatCompletion(
-    [
-      {
-        role: "system",
-        content: `You are WAiK Intelligence for a single skilled nursing community (${facilityLabel}). The ONLY data you may use is the incident list provided below. Do not invent residents, events, or metrics. If the answer is not supported by the list, say you cannot tell from the available records. Keep answers short (2–5 sentences), plain text, no markdown.`,
-      },
-      {
-        role: "user",
-        content: `User question: ${userQuestion}
-
-Incident records (this facility only; up to 80, newest first):
-${pack}
-`,
-      },
-    ],
-    { model: AI_CONFIG.model, maxTokens: 800 },
-  )
-  return res.choices[0]?.message?.content?.trim() ?? "No response from model."
+  const out = await answerCrossFacilityIntelligence({
+    facilityId,
+    queryingUserId: "community",
+    question: q,
+    scope: "facility",
+  })
+  return out.answer
 }
 
 /**
@@ -142,12 +145,14 @@ ${pack}
  */
 export async function buildOrGetInsights(facilityId: string): Promise<InsightPayload> {
   const c = await getCachedInsights(facilityId)
-  if (c?.cards?.length === 4) {
+  if (c?.cards?.length === 4 && (c.insights?.length ?? 0) >= 2) {
     return c
   }
   const now = new Date()
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const monthStats = await queryFacilityIncidentStats(facilityId, monthAgo, now)
+  const weekStats = await queryFacilityIncidentStats(facilityId, weekAgo, now)
   const rows = await loadIncidents(facilityId)
   const w = rows.filter((i) => i.createdAt && new Date(i.createdAt) >= weekAgo)
   const m = rows.filter((i) => i.createdAt && new Date(i.createdAt) >= monthAgo)
@@ -235,12 +240,53 @@ export async function buildOrGetInsights(facilityId: string): Promise<InsightPay
     }
   }
 
+  const insights: InsightMetaCard[] = [
+    {
+      id: "weekly-summary",
+      type: "summary",
+      title: "This week",
+      body: `${weekStats.total} incident${weekStats.total !== 1 ? "s" : ""} reported this week. Average completeness: ${weekStats.avgCompleteness}%.`,
+      priority: weekStats.total > 5 ? "high" : "normal",
+    },
+  ]
+
+  const topLocation = Object.entries(monthStats.byLocation).sort(([, a], [, b]) => b - a)[0]
+  if (topLocation && topLocation[1] >= 3) {
+    insights.push({
+      id: "location-hotspot",
+      type: "pattern",
+      title: "Location pattern",
+      body: `${topLocation[0]} has had ${topLocation[1]} incidents in the past 30 days — highest in the facility.`,
+      priority: "high",
+    })
+  }
+
+  const repeatResidents = monthStats.byResident.filter((r) => r.count >= 2)
+  if (repeatResidents.length > 0) {
+    insights.push({
+      id: "repeat-residents",
+      type: "alert",
+      title: "Residents with multiple incidents",
+      body: `${repeatResidents.map((r) => `${r.residentName} (Room ${r.residentRoom}): ${r.count} incidents`).join(". ")}. Consider care plan review.`,
+      priority: "high",
+    })
+  }
+
+  insights.push({
+    id: "completeness-trend",
+    type: "metric",
+    title: "Documentation quality",
+    body: `Average report completeness: ${monthStats.avgCompleteness}% (30-day). Average data collection time: ${Math.round(monthStats.avgActiveSeconds / 60)} minutes per report.`,
+    priority: "normal",
+  })
+
   const out: InsightPayload = {
     facilityId,
     generatedAt: new Date().toISOString(),
     cards: [thisWeek, comp, att, staff],
+    insights,
   }
-  await getRedis().set(insKey(facilityId), JSON.stringify(out), "EX", INSIGHTS_TTL_SEC)
+  await setCachedInsights(out)
   return out
 }
 

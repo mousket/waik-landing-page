@@ -106,7 +106,12 @@ export interface IncidentInvestigationMetadata {
 export interface IncidentNotification {
   id: string
   incidentId: string
-  type: "incident-created" | "investigation-started" | "follow-up-required" | "investigation-completed"
+  type:
+    | "incident-created"
+    | "investigation-started"
+    | "investigation-ready"
+    | "follow-up-required"
+    | "investigation-completed"
   message: string
   createdAt: string
   readAt?: string

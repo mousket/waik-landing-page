@@ -455,45 +455,6 @@ export async function updateIncident(
   return incident ? serializeIncident(incident) : null
 }
 
-/**
- * Best-effort persistence when the report-conversational LLM path times out
- * (does not mark investigation completed; never downgrades a completed state).
- */
-export async function updateInvestigationProgressOnTimeout(
-  incidentId: string,
-  facilityId: string,
-  completenessScore: number,
-): Promise<void> {
-  const incident = await getIncidentById(incidentId, facilityId)
-  if (!incident) return
-
-  const inv = incident.investigation
-  const existing: IncidentInvestigationMetadata = inv
-    ? { ...inv }
-    : { status: "not-started" }
-
-  if (existing.status === "completed") {
-    await updateIncident(incidentId, facilityId, {
-      investigation: {
-        ...existing,
-        completenessScore: completenessScore ?? existing.completenessScore ?? 0,
-      },
-    })
-    return
-  }
-
-  const nextStatus: InvestigationStatus =
-    existing.status === "not-started" ? "in-progress" : existing.status
-
-  await updateIncident(incidentId, facilityId, {
-    investigation: {
-      ...existing,
-      status: nextStatus,
-      completenessScore,
-    },
-  })
-}
-
 export async function addQuestionToIncident(
   incidentId: string,
   facilityId: string,
