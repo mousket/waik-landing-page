@@ -20,7 +20,7 @@ export function Hero() {
           <ScrollReveal>
             <div className="max-w-2xl">
               <h1 className="mb-8 text-balance text-6xl font-bold tracking-tight md:text-7xl lg:text-8xl leading-[1.1]">
-                The 3-Hour Incident Report is <span className="text-primary">Obsolete.</span>
+                The 4-Hour Incident Report is <span className="text-primary">Obsolete.</span>
               </h1>
 
               <p className="mb-10 text-pretty text-xl text-foreground/70 md:text-2xl leading-relaxed">
