@@ -20,6 +20,13 @@ import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  displayIncidentPhase,
+  displayIncidentPhaseShort,
+  displayIncidentType,
+} from "@/lib/incidents/presentation"
+import { mapIncidentTypeToTrendBucket } from "@/lib/admin/trends-incident-type-buckets"
+import type { IncidentTrendBucket } from "@/lib/types/trends-incident-trends"
 import { cn } from "@/lib/utils"
 import type { IncidentPhase } from "@/lib/types/incident-summary"
 
@@ -31,36 +38,6 @@ const PHASE_FILTER_ORDER: readonly IncidentPhase[] = [
   "closed",
 ] as const
 
-export function displayIncidentPhase(phase: string): string {
-  switch (phase) {
-    case "phase_1_in_progress":
-      return "Phase 1 · in progress"
-    case "phase_1_complete":
-      return "Phase 1 · complete"
-    case "phase_2_in_progress":
-      return "Phase 2 · in progress"
-    case "closed":
-      return "Closed"
-    default:
-      return (phase || "").replace(/_/g, " ") || "—"
-  }
-}
-
-export function displayIncidentPhaseShort(phase: string): string {
-  switch (phase) {
-    case "phase_1_in_progress":
-      return "P1 ongoing"
-    case "phase_1_complete":
-      return "P1 complete"
-    case "phase_2_in_progress":
-      return "Phase 2"
-    case "closed":
-      return "Closed"
-    default:
-      return (phase || "").replace(/_/g, " ") || "—"
-  }
-}
-
 export type ResidentIncidentRow = {
   id: string
   title: string
@@ -70,12 +47,6 @@ export type ResidentIncidentRow = {
   startedAt?: string | null
   staffName: string
   incidentType: string
-}
-
-export function displayIncidentType(raw: string) {
-  const t = (raw || "").replace(/[_-]+/g, " ").trim()
-  if (!t) return "Report"
-  return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
 /** Icon for an incident type string (keyword heuristics). */
@@ -98,6 +69,10 @@ export function useResidentIncidentFilters(incidents: ResidentIncidentRow[]) {
   const [staffFilter, setStaffFilter] = useState<string>("all")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [phaseFilter, setPhaseFilter] = useState<"all" | string>("all")
+  /** Trends drilldown: Falls / Skin / Medication / Behavior bucket (not raw type string). */
+  const [trendTypeBucket, setTrendTypeBucket] = useState<IncidentTrendBucket | null>(null)
+  /** When non-empty, row phase must be in this set (URL `phase=a,b`). */
+  const [phaseInFilter, setPhaseInFilter] = useState<string[]>([])
 
   const staffOptions = useMemo(() => {
     const s = new Set<string>()
@@ -166,12 +141,18 @@ export function useResidentIncidentFilters(incidents: ResidentIncidentRow[]) {
         if (t > toT) return false
       }
       if (staffFilter !== "all" && (i.staffName || "") !== staffFilter) return false
-      const tNorm = (i.incidentType || "incident").toLowerCase()
-      if (typeFilter !== "all" && tNorm !== typeFilter.toLowerCase()) return false
-      if (phaseFilter !== "all" && (i.phase || "") !== phaseFilter) return false
+      if (trendTypeBucket) {
+        if (mapIncidentTypeToTrendBucket(i.incidentType) !== trendTypeBucket) return false
+      } else {
+        const tNorm = (i.incidentType || "incident").toLowerCase()
+        if (typeFilter !== "all" && tNorm !== typeFilter.toLowerCase()) return false
+      }
+      if (phaseInFilter.length > 0) {
+        if (!phaseInFilter.includes(i.phase)) return false
+      } else if (phaseFilter !== "all" && (i.phase || "") !== phaseFilter) return false
       return true
     })
-  }, [incidents, dateFrom, dateTo, staffFilter, typeFilter, phaseFilter])
+  }, [incidents, dateFrom, dateTo, staffFilter, typeFilter, phaseFilter, trendTypeBucket, phaseInFilter])
 
   const resetFilters = useCallback(() => {
     setDateFrom("")
@@ -179,6 +160,8 @@ export function useResidentIncidentFilters(incidents: ResidentIncidentRow[]) {
     setStaffFilter("all")
     setTypeFilter("all")
     setPhaseFilter("all")
+    setTrendTypeBucket(null)
+    setPhaseInFilter([])
   }, [])
 
   return {
@@ -197,6 +180,10 @@ export function useResidentIncidentFilters(incidents: ResidentIncidentRow[]) {
     phaseFilter,
     setPhaseFilter,
     phaseOptions,
+    trendTypeBucket,
+    setTrendTypeBucket,
+    phaseInFilter,
+    setPhaseInFilter,
     resetFilters,
     filtered,
   }
@@ -220,7 +207,7 @@ function filterPillClass() {
 }
 
 function phaseLabel(phase: string) {
-  return (phase || "").replace(/_/g, " ") || "—"
+  return displayIncidentPhase(phase)
 }
 
 export function FilterChip({

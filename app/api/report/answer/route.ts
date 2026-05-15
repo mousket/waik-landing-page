@@ -317,6 +317,10 @@ async function handleDeferAll(session: ReportSession): Promise<Response> {
           completenessScore: updated.completenessScore,
           questionsDeferred: updated.tier2DeferredIds.length,
           questionsAnswered: Object.keys(updated.tier2Answers).length,
+          tier2DeferredAt: new Date(),
+          tier2Reminder2hSentAt: null,
+          tier2Reminder4hSentAt: null,
+          tier2EscalationSentAt: null,
           updatedAt: new Date(),
         },
       },
@@ -453,6 +457,43 @@ async function handleTier2Answer(
     }
     return s
   })
+
+  const unanswered = finalSession.tier2Questions.filter((q) => !finalSession.tier2Answers[q.id]?.trim()).length
+  try {
+    await connectMongo()
+    const { IncidentModel } = await import("@/backend/src/models/incident.model")
+    if (thresholdReached) {
+      await IncidentModel.updateOne(
+        { id: session.incidentId, facilityId: session.facilityId },
+        {
+          $set: {
+            completenessScore: completenessPercent,
+            questionsAnswered: Object.keys(finalSession.tier2Answers).length,
+            questionsDeferred: 0,
+            tier2DeferredAt: null,
+            tier2Reminder2hSentAt: null,
+            tier2Reminder4hSentAt: null,
+            tier2EscalationSentAt: null,
+            updatedAt: new Date(),
+          },
+        },
+      )
+    } else {
+      await IncidentModel.updateOne(
+        { id: session.incidentId, facilityId: session.facilityId },
+        {
+          $set: {
+            completenessScore: completenessPercent,
+            questionsAnswered: Object.keys(finalSession.tier2Answers).length,
+            questionsDeferred: unanswered,
+            updatedAt: new Date(),
+          },
+        },
+      )
+    }
+  } catch (err) {
+    console.error("[report/answer] tier2 incident sync failed:", err)
+  }
 
   if (thresholdReached) {
     return NextResponse.json({

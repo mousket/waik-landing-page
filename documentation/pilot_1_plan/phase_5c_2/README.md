@@ -103,21 +103,33 @@ This ordering is the default for `/admin/dashboard?view=trends`.
 
 ## Subtask Index (Granular)
 
-Companion files live in this folder. Completed work uses `*-done.md`.
+Companion files live in this folder. **Shipped tasks** use `*-done.md` (same slug + `-done` before `.md`). Remaining work keeps the original filename until closed.
 
-| Task   | What It Builds                                                     | Est. Time |
-|--------|---------------------------------------------------------------------|-----------|
-| 5c2-01 | Trends layout rails + date range control + toggle wiring            | 2–3 hrs   |
-| 5c2-02 | E1 Trends Header (range, deltas, jump chips)                        | 2–3 hrs   |
-| 5c2-03 | E2 Facility Health Summary (KPIs + deltas + definitions)            | 3–5 hrs   |
-| 5c2-04 | E3 Incident Trends card (type + severity mix)                       | 3–5 hrs   |
-| 5c2-05 | E4 Compliance Drift card (unit/role slip detection)                 | 3–6 hrs   |
-| 5c2-06 | E5 Pattern & Cluster Insights (evidence-backed insights module)     | 4–7 hrs   |
-| 5c2-07 | E6 High-risk Cohort Trends (drivers changing over time)             | 3–6 hrs   |
-| 5c2-08 | E7 Intervention Effectiveness (before/after snapshots)              | 3–6 hrs   |
-| 5c2-09 | E8 Staffing/Throughput Trends (support lens, not surveillance)      | 3–6 hrs   |
-| 5c2-10 | Weekly Brief (Trends narrative) + citations                          | 2–4 hrs   |
-| 5c2-11 | Data contracts + endpoints for Trends (API plan)                    | 4–8 hrs   |
-| 5c2-12 | Loading/empty/error states + performance guardrails                 | 2–4 hrs   |
-| 5c2-13 | QA: responsive ordering + parity + drilldown links                  | 2–3 hrs   |
+**Progress:** **5c2-01–5c2-13 complete** — Phase 5c-2 Executive View (Trends) is shipped end-to-end.
+
+| Area | Status |
+|------|--------|
+| E1–E8 cards + range toggle | Shipped |
+| Trends APIs | `GET /api/admin/trends/snapshot` (+ per-card routes sharing `loadTrendsIncidentPool`) |
+| `/admin/incidents` drilldowns | `range`, `from`/`to`, `type`, `severity`, `repeat`, `phase`, `unit`, `role`, `bottleneck` |
+| `/admin/residents` drilldowns | `range`, `risk=high`, `driver` |
+| S1 Weekly brief | Shipped — **5c2-10** |
+
+| Task   | What It Builds                                                     | Est. Time | Spec |
+|--------|---------------------------------------------------------------------|-----------|------|
+| 5c2-01 | Trends layout rails + date range control + toggle wiring            | 2–3 hrs   | [done](task-5c2-01-trends-layout-and-range-done.md) |
+| 5c2-02 | E1 Trends Header (range, deltas, jump chips)                        | 2–3 hrs   | [done](task-5c2-02-trends-header-done.md) |
+| 5c2-03 | E2 Facility Health Summary (KPIs + deltas + definitions)            | 3–5 hrs   | [done](task-5c2-03-facility-health-summary-done.md) |
+| 5c2-04 | E3 Incident Trends card (type + severity mix)                       | 3–5 hrs   | [done](task-5c2-04-incident-trends-done.md) |
+| 5c2-05 | E4 Compliance Drift card (unit/role slip detection)                 | 3–6 hrs   | [done](task-5c2-05-compliance-drift-done.md) |
+| 5c2-06 | E5 Pattern & Cluster Insights (evidence-backed insights module)     | 4–7 hrs   | [done](task-5c2-06-pattern-and-cluster-insights-done.md) |
+| 5c2-07 | E6 High-risk Cohort Trends (drivers changing over time)             | 3–6 hrs   | [done](task-5c2-07-high-risk-cohort-trends-done.md) |
+| 5c2-08 | E7 Intervention Effectiveness (before/after snapshots)              | 3–6 hrs   | [done](task-5c2-08-intervention-effectiveness-done.md) |
+| 5c2-09 | E8 Staffing/Throughput Trends (support lens, not surveillance)      | 3–6 hrs   | [done](task-5c2-09-staffing-throughput-trends-done.md) |
+| 5c2-10 | Weekly Brief (Trends narrative) + citations                          | 2–4 hrs   | [done](task-5c2-10-weekly-brief-trends-narrative-done.md) |
+| 5c2-11 | Data contracts + endpoints for Trends (API plan)                    | 4–8 hrs   | [done](task-5c2-11-data-contracts-and-endpoints-done.md) |
+| 5c2-12 | Loading/empty/error states + performance guardrails                 | 2–4 hrs   | [done](task-5c2-12-states-performance-guardrails-done.md) |
+| 5c2-13 | QA: responsive ordering + parity + drilldown links                  | 2–3 hrs   | [done](task-5c2-13-qa-parity-and-drilldowns-done.md) |
+
+**Also:** [Drilldown destinations map](drilldowns-map.md) (URLs + query vocabulary for cards and lists).
 

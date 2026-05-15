@@ -13,12 +13,17 @@ type SpeechRecognitionType = {
   continuous: boolean
   interimResults: boolean
   lang: string
-  onresult: ((event: { results: ArrayLike<SpeechRecognitionResult> }) => void) | null
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
   onerror: ((event: { error: string }) => void) | null
   onend: (() => void) | null
   start: () => void
   stop: () => void
   abort: () => void
+}
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number
+  results: ArrayLike<SpeechRecognitionResult>
 }
 
 /**
@@ -200,7 +205,7 @@ export function VoiceInputScreen({
     recognition.interimResults = true
     recognition.lang = "en-US"
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       consecutiveNoSpeechRef.current = 0
       const results = event.results
 

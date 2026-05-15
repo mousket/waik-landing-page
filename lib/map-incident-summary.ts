@@ -83,9 +83,14 @@ export function mapIncidentDocToSummary(doc: Record<string, unknown>): IncidentS
       }
     : defaultPhase2Sections()
 
+  const residentIdRaw = doc.residentId
+  const residentId =
+    typeof residentIdRaw === "string" && residentIdRaw.trim() ? residentIdRaw.trim() : undefined
+
   return {
     id: String(doc.id),
     facilityId: String(doc.facilityId ?? ""),
+    ...(residentId ? { residentId } : {}),
     residentName: String(doc.residentName ?? ""),
     residentRoom: String(doc.residentRoom ?? ""),
     incidentType,

@@ -183,6 +183,11 @@ export interface IncidentDocument extends Document {
   tier2QuestionsGenerated?: number
   questionsAnswered?: number
   questionsDeferred?: number
+  /** Last time staff tapped “Answer later” on Tier 2 (cron reminders anchor to this). */
+  tier2DeferredAt?: Date
+  tier2Reminder2hSentAt?: Date
+  tier2Reminder4hSentAt?: Date
+  tier2EscalationSentAt?: Date
   questionsMarkedUnknown?: number
   activeDataCollectionSeconds?: number
   completenessAtTier1Complete?: number
@@ -555,6 +560,10 @@ const IncidentSchema = new Schema<IncidentDocument>(
     tier2QuestionsGenerated: { type: Number, default: 0 },
     questionsAnswered: { type: Number, default: 0 },
     questionsDeferred: { type: Number, default: 0 },
+    tier2DeferredAt: { type: Date },
+    tier2Reminder2hSentAt: { type: Date },
+    tier2Reminder4hSentAt: { type: Date },
+    tier2EscalationSentAt: { type: Date },
     questionsMarkedUnknown: { type: Number, default: 0 },
     activeDataCollectionSeconds: { type: Number, default: 0 },
     completenessAtTier1Complete: { type: Number, default: 0 },

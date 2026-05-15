@@ -22,6 +22,8 @@ export interface IdtTeamMember {
 export interface IncidentSummary {
   id: string
   facilityId: string
+  /** Present when the incident is linked to a resident record (enables /admin/residents/[id]). */
+  residentId?: string
   residentName: string
   residentRoom: string
   incidentType: string

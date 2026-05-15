@@ -251,10 +251,19 @@ export function Phase2InvestigationShell({
 
         {inc.phase === "closed" ? (
           <WaikCard className="border-amber-200/80 bg-amber-50/50">
-            <WaikCardContent className="flex flex-col gap-2 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-amber-900">
-                <CheckCircle2 className="h-4 w-4" />
-                This investigation is locked. Contact DON or an administrator to unlock.
+            <WaikCardContent className="flex flex-col gap-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 text-amber-900">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  This investigation is locked. Contact DON or an administrator to unlock.
+                </div>
+                {canP2 ? (
+                  <Button asChild variant="secondary" size="sm" className="w-fit rounded-xl">
+                    <Link href={buildAdminPathWithContext(`/admin/incidents/${incidentId}/report`, searchParams)}>
+                      Closure report (print / PDF)
+                    </Link>
+                  </Button>
+                ) : null}
               </div>
               {canP2 && (
                 <div className="flex flex-1 flex-col gap-1 sm:max-w-md">

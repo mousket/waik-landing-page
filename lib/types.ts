@@ -112,10 +112,18 @@ export interface IncidentNotification {
     | "investigation-ready"
     | "follow-up-required"
     | "investigation-completed"
+    | "phase2-all-sections-complete"
+    | "phase2-pending-signature"
+    | "investigation-reporter-closed"
   message: string
   createdAt: string
   readAt?: string
   targetUserId: string
+  facilityId?: string
+  actionUrl?: string
+  category?: "incident" | "assessment" | "investigation" | "system" | "intelligence"
+  priority?: "urgent" | "normal" | "low"
+  actorName?: string
 }
 
 export interface HumanReport {
@@ -242,6 +250,10 @@ export interface Incident {
   tier2QuestionsGenerated?: number
   questionsAnswered?: number
   questionsDeferred?: number
+  tier2DeferredAt?: string
+  tier2Reminder2hSentAt?: string
+  tier2Reminder4hSentAt?: string
+  tier2EscalationSentAt?: string
   questionsMarkedUnknown?: number
   activeDataCollectionSeconds?: number
   completenessAtTier1Complete?: number

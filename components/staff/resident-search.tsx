@@ -195,6 +195,7 @@ export function StaffResidentSearch({
                       <button
                         type="button"
                         role="option"
+                        aria-selected={false}
                         className="min-h-12 w-full cursor-pointer px-3 py-2.5 text-left text-sm text-foreground transition hover:bg-muted/60"
                         onClick={() => {
                           onChange(r)

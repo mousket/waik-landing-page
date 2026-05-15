@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
-import { getAdminContextQueryString, buildAdminPathWithContext } from "@/lib/admin-nav-context"
+import { getAdminContextQueryString, buildAdminPathWithContext, buildAdminIncidentsApiPath } from "@/lib/admin-nav-context"
+import {
+  adminResidentsUrlHasTrendsDrilldown,
+  parseAdminResidentsTrendsDrilldown,
+  residentsTrendsCurrentWindow,
+} from "@/lib/admin/parse-admin-residents-url"
+import { buildCohortDriverMap } from "@/lib/admin/trends-high-risk-cohort-metrics"
+import { trendsRangeDayCount } from "@/lib/admin/trends-range"
+import { ResidentDirectorySearch } from "@/components/residents/resident-directory-search"
+import { ResidentDirectoryTable } from "@/components/residents/resident-directory-table"
 import { Button } from "@/components/ui/button"
 import { CardDescription, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
@@ -17,29 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Loader2, Plus, Search } from "lucide-react"
-import Link from "next/link"
-
-type Resident = {
-  id: string
-  firstName: string
-  lastName: string
-  roomNumber: string
-  careLevel: string
-  status?: string
-  admissionDate?: string | null
-  incidents30d?: number
-  lastAssessmentAt?: string | null
-  nextDueAt?: string | null
-}
+import type { ResidentDirectoryRow } from "@/lib/types/resident-directory"
+import { residentFullName } from "@/lib/types/resident-directory"
+import type { IncidentSummary } from "@/lib/types/incident-summary"
+import { Plus } from "lucide-react"
 
 const CARE_OPTIONS = [
   { value: "independent", label: "Independent" },
@@ -51,7 +41,7 @@ const CARE_OPTIONS = [
 export default function AdminResidentsPage() {
   const searchParams = useAdminUrlSearchParams()
   const apiCtx = useMemo(() => getAdminContextQueryString(searchParams), [searchParams])
-  const [residents, setResidents] = useState<Resident[]>([])
+  const [residents, setResidents] = useState<ResidentDirectoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [open, setOpen] = useState(false)
@@ -62,6 +52,11 @@ export default function AdminResidentsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusF, setStatusF] = useState<"all" | "active" | "discharged" | "on-leave" | "inactive">("all")
+
+  const trendsDrilldown = useMemo(() => parseAdminResidentsTrendsDrilldown(searchParams), [searchParams.toString()])
+  const [cohortIncidents, setCohortIncidents] = useState<IncidentSummary[] | null>(null)
+  const [cohortLoading, setCohortLoading] = useState(false)
+  const [cohortError, setCohortError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -77,7 +72,7 @@ export default function AdminResidentsPage() {
         setResidents([])
         return
       }
-      const j = (await res.json()) as { residents: Resident[] }
+      const j = (await res.json()) as { residents: ResidentDirectoryRow[] }
       setResidents(j.residents ?? [])
     } finally {
       setLoading(false)
@@ -97,6 +92,64 @@ export default function AdminResidentsPage() {
         r.roomNumber.toLowerCase().includes(q),
     )
   }, [residents, search])
+
+  useEffect(() => {
+    if (!adminResidentsUrlHasTrendsDrilldown(searchParams)) {
+      setCohortIncidents(null)
+      setCohortError(null)
+      setCohortLoading(false)
+      return
+    }
+    let cancelled = false
+    setCohortLoading(true)
+    setCohortError(null)
+    setCohortIncidents(null)
+    const range = trendsDrilldown.trendsRange
+    const days = Math.min(400, trendsRangeDayCount(range) * 2 + 14)
+    const path = buildAdminIncidentsApiPath(searchParams, { days: String(days) })
+    void fetch(path, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(j.error ?? "Could not load incidents for cohort")
+        }
+        const j = (await res.json()) as { incidents?: IncidentSummary[] }
+        if (!cancelled) setCohortIncidents(j.incidents ?? [])
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setCohortIncidents(null)
+          setCohortError(e instanceof Error ? e.message : "Could not load cohort data")
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCohortLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, trendsDrilldown.trendsRange, trendsDrilldown.riskHigh, trendsDrilldown.driver])
+
+  const cohortMap = useMemo(() => {
+    if (!adminResidentsUrlHasTrendsDrilldown(searchParams) || cohortIncidents == null) return null
+    const win = residentsTrendsCurrentWindow(searchParams)
+    return buildCohortDriverMap(cohortIncidents, win, Date.now())
+  }, [cohortIncidents, searchParams])
+
+  const directoryRows = useMemo(() => {
+    if (!adminResidentsUrlHasTrendsDrilldown(searchParams) || cohortMap == null) return filtered
+    const driver = trendsDrilldown.driver
+    return filtered.filter((row) => {
+      const keys = [
+        `id:${row.id}`,
+        `nm:${residentFullName(row).trim().toLowerCase()}|${row.roomNumber.trim().toLowerCase()}`,
+      ]
+      const inCohort = keys.some((k) => cohortMap.has(k))
+      if (!inCohort) return false
+      if (!driver) return true
+      return keys.some((k) => cohortMap.get(k)?.includes(driver))
+    })
+  }, [filtered, cohortMap, searchParams, trendsDrilldown.driver])
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -139,6 +192,20 @@ export default function AdminResidentsPage() {
           }
         />
 
+        {adminResidentsUrlHasTrendsDrilldown(searchParams) ? (
+          <div
+            className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/90"
+            role="status"
+          >
+            <span className="font-semibold">Trends cohort filter</span> — directory is narrowed using incident-derived
+            signals for {trendsDrilldown.trendsRange}
+            {trendsDrilldown.riskHigh ? " (high-risk cohort)" : ""}
+            {trendsDrilldown.driver ? ` · driver: ${trendsDrilldown.driver}` : ""}. Clear query params in the address bar
+            to return to the full list.
+            {cohortError ? <span className="mt-1 block text-destructive">{cohortError}</span> : null}
+          </div>
+        ) : null}
+
         <WaikCard>
           <WaikCardContent className="space-y-0 p-0">
             <div className="flex flex-col gap-4 border-b border-border/50 p-6 sm:flex-row sm:items-end sm:justify-between">
@@ -147,13 +214,11 @@ export default function AdminResidentsPage() {
                 <CardDescription>Search by name or room. Status filter reloads the list.</CardDescription>
               </div>
               <div className="flex w-full flex-col gap-2 sm:max-w-md sm:flex-row sm:items-end">
-                <div className="relative w-full sm:max-w-xs">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search…"
+                <div className="w-full sm:max-w-xs">
+                  <ResidentDirectorySearch
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="h-12 min-h-12 pl-9"
+                    onChange={setSearch}
+                    placeholder="Search…"
                   />
                 </div>
                 <div className="w-full min-w-0 sm:w-40">
@@ -181,62 +246,17 @@ export default function AdminResidentsPage() {
               </div>
             </div>
             <div className="p-0">
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border bg-muted/40 hover:bg-muted/40">
-                      <TableHead className="font-semibold">Name</TableHead>
-                      <TableHead className="font-semibold">Room</TableHead>
-                      <TableHead className="font-semibold">Care level</TableHead>
-                      <TableHead className="text-right font-semibold"># Inc (30d)</TableHead>
-                      <TableHead className="font-semibold">Last asmt</TableHead>
-                      <TableHead className="font-semibold">Next due</TableHead>
-                      <TableHead className="w-[90px] font-semibold" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                          No residents yet
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filtered.map((r) => (
-                        <TableRow key={r.id} className="border-border transition-colors hover:bg-muted/30">
-                          <TableCell className="font-medium">
-                            {r.firstName} {r.lastName}
-                          </TableCell>
-                          <TableCell>{r.roomNumber || "—"}</TableCell>
-                          <TableCell className="capitalize">{r.careLevel.replace(/_/g, " ")}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {r.incidents30d ?? 0}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {r.lastAssessmentAt ? r.lastAssessmentAt.slice(0, 10) : "—"}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {r.nextDueAt ? r.nextDueAt.slice(0, 10) : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <Button variant="outline" size="sm" className="h-8 px-2" asChild>
-                              <Link
-                                href={buildAdminPathWithContext(`/residents/${r.id}`, searchParams)}
-                              >
-                                View
-                              </Link>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
+              <ResidentDirectoryTable
+                residents={directoryRows}
+                loading={loading || (adminResidentsUrlHasTrendsDrilldown(searchParams) && cohortLoading)}
+                variant="admin"
+                emptyMessage={
+                  adminResidentsUrlHasTrendsDrilldown(searchParams) && cohortMap != null
+                    ? "No residents matched this cohort filter"
+                    : "No residents yet"
+                }
+                getResidentHref={(resident) => buildAdminPathWithContext(`/residents/${resident.id}`, searchParams)}
+              />
             </div>
           </WaikCardContent>
         </WaikCard>

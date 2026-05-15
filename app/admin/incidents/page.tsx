@@ -2,50 +2,50 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { buildAdminPathWithContext, getAdminContextQueryString } from "@/lib/admin-nav-context"
+import { buildAdminIncidentsApiPath, buildAdminPathWithContext } from "@/lib/admin-nav-context"
+import {
+  adminIncidentsFetchDaysHint,
+  adminIncidentsUrlHasDrilldownParams,
+  parseAdminIncidentsUrl,
+} from "@/lib/admin/parse-admin-incidents-url"
+import { incidentMatchesBottleneck } from "@/lib/admin/trends-staffing-throughput-metrics"
+import { isRepeatWithin7Days } from "@/lib/admin/trends-facility-health-metrics"
+import { incidentHasOverdueIdt } from "@/lib/admin/incident-attention-helpers"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
 import { AllIncidentsFilterBar } from "@/components/admin/all-incidents-filter-bar"
 import { useResidentIncidentFilters, type ResidentIncidentRow } from "@/components/admin/resident-incidents-section"
-import type { IncidentPhase, IncidentSummary } from "@/lib/types/incident-summary"
-import { Badge } from "@/components/ui/badge"
+import { IncidentCompletionIndicator } from "@/components/incidents/incident-completion-indicator"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
 import { PageHeader } from "@/components/ui/page-header"
-import { Loader2 } from "lucide-react"
+import { PhaseBadge } from "@/components/shared/phase-badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { displayIncidentType } from "@/lib/incidents/presentation"
+import type { IncidentSummary } from "@/lib/types/incident-summary"
+import { mapIncidentSummaryToListRow, type IncidentListRow } from "@/lib/types/incident-list-row"
+import { classifyIncident, computeClock } from "@/lib/utils/incident-classification"
+import { FileText } from "lucide-react"
 
-function RingPct({ pct }: { pct: string }) {
-  return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-primary text-xs font-semibold text-primary">
-      {pct}
-    </div>
-  )
+function unitKeyFromRoom(room: string): string {
+  const r = room.trim()
+  if (!r) return "Unknown"
+  const wing = r.split(/[-/]/)[0]?.trim()
+  if (wing && wing.length <= 8) return wing
+  const first = r.split(/\s+/)[0]?.trim()
+  return first || r.slice(0, 6)
 }
 
-function phaseLabel(p: IncidentPhase): string {
-  switch (p) {
-    case "phase_1_in_progress":
-      return "Phase 1 in progress"
-    case "phase_1_complete":
-      return "Phase 1 complete"
-    case "phase_2_in_progress":
-      return "Phase 2"
-    case "closed":
-      return "Closed"
-    default:
-      return p
-  }
-}
-
-function toResidentRow(inc: IncidentSummary): ResidentIncidentRow {
+function toResidentRow(inc: IncidentListRow): ResidentIncidentRow {
   const room = inc.residentRoom?.trim()
   const who = [inc.residentName?.trim(), room ? `Room ${room}` : null].filter(Boolean).join(" · ")
   return {
     id: inc.id,
     title: who || "Incident",
     phase: inc.phase,
-    completenessScore: inc.completenessScore,
+    completenessScore: inc.completenessPercent,
     createdAt: inc.startedAt,
     startedAt: inc.startedAt,
-    staffName: inc.reportedByName,
+    staffName: inc.reporterName,
     incidentType: inc.incidentType,
   }
 }
@@ -59,9 +59,10 @@ export default function AdminIncidentsListPage() {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const suffix = getAdminContextQueryString(searchParams)
+    const daysHint = adminIncidentsFetchDaysHint(searchParams)
+    const path = buildAdminIncidentsApiPath(searchParams, daysHint ? { days: String(daysHint) } : {})
     try {
-      const res = await fetch(`/api/incidents${suffix}`, { credentials: "include" })
+      const res = await fetch(path, { credentials: "include" })
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string }
         setError(j.error ?? "Could not load incidents")
@@ -82,13 +83,98 @@ export default function AdminIncidentsListPage() {
     void load()
   }, [load])
 
-  const filterRows = useMemo(() => incidents.map(toResidentRow), [incidents])
+  const listRows = useMemo(() => incidents.map(mapIncidentSummaryToListRow), [incidents])
+  const filterRows = useMemo(() => listRows.map(toResidentRow), [listRows])
   const f = useResidentIncidentFilters(filterRows)
-  const byId = useMemo(() => new Map(incidents.map((i) => [i.id, i] as const)), [incidents])
+  const {
+    setDateFrom,
+    setDateTo,
+    setTypeFilter,
+    setTrendTypeBucket,
+    setPhaseInFilter,
+    setPhaseFilter,
+  } = f
+  const byId = useMemo(() => new Map(listRows.map((i) => [i.id, i] as const)), [listRows])
+
+  const parsedUrl = useMemo(() => parseAdminIncidentsUrl(searchParams), [searchParams.toString()])
+
+  const urlSyncKey = searchParams.toString()
+
+  useEffect(() => {
+    const sp = new URLSearchParams(urlSyncKey)
+    if (!adminIncidentsUrlHasDrilldownParams(sp)) return
+    const p = parseAdminIncidentsUrl(sp)
+    if (p.dateFrom) setDateFrom(p.dateFrom)
+    if (p.dateTo) setDateTo(p.dateTo)
+    if (p.trendTypeBucket) {
+      setTrendTypeBucket(p.trendTypeBucket)
+      setTypeFilter("all")
+    } else if (p.typeExact) {
+      setTrendTypeBucket(null)
+      setTypeFilter(p.typeExact)
+    } else {
+      setTrendTypeBucket(null)
+    }
+    if (p.phaseIn.length) {
+      setPhaseInFilter(p.phaseIn)
+      setPhaseFilter("all")
+    } else {
+      setPhaseInFilter([])
+    }
+  }, [urlSyncKey, setDateFrom, setDateTo, setTypeFilter, setTrendTypeBucket, setPhaseInFilter, setPhaseFilter])
 
   const tableRows = useMemo(() => {
-    return f.filtered.map((r) => byId.get(r.id)).filter((x): x is IncidentSummary => x != null)
-  }, [byId, f.filtered])
+    const base = f.filtered.map((r) => byId.get(r.id)).filter((x): x is IncidentListRow => x != null)
+    const nowMs = Date.now()
+    let rows = base
+    if (parsedUrl.severity) {
+      rows = rows.filter((row) => {
+        const inc = incidents.find((i) => i.id === row.id)
+        if (!inc) return false
+        const u = classifyIncident(inc, nowMs)
+        const sev = u === "red_alert" ? "critical" : u === "yellow_awaiting" ? "warning" : "normal"
+        return sev === parsedUrl.severity
+      })
+    }
+    if (parsedUrl.repeatOnly) {
+      rows = rows.filter((row) => {
+        const inc = incidents.find((i) => i.id === row.id)
+        return Boolean(inc && isRepeatWithin7Days(inc, incidents))
+      })
+    }
+    if (parsedUrl.unit) {
+      rows = rows.filter((row) => unitKeyFromRoom(row.residentRoom || "") === parsedUrl.unit)
+    }
+    if (parsedUrl.role) {
+      rows = rows.filter((row) => {
+        const inc = incidents.find((i) => i.id === row.id)
+        return Boolean(inc && (inc.reportedByRole || "").trim().toLowerCase() === parsedUrl.role)
+      })
+    }
+    if (parsedUrl.bottleneck) {
+      const bottleneck = parsedUrl.bottleneck
+      rows = rows.filter((row) => {
+        const inc = incidents.find((i) => i.id === row.id)
+        if (!inc) return false
+        if (bottleneck === "overdue_docs") {
+          const clock = computeClock(inc.phase1SignedAt, 48, nowMs)
+          if (inc.phase === "phase_2_in_progress" && clock?.status === "overdue") return true
+          return incidentHasOverdueIdt(inc, nowMs)
+        }
+        return incidentMatchesBottleneck(inc, bottleneck, nowMs)
+      })
+    }
+    return rows
+  }, [
+    byId,
+    f.filtered,
+    incidents,
+    parsedUrl.bottleneck,
+    parsedUrl.repeatOnly,
+    parsedUrl.role,
+    parsedUrl.severity,
+    parsedUrl.unit,
+  ])
 
   return (
     <div className="relative flex w-full flex-1 flex-col">
@@ -99,27 +185,57 @@ export default function AdminIncidentsListPage() {
           title="All incidents"
           description=""
         />
+        {adminIncidentsUrlHasDrilldownParams(searchParams) ? (
+          <div
+            className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/90"
+            role="status"
+          >
+            Filters were applied from the address bar (Trends drilldown). Use{" "}
+            <span className="font-semibold">Clear</span> in the filter card to widen the list.
+          </div>
+        ) : null}
         {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
 
         {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="space-y-3 py-2">
+            <Skeleton className="h-10 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-2xl" />
           </div>
         ) : (
           <div className="space-y-4">
             {incidents.length > 0 ? <AllIncidentsFilterBar incidents={filterRows} f={f} /> : null}
-            <p className="text-center text-sm text-muted-foreground">
-              {incidents.length === 0
-                ? "No incidents for this facility."
-                : `${f.filtered.length} of ${incidents.length} incident${incidents.length === 1 ? "" : "s"} in view`}
-            </p>
-            {incidents.length > 0 && f.filtered.length === 0
-              ? (
-                  <p className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 text-center text-sm text-muted-foreground">
-                    No incidents match the current filters. Try adjusting type, date, or staff.
-                  </p>
-                )
-              : null}
+            {incidents.length === 0 ? (
+              <EmptyState
+                icon={<FileText className="h-6 w-6" />}
+                title="No incidents for this facility"
+                description="Incident reports will appear here as they move through the facility pipeline."
+              />
+            ) : (
+              <p className="text-center text-sm text-muted-foreground">
+                {tableRows.length} of {incidents.length} incident{incidents.length === 1 ? "" : "s"} in view
+                {parsedUrl.severity ||
+                parsedUrl.repeatOnly ||
+                parsedUrl.unit ||
+                parsedUrl.role ||
+                parsedUrl.bottleneck ? (
+                  <span className="mt-1 block text-xs">
+                    Includes link-applied filters (severity, repeat, unit, role, or bottleneck) where present.
+                  </span>
+                ) : null}
+              </p>
+            )}
+            {incidents.length > 0 && f.filtered.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 text-center text-sm text-muted-foreground">
+                No incidents match the current filters. Try adjusting type, date, or staff.
+              </p>
+            ) : null}
+            {incidents.length > 0 && f.filtered.length > 0 && tableRows.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 text-center text-sm text-muted-foreground">
+                No incidents match link filters (severity, repeat, unit, role, or bottleneck). Try clearing filters or
+                widening the date range.
+              </p>
+            ) : null}
             <div className="overflow-x-auto rounded-2xl border border-border/80 bg-background/95 shadow-sm">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
@@ -145,7 +261,6 @@ export default function AdminIncidentsListPage() {
                       ? null
                     : tableRows.map((inc) => {
                         const detailPath = buildAdminPathWithContext(`/admin/incidents/${inc.id}`, searchParams)
-                        const comp = Math.round(inc.completenessScore ?? 0)
                         return (
                           <tr
                             key={inc.id}
@@ -160,13 +275,13 @@ export default function AdminIncidentsListPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-muted-foreground">
-                              {inc.incidentType || "—"}
+                              {displayIncidentType(inc.incidentType)}
                             </td>
                             <td className="px-4 py-3">
-                              <Badge className="bg-primary text-primary-foreground">{phaseLabel(inc.phase)}</Badge>
+                              <PhaseBadge phase={inc.phase} size="sm" />
                             </td>
                             <td className="px-4 py-3">
-                              <RingPct pct={`${comp}%`} />
+                              <IncidentCompletionIndicator percent={inc.completenessPercent} ringSize={40} strokeWidth={3} />
                             </td>
                             <td className="px-4 py-3 text-sm text-muted-foreground">—</td>
                             <td className="px-4 py-3">

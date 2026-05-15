@@ -3,6 +3,7 @@
 import type { ElementType } from "react"
 import Link from "next/link"
 import { ClipboardList, Stethoscope, Users } from "lucide-react"
+import { buildStaffAssessmentHref, displayAssessmentType } from "@/lib/assessments/presentation"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -53,11 +54,6 @@ function displayName(a: SidebarAssessment) {
   return "Resident"
 }
 
-function typeLabel(t: string) {
-  if (!t) return "Assessment"
-  return `${t.charAt(0).toUpperCase()}${t.slice(1)}`
-}
-
 /**
  * Right column — your last 30 days, shortcuts, and “due soon” assessments.
  */
@@ -98,11 +94,7 @@ export function StaffDashboardSidebar({
             {assessments.slice(0, 4).map((a) => {
               const d = Number(a.daysUntilDue ?? 0)
               const badge = d <= 0 ? "Today" : d === 1 ? "1 day" : `${d} days`
-              const href = `/staff/assessments/${encodeURIComponent(a.assessmentType)}?${new URLSearchParams({
-                residentId: a.residentId,
-                residentName: (a.residentName || "Resident").trim() || "Resident",
-                residentRoom: a.residentRoom || "",
-              })}`
+              const href = buildStaffAssessmentHref(a) ?? "/staff/assessments"
               return (
                 <li key={a.id}>
                   <Link
@@ -114,7 +106,7 @@ export function StaffDashboardSidebar({
                         {displayName(a)}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {typeLabel(a.assessmentType)}
+                        {displayAssessmentType(a.assessmentType)}
                         {a.residentRoom ? ` · Room ${a.residentRoom}` : ""}
                       </p>
                     </div>

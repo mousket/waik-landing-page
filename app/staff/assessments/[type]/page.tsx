@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import VoiceInputScreen, { type VoiceInputScreenProps } from "@/components/voice-input-screen"
 import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
 import { useWaikUser } from "@/hooks/use-waik-user"
+import { isStaffSupportedAssessmentType, type SupportedStaffAssessmentType } from "@/lib/assessments/presentation"
 import { cn } from "@/lib/utils"
 
 type Phase = "loading" | "voice" | "done" | "error" | "missing"
@@ -46,8 +47,7 @@ export default function StaffAssessmentByTypePage() {
   const { isLoaded, isSignedIn, userId, name, role, mustChangePassword } = useWaikUser()
 
   const typeRaw = typeof params.type === "string" ? params.type : ""
-  const assessmentType =
-    typeRaw === "activity" || typeRaw === "dietary" ? (typeRaw as "activity" | "dietary") : null
+  const assessmentType: SupportedStaffAssessmentType | null = isStaffSupportedAssessmentType(typeRaw) ? typeRaw : null
 
   const residentId = sp.get("residentId")?.trim() ?? ""
   const residentName = sp.get("residentName")?.trim() || "Resident"

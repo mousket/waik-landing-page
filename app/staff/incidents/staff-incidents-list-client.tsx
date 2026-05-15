@@ -3,24 +3,21 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { format, isToday } from "date-fns"
 import type { StaffIncidentSummary } from "@/lib/types/staff-incident-summary"
+import { IncidentCompletionIndicator } from "@/components/incidents/incident-completion-indicator"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FileText } from "lucide-react"
 import { PhaseBadge } from "@/components/shared/phase-badge"
-import { CompletionRing } from "@/components/shared/completion-ring"
+import { displayIncidentType, formatIncidentListDate } from "@/lib/incidents/presentation"
+import { mapStaffIncidentSummaryToListRow, type IncidentListRow } from "@/lib/types/incident-list-row"
 import { cn } from "@/lib/utils"
-
-function typeLabel(s: string) {
-  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-}
 
 export function StaffIncidentsListClient() {
   const router = useRouter()
-  const [rows, setRows] = useState<StaffIncidentSummary[]>([])
+  const [rows, setRows] = useState<IncidentListRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,7 +30,9 @@ export function StaffIncidentsListClient() {
           return
         }
         const d = (await r.json()) as { incidents?: StaffIncidentSummary[] }
-        if (a) setRows(Array.isArray(d.incidents) ? d.incidents : [])
+        if (a) {
+          setRows(Array.isArray(d.incidents) ? d.incidents.map(mapStaffIncidentSummaryToListRow) : [])
+        }
       } finally {
         if (a) setLoading(false)
       }
@@ -76,9 +75,7 @@ export function StaffIncidentsListClient() {
         ) : (
           <ul className="min-w-0 space-y-3">
             {rows.map((inc) => {
-              const started = new Date(inc.startedAt)
-              const when = isToday(started) ? "Today" : format(started, "MMM d, yyyy")
-              const pct = Math.round(inc.completenessAtSignoff || inc.completenessScore)
+              const when = formatIncidentListDate(inc.startedAt)
               return (
                 <li key={inc.id}>
                   <button
@@ -91,17 +88,20 @@ export function StaffIncidentsListClient() {
                   >
                     <div className="flex w-full min-w-0 items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-foreground">Room {inc.residentRoom}</p>
-                        <p className="text-sm text-muted-foreground">{typeLabel(inc.incidentType)}</p>
+                        <p className="truncate font-semibold text-foreground">
+                          {inc.residentRoom ? `Room ${inc.residentRoom}` : inc.residentName || "Resident"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{displayIncidentType(inc.incidentType)}</p>
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">{when}</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <PhaseBadge phase={inc.phase} size="sm" />
-                      <div className="ml-auto flex shrink-0 items-center gap-1">
-                        <span className="text-xs text-muted-foreground">Done</span>
-                        <CompletionRing percent={pct} size={32} strokeWidth={2.5} />
-                      </div>
+                      <IncidentCompletionIndicator
+                        percent={inc.completenessPercent}
+                        label="Done"
+                        className="ml-auto"
+                      />
                     </div>
                     <span className="text-xs font-medium text-primary">View →</span>
                   </button>

@@ -11,6 +11,64 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope
 
+self.addEventListener("push", (event: PushEvent) => {
+  let title = "WAiK"
+  let body = "You have a new notification."
+  let urlPath = "/staff/dashboard"
+
+  try {
+    const txt = event.data?.text()
+    const raw = txt ? JSON.parse(txt) : {}
+    title = typeof raw.title === "string" ? raw.title : title
+    body = typeof raw.body === "string" ? raw.body : body
+    if (typeof raw.url === "string") {
+      try {
+        const u = new URL(raw.url)
+        urlPath = u.pathname + u.search + u.hash
+      } catch {
+        urlPath = raw.url.startsWith("/") ? raw.url : `/${raw.url}`
+      }
+    }
+  } catch {
+    //
+  }
+
+  const abs = new URL(urlPath, self.location.origin).href
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/android-chrome-192x192.png",
+      badge: "/android-chrome-192x192.png",
+      data: { url: abs },
+    }),
+  )
+})
+
+self.addEventListener("notificationclick", (event: NotificationEvent) => {
+  event.notification.close()
+
+  let target = `${self.location.origin}/staff/dashboard`
+  const rawUrl = event.notification?.data?.url as string | undefined
+
+  try {
+    if (rawUrl) {
+      const u = new URL(rawUrl, self.location.origin)
+      target = u.href
+    }
+  } catch {
+    //
+  }
+
+  event.waitUntil(
+    (async () => {
+      if (typeof self.clients.openWindow === "function") {
+        await self.clients.openWindow(target)
+      }
+    })(),
+  )
+})
+
 const exp = (maxEntries: number) =>
   new ExpirationPlugin({
     maxEntries,

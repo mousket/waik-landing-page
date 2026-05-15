@@ -15,6 +15,7 @@ import { useWaikUser } from "@/hooks/use-waik-user"
 import { StaffResidentSearch, type StaffResidentSearchOption } from "@/components/staff/resident-search"
 import { StaffFlowFrame } from "@/components/staff/staff-flow-backdrop"
 import { ReportStepHeader } from "@/components/staff/report-step-header"
+import { ReportCompletionFeedback } from "@/components/staff/report-completion-feedback"
 import { cn } from "@/lib/utils"
 
 const FLOW_CARD =
@@ -747,6 +748,7 @@ export default function StaffReportPage() {
                     Incident <span className="font-mono">{incidentId}</span>
                   </p>
                 ) : null}
+                <ReportCompletionFeedback incidentId={incidentId} />
                 <Button
                   type="button"
                   className="min-h-11 w-full rounded-xl text-sm font-semibold shadow-md sm:min-h-12 sm:text-base"

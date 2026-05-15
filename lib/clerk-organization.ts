@@ -16,14 +16,20 @@ export function clerkOrgRoleForWaikRole(roleSlug: string): "org:admin" | "org:me
 
 export function isClerkNotFoundError(err: unknown): boolean {
   const e = err as
-    | { status?: number; errors?: Array<{ code?: string; message?: string }> }
-    | { statusCode?: number; errors?: Array<{ code?: string; message?: string }> }
-    | { message?: string }
-  const status = e?.status ?? (e as { statusCode?: number } | undefined)?.statusCode
+    | {
+        status?: number
+        statusCode?: number
+        errors?: Array<{ code?: string; message?: string }>
+        message?: string
+      }
+    | null
+    | undefined
+  const status = e?.status ?? e?.statusCode
   if (status === 404) return true
-  const code = e?.errors?.[0]?.code?.toLowerCase()
+  const firstError = Array.isArray(e?.errors) ? e.errors[0] : undefined
+  const code = firstError?.code?.toLowerCase()
   if (code && (code.includes("not_found") || code.includes("resource_not_found"))) return true
-  const msg = (e?.errors?.[0]?.message ?? e?.message ?? String(err)).toLowerCase()
+  const msg = (firstError?.message ?? e?.message ?? String(err)).toLowerCase()
   return msg.includes("not found") || msg.includes("resource_not_found") || msg.includes("404")
 }
 

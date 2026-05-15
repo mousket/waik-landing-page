@@ -1,3 +1,5 @@
+import type { IncidentPhase } from "@/lib/types/incident-summary"
+
 export interface StaffIncidentSummary {
   id: string
   facilityId: string
@@ -6,7 +8,7 @@ export interface StaffIncidentSummary {
   residentRoom: string
   incidentType: string
   hasInjury: boolean
-  phase: "phase_1_in_progress" | "phase_1_complete" | "phase_2_in_progress" | "closed"
+  phase: IncidentPhase
   staffId: string
   startedAt: string
   phase1SignedAt: string | null

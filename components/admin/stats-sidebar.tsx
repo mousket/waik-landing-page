@@ -8,8 +8,13 @@ import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
 import Link from "next/link"
 import type { DashboardStats } from "@/lib/types/dashboard-stats"
 import { trendGlyph } from "@/lib/utils/dashboard-trends"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { RefreshCw } from "lucide-react"
+
+const STATS_CARD_CLASS =
+  "rounded-2xl border border-border/50 bg-gradient-to-b from-muted/30 to-muted/5 p-4 shadow-sm"
 
 function TrendMark({ current, prev, higherIsBetter }: { current: number; prev: number; higherIsBetter: boolean }) {
   const g = trendGlyph(current, prev, higherIsBetter)
@@ -32,10 +37,12 @@ export function StatsSidebar({
   stats,
   loading,
   error,
+  onRetry,
 }: {
   stats: DashboardStats | null
   loading: boolean
   error: string | null
+  onRetry?: () => void
 }) {
   const router = useRouter()
   const searchParams = useAdminUrlSearchParams()
@@ -47,7 +54,7 @@ export function StatsSidebar({
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className={`${STATS_CARD_CLASS} min-h-[220px]`}>
           <Skeleton className="h-4 w-28" />
           <ul className="mt-4 space-y-4">
             {[0, 1, 2, 3].map((i) => (
@@ -61,23 +68,47 @@ export function StatsSidebar({
             ))}
           </ul>
         </div>
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full min-h-[10rem] rounded-2xl" />
+        <Skeleton className="h-24 w-full min-h-[6rem] rounded-2xl" />
       </div>
     )
   }
 
-  if (error || !stats) {
+  if (error) {
     return (
-      <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
-        {error ?? "Stats unavailable."}
+      <div className={`${STATS_CARD_CLASS} min-h-[12rem]`}>
+        <p className="text-sm font-semibold text-foreground">30-day stats paused</p>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{error}</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          Sidebar metrics are cached on the server — a retry usually clears transient issues.
+        </p>
+        {onRetry ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-4 h-9 w-full rounded-xl border-border/60 font-semibold"
+            onClick={onRetry}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+            Retry stats
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
+  if (!stats) {
+    return (
+      <div className={`${STATS_CARD_CLASS} text-sm text-muted-foreground`}>
+        Select a facility to load last-30-day counts and upcoming assessments.
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className={STATS_CARD_CLASS}>
         <h3 className="text-sm font-semibold text-primary">Last 30 Days</h3>
         <ul className="mt-4 space-y-4 text-sm">
           <li className="flex justify-between gap-2 border-b border-border/60 pb-3">
@@ -128,7 +159,7 @@ export function StatsSidebar({
         </ul>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className={STATS_CARD_CLASS}>
         <h3 className="text-sm font-semibold text-primary">Due This Week</h3>
         {stats.upcomingAssessments7d === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No assessments due in the next 7 days.</p>
@@ -155,7 +186,7 @@ export function StatsSidebar({
         </Link>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className={STATS_CARD_CLASS}>
         <h3 className="text-sm font-semibold text-primary">Ask your community...</h3>
         <Input
           placeholder="e.g. How many falls this month?"

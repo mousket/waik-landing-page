@@ -11,5 +11,10 @@ export async function GET() {
   return NextResponse.json({
     mustChangePassword: Boolean(u.mustChangePassword),
     userId: u.userId,
+    deviceType: u.deviceType,
+    facilityId: u.facilityId,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    email: u.email,
   })
 }

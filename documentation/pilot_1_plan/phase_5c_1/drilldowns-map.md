@@ -148,3 +148,13 @@ Each hero row must include a single CTA and a “View all” link when >3 exist.
 - **Primary destination**: existing messaging surface if/when available
 - **Fallback**: `/admin/settings/activity` (for audit trail) + `/admin/settings/staff` (to find staff contacts)
 
+---
+
+## API — Daily Command Today (aggregate)
+
+- **`GET /api/admin/daily-command/today`** (same auth + `facilityId` / `organizationId` resolution as `/api/incidents` and `/api/admin/dashboard-stats`).
+- **Response**: `DailyCommandTodayPayload` (`schemaVersion: 1`) — see `lib/types/daily-command-today.ts` and builder `lib/admin/build-daily-command-today.ts`.
+- **Incident scope**: open pipeline only (`phase_1_in_progress`, `phase_1_complete`, `phase_2_in_progress`), matching the dashboard’s primary incidents fetch.
+- **Stats merge**: optional — reads cached `waik:stats:<facilityId>` when present so A1 protection matches the header when Redis has warmed `dashboard-stats`.
+- **Deep links** in the payload are built with the same query vocabulary as this document; shared helpers live in `lib/admin/daily-command-drilldowns.ts`.
+

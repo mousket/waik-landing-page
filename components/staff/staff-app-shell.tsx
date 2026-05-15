@@ -4,7 +4,6 @@ import type React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { UserButton } from "@clerk/nextjs"
-import { Bell } from "lucide-react"
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
 import { WaikLogo } from "@/components/waik-logo"
@@ -12,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { BadgePoller } from "@/components/staff/badge-poller"
 import { ActivitySessionLogger } from "@/components/activity-session-logger"
 import { BadgeProvider } from "@/components/staff/badge-context"
+import { NotificationBell } from "@/components/notification-bell"
 import { StaffBottomNav } from "@/components/staff/staff-bottom-nav"
 
 const NAV_LINKS = [
@@ -99,13 +99,7 @@ export function StaffAppShell({
                   {unitLabel}
                 </span>
               ) : null}
-              <button
-                type="button"
-                className="flex h-11 w-11 min-h-[48px] min-w-[48px] items-center justify-center text-muted-foreground md:h-12 md:w-12"
-                aria-label="Notifications"
-              >
-                <Bell className="h-5 w-5 md:h-[22px] md:w-[22px]" strokeWidth={1.75} />
-              </button>
+              <NotificationBell historyHref="/staff/notifications" managePushHref="/staff/profile" />
               <div className="flex shrink-0 items-center [&_.cl-userButtonTrigger]:h-9 [&_.cl-userButtonTrigger]:w-9 md:[&_.cl-userButtonTrigger]:h-10 md:[&_.cl-userButtonTrigger]:w-10">
                 <span className="sr-only">{`Signed in as ${[firstName, lastName].filter(Boolean).join(" ")}`}</span>
                 <UserButton appearance={clerkAppearance} afterSignOutUrl={getClerkAfterSignOutUrl()} />

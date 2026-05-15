@@ -34,7 +34,7 @@ These params are used to create consistent filtered drilldowns. Where a page doe
 - `driver`: risk driver key (e.g., `repeat_falls`, `anticoagulant_fall`, `behavior_escalation`)
 - `bottleneck`: throughput/compliance blocker reason (e.g., `missing_followup_note`)
 
-Note: `/admin/incidents` currently uses `useResidentIncidentFilters` in-page, but does not yet parse these params into initial filter state. That enablement is part of phase work.
+**Shipped (5c2-13):** `/admin/incidents` parses `range`, `from`/`to`, `type`, `severity`, `repeat`, `phase`, `unit`, `role`, and `bottleneck` into initial filter state via `parseAdminIncidentsUrl`. `/admin/residents` supports `range`, `risk=high`, and `driver`. Trend cards use `lib/admin/trends-drilldowns.ts` for href construction.
 
 ---
 
@@ -95,7 +95,7 @@ Note: `/admin/incidents` currently uses `useResidentIncidentFilters` in-page, bu
   - “Show documentation completion by unit over the last <range>.”
 
 ### Clicking role breakdown (e.g., RN)
-- **Drilldown**: `/admin/incidents?range=<range>&role=rn` (planned)
+- **Drilldown**: `/admin/incidents?range=<range>&role=rn`
 - **Alternative**: `/admin/settings/activity?range=<range>&action=<doc_related_action>` (if available)
 
 ### Biggest slip callout
@@ -117,12 +117,12 @@ Every insight MUST include “View evidence”.
 ## E6 — High-risk Cohort Trends
 
 ### “View cohort”
-- **Primary drilldown**: `/admin/residents?range=<range>&risk=high` (planned)
+- **Primary drilldown**: `/admin/residents?range=<range>&risk=high`
 - **Fallback**: `/admin/intelligence` suggested question:
   - “List high-risk residents this period and why they’re flagged.”
 
 ### Clicking a driver (top 3)
-- **Primary drilldown**: `/admin/residents?range=<range>&driver=<driverKey>` (planned)
+- **Primary drilldown**: `/admin/residents?range=<range>&risk=high&driver=<driverKey>`
 - **Fallback**: `/admin/intelligence` suggested question:
   - “List residents flagged for <driver> in the last <range> with supporting evidence.”
 
@@ -143,7 +143,7 @@ If UI can only link one place, link to:
 ## E8 — Staffing / Throughput Trends
 
 ### Clicking a bottleneck reason
-- **Drilldown**: `/admin/incidents?range=<range>&bottleneck=<reasonKey>` (planned)
+- **Drilldown**: `/admin/incidents?range=<range>&bottleneck=<reasonKey>`
 - **Fallback**: `/admin/intelligence` suggested question:
   - “What are the top documentation bottlenecks in the last <range>?”
 

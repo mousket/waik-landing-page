@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { ChevronDown, Stethoscope } from "lucide-react"
+import { buildStaffAssessmentHref, displayAssessmentType } from "@/lib/assessments/presentation"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -17,19 +18,8 @@ export type SpotlightAssessment = {
   daysUntilDue: number
 }
 
-function typeLabel(t: string) {
-  if (!t) return "Assessment"
-  return `${t.charAt(0).toUpperCase()}${t.slice(1)}`
-}
-
 function assessmentHref(a: SpotlightAssessment) {
-  const type = encodeURIComponent(a.assessmentType)
-  const q = new URLSearchParams({
-    residentId: a.residentId,
-    residentName: (a.residentName || "Resident").trim() || "Resident",
-    residentRoom: a.residentRoom || "",
-  })
-  return `/staff/assessments/${type}?${q.toString()}`
+  return buildStaffAssessmentHref(a) ?? "/staff/assessments"
 }
 
 function dueBadge(d: number) {
@@ -176,7 +166,7 @@ export function StaffDashboardAssessmentsSpotlight({
                     key={type}
                     className="inline-flex items-center rounded-full border border-emerald-200/70 bg-emerald-100/60 px-2.5 py-1 text-[0.7rem] font-semibold text-emerald-950 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-100 sm:text-xs"
                   >
-                    {typeLabel(type)} · {n}
+                    {displayAssessmentType(type)} · {n}
                   </li>
                 ))}
               </ul>
@@ -203,7 +193,7 @@ export function StaffDashboardAssessmentsSpotlight({
                         {(a.residentName || "").trim() || "Resident"}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {typeLabel(a.assessmentType)}
+                        {displayAssessmentType(a.assessmentType)}
                         {a.residentRoom ? ` · Room ${a.residentRoom}` : ""}
                       </span>
                       <span

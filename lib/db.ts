@@ -5,6 +5,8 @@ import type { IncidentDocument } from "@/backend/src/models/incident.model"
 import UserModel from "@/backend/src/models/user.model"
 import type { UserDocument } from "@/backend/src/models/user.model"
 import NotificationModel from "@/backend/src/models/notification.model"
+import { persistOneNotification } from "@/lib/notification-service"
+import type { DualPushText } from "@/lib/push-service"
 import { leanOne } from "@/lib/mongoose-lean"
 import type {
   Answer,
@@ -249,6 +251,11 @@ const serializeNotification = (notification: any): IncidentNotification => ({
   createdAt: toIsoString(notification.createdAt) ?? new Date().toISOString(),
   readAt: toIsoString(notification.readAt),
   targetUserId: notification.targetUserId,
+  facilityId: notification.facilityId,
+  actionUrl: notification.actionUrl,
+  category: notification.category,
+  priority: notification.priority,
+  actorName: notification.actorName,
 })
 
 const VOICE_SEED_QUESTIONS: Array<{ key: keyof IncidentInitialReport; prompt: string }> = [
@@ -961,21 +968,37 @@ export async function markInvestigationComplete(
   return incident ? serializeIncident(incident) : null
 }
 
-type CreateNotificationInput = Omit<IncidentNotification, "id" | "createdAt" | "readAt"> & { id?: string }
+type CreateNotificationInput = Omit<
+  IncidentNotification,
+  "id" | "createdAt" | "readAt" | "facilityId" | "actionUrl" | "category" | "priority" | "actorName"
+> & {
+  id?: string
+  facilityId?: string
+  actionUrl?: string
+  actorName?: string
+  priority?: IncidentNotification["priority"]
+  category?: IncidentNotification["category"]
+  push?: DualPushText | null
+}
 
 export async function createNotification(input: CreateNotificationInput): Promise<IncidentNotification> {
   await ensureDatabase()
 
-  const notification = await NotificationModel.create({
-    id: input.id || `notif-${Date.now()}`,
+  const actionUrl = input.actionUrl ?? `/admin/incidents/${input.incidentId}`
+  const saved = await persistOneNotification({
     incidentId: input.incidentId,
     type: input.type,
     message: input.message,
-    createdAt: new Date(),
     targetUserId: input.targetUserId,
+    id: input.id,
+    facilityId: input.facilityId,
+    actionUrl,
+    actorName: input.actorName,
+    priority: input.priority,
+    category: input.category,
+    push: input.push,
   })
-
-  return serializeNotification(notification.toJSON())
+  return serializeNotification(saved)
 }
 
 export async function getNotificationsForUser(userId: string): Promise<IncidentNotification[]> {

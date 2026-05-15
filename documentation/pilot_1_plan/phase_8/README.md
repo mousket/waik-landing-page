@@ -1,6 +1,8 @@
 # Phase 8 — Staff–admin operational surface parity
 
-## Status: **NOT STARTED**
+## Status: **IMPLEMENTED — 2026-05-14**
+
+Implementation is complete for Tasks 18–21. Verification gates passed for `npm run lint`, `npm run typecheck`, and `npm run build`; live browser smoke testing against seed users was attempted but blocked by Clerk email verification on a new device.
 
 Unify **Incidents**, **Assessments**, and **Residents** list experiences across **`/staff/*`** and **`/admin/*`** so the same building blocks, layout rhythm, and data density rules apply wherever both roles need the same operational view. **Staff patterns are the visual and shell baseline** unless a workspace rule explicitly requires an admin variant (e.g. all-incidents table on desktop).
 
@@ -42,10 +44,10 @@ Agents should read **`AGENT-HANDOFF.md`** first, then execute tasks **18 → 21*
 
 | Order | ID | Task | Task file |
 |------:|----|------|-----------|
-| 1 | **18** | Incidents: extract shared list/detail primitives; align admin + staff | [`task-18-incidents-staff-admin-parity.md`](./task-18-incidents-staff-admin-parity.md) |
-| 2 | **19** | Residents: shared search/list; admin-only create gated | [`task-19-residents-staff-admin-parity.md`](./task-19-residents-staff-admin-parity.md) |
-| 3 | **20** | Assessments: staff real data + shared module with admin | [`task-20-assessments-staff-admin-parity.md`](./task-20-assessments-staff-admin-parity.md) |
-| 4 | **21** | Integration verification, RBAC sanity, scroll/nav QA | [`task-21-phase-8-integration-verification.md`](./task-21-phase-8-integration-verification.md) |
+| 1 | **18** | Incidents: extract shared list/detail primitives; align admin + staff | [`task-18-incidents-staff-admin-parity-done.md`](./task-18-incidents-staff-admin-parity-done.md) — done |
+| 2 | **19** | Residents: shared search/list; admin-only create gated | [`task-19-residents-staff-admin-parity-done.md`](./task-19-residents-staff-admin-parity-done.md) — done |
+| 3 | **20** | Assessments: staff real data + shared module with admin | [`task-20-assessments-staff-admin-parity-done.md`](./task-20-assessments-staff-admin-parity-done.md) — done |
+| 4 | **21** | Integration verification, RBAC sanity, scroll/nav QA | [`task-21-phase-8-integration-verification-done.md`](./task-21-phase-8-integration-verification-done.md) — done with auth-gated browser blocker noted |
 
 ---
 
@@ -73,7 +75,7 @@ Task **19** may start after **18** is far enough along that shared patterns (car
 |------|-------|-------|
 | Incidents list | `app/staff/incidents/`, `staff-incidents-list-client.tsx` | `app/admin/incidents/page.tsx`, `AllIncidentsFilterBar`, `resident-incidents-section` filters |
 | Residents | `app/staff/residents/`, `staff-residents-client.tsx` | `app/admin/residents/page.tsx` |
-| Assessments | `app/staff/assessments/page.tsx` (placeholder) | `app/admin/assessments/page.tsx` |
+| Assessments | `app/staff/assessments/page.tsx` | `app/admin/assessments/page.tsx` |
 | Shell | `components/staff/staff-app-shell.tsx` | `components/admin/admin-app-shell.tsx` |
 
 ---

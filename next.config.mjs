@@ -4,6 +4,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import withSerwistInit from "@serwist/next"
+import { withSentryConfig } from "@sentry/nextjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -73,4 +74,10 @@ const nextConfig = {
   },
 }
 
-export default withSerwist(nextConfig)
+const serwistApp = withSerwist(nextConfig)
+
+export default withSentryConfig(serwistApp, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+})

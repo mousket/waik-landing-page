@@ -5,12 +5,12 @@ import { leanOne } from "@/lib/mongoose-lean"
 import type { ClinicalRecord } from "@/lib/agents/clinical-record-generator"
 import { generateClinicalRecord } from "@/lib/agents/clinical-record-generator"
 import { deleteReportSession, getReportSession, type ReportSession } from "@/lib/config/report-session"
-import { createNotification } from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
-import { WAIK_PHASE2_ROLES } from "@/lib/waik-roles"
 import { generateAndStoreEmbedding } from "@/lib/agents/embedding-service"
 import { generateCoachingTips } from "@/lib/agents/coaching-tips-generator"
 import { verifyClinicalRecord } from "@/lib/agents/verification-agent"
+import { builtinIncidentTypeLabel } from "@/lib/facility-builtin-incident-types"
+import { enqueueIncidentNotifications, fetchPhase2RecipientsForFacility } from "@/lib/notification-service"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -144,7 +144,6 @@ export async function POST(request: Request) {
 
     await connectMongo()
     const { default: IncidentModel } = await import("@/backend/src/models/incident.model")
-    const { default: UserModel } = await import("@/backend/src/models/user.model")
 
     const existing = leanOne<Pick<IncidentDocument, "incidentDate" | "createdAt" | "redFlags">>(
       await IncidentModel.findOne({
@@ -187,6 +186,10 @@ export async function POST(request: Request) {
       questionsMarkedUnknown: session.tier2UnknownIds.length,
       activeDataCollectionSeconds: Math.round(session.activeDataCollectionMs / 1000),
       dataPointsPerQuestion,
+      tier2DeferredAt: null,
+      tier2Reminder2hSentAt: null,
+      tier2Reminder4hSentAt: null,
+      tier2EscalationSentAt: null,
       summary: clinicalRecord.narrative.slice(0, 500),
       updatedAt: now,
 
@@ -350,24 +353,32 @@ export async function POST(request: Request) {
     }
 
     try {
-      const admins = await UserModel.find({
-        facilityId: session.facilityId,
-        roleSlug: { $in: [...WAIK_PHASE2_ROLES] },
-        isActive: true,
-      })
-        .select(["id"])
-        .lean()
+      const recipients = await fetchPhase2RecipientsForFacility(session.facilityId, session.incidentType)
+      const targetUserIds = recipients.map((r) => r.userId).filter(Boolean)
+      if (targetUserIds.length > 0) {
+        const incidentTypeLabel = builtinIncidentTypeLabel(session.incidentType)
+        const room = session.residentRoom.trim() || "—"
+        const resident = session.residentName.trim()
 
-      const msg = `Investigation ready — Room ${session.residentRoom}. Phase 1 complete for ${session.incidentType} incident. Tap /admin/incidents/${session.incidentId} to review.`
-
-      for (const admin of admins) {
-        const targetUserId = admin.id
-        if (!targetUserId) continue
-        await createNotification({
+        enqueueIncidentNotifications({
+          facilityId: session.facilityId,
           incidentId: session.incidentId,
           type: "investigation-ready",
-          message: msg,
-          targetUserId,
+          message: `Investigation ready — Room ${room}. Phase 1 complete for ${incidentTypeLabel} incident.`,
+          actionUrl: `/admin/incidents/${session.incidentId}`,
+          actorName: session.userName,
+          priority: "urgent",
+          targetUserIds,
+          push: {
+            titlePersonal: `${incidentTypeLabel} investigation ready — Room ${room}`,
+            titleWork:
+              resident.length > 0
+                ? `${incidentTypeLabel} investigation ready — ${resident}, Room ${room}`
+                : `${incidentTypeLabel} investigation ready — Room ${room}`,
+            bodyPersonal: "Phase 1 complete. Tap to begin the investigation.",
+            bodyWork: "Phase 1 complete. Tap to claim the investigation.",
+            url: `/admin/incidents/${session.incidentId}`,
+          },
         })
       }
     } catch (err) {

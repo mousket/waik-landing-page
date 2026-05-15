@@ -103,6 +103,15 @@ function mapIncident(incident: Incident) {
 }
 
 function mapNotification(notification: IncidentNotification) {
+  const t = notification.type as string
+  const category =
+    t.startsWith("phase2") ||
+    t === "investigation-started" ||
+    t === "investigation-completed" ||
+    t === "investigation-reporter-closed"
+      ? ("investigation" as const)
+      : ("incident" as const)
+  const priority = t === "investigation-ready" ? ("urgent" as const) : ("normal" as const)
   return {
     id: notification.id,
     incidentId: notification.incidentId,
@@ -111,6 +120,12 @@ function mapNotification(notification: IncidentNotification) {
     createdAt: parseDate(notification.createdAt) ?? new Date(),
     readAt: parseDate(notification.readAt),
     targetUserId: notification.targetUserId,
+    facilityId: "",
+    actionUrl: "",
+    category,
+    priority,
+    actorName: "",
+    isArchived: false,
   }
 }
 

@@ -179,9 +179,12 @@ export async function* runReportAgent(input: ReportAgentInput): AsyncGenerator<R
         for (const admin of admins) {
           const notification = await createNotification({
             incidentId: incident.id,
+            facilityId: input.facilityId,
             targetUserId: admin.id,
             type: "incident-created",
             message: `New incident reported for ${incident.residentName} (Room ${incident.residentRoom}).`,
+            actionUrl: `/admin/incidents/${incident.id}`,
+            priority: "normal",
           })
 
           yield {

@@ -22,6 +22,7 @@ const isPublicRoute = createRouteMatcher([
   "/auth/account-pending(.*)",
   "/accept-invite(.*)",
   "/sign-out(.*)",
+  "/api/cron(.*)",
 ])
 
 function isMustChangePasswordExempt(pathname: string): boolean {

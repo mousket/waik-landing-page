@@ -81,6 +81,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const staffId = String((doc as { staffId?: string }).staffId ?? "")
     if (staffId) {
       void notifyReportingStaffInvestigationClosed({
+        facilityId,
         staffId,
         incidentId,
         incidentTitle: out.title,

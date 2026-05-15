@@ -1,8 +1,6 @@
-// STUB — Replace with real implementation in task-12-push-notifications.
-// Do not add VAPID logic here — task-12 handles that.
-
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/api-handler"
+import { isPushConfigured, sendDualPushToUser } from "@/lib/push-service"
 
 type PushPayload = {
   title?: string
@@ -19,25 +17,36 @@ export const POST = withAdminAuth(async (request, { currentUser }) => {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    console.log("[Push Stub] Notification queued:", {
-      from: currentUser.clerkUserId,
-      fromMongoUserId: currentUser.userId,
-      to: targetUserId,
-      facilityId: currentUser.facilityId,
-      title: payload.title,
-      body: payload.body,
-      url: payload.url ?? null,
-      timestamp: new Date().toISOString(),
+    const configured = isPushConfigured()
+    if (!configured) {
+      console.info("[Push] VAPID not configured — queued only", {
+        from: currentUser.clerkUserId,
+        targetUserId,
+      })
+      return NextResponse.json({
+        success: true,
+        queued: true,
+        delivered: false,
+        message: "VAPID not configured on server — push skipped",
+      })
+    }
+
+    await sendDualPushToUser(targetUserId, {
+      titlePersonal: payload.title,
+      titleWork: payload.title,
+      bodyPersonal: payload.body,
+      bodyWork: payload.body,
+      url: payload.url ?? "/staff/dashboard",
     })
 
     return NextResponse.json({
       success: true,
       queued: true,
-      delivered: false,
-      message: "Notification queued (push not yet configured)",
+      delivered: true,
+      message: "Push sent where subscriptions exist",
     })
   } catch (e) {
-    console.error("[Push Stub] Invalid JSON or handler error:", e)
+    console.error("[Push] Handler error:", e)
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
 })

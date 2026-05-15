@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
-import type { StaffIncidentSummary } from "@/lib/types/staff-incident-summary"
+import type { IncidentPhase } from "@/lib/types/incident-summary"
 
-export type PhaseBadgePhase = StaffIncidentSummary["phase"]
+export type PhaseBadgePhase = IncidentPhase
 
 const phaseStyles: Record<PhaseBadgePhase, { className: string; label: string }> = {
   phase_1_in_progress: {

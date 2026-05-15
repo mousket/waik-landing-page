@@ -3,14 +3,14 @@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { displayIncidentPhaseShort, displayIncidentType } from "@/lib/incidents/presentation"
 import { cn } from "@/lib/utils"
 import {
-  displayIncidentType,
-  displayIncidentPhaseShort,
   FilterChip,
   type ResidentIncidentRow,
   type ResidentIncidentFilters,
 } from "@/components/admin/resident-incidents-section"
+import { trendBucketLabel } from "@/lib/admin/trends-incident-type-buckets"
 
 export function AllIncidentsFilterBar({ incidents, f }: { incidents: ResidentIncidentRow[]; f: ResidentIncidentFilters }) {
   const {
@@ -28,12 +28,18 @@ export function AllIncidentsFilterBar({ incidents, f }: { incidents: ResidentInc
     phaseFilter,
     setPhaseFilter,
     phaseOptions,
+    trendTypeBucket,
+    setTrendTypeBucket,
+    phaseInFilter,
+    setPhaseInFilter,
     resetFilters,
   } = f
 
   const hasFilters =
     phaseFilter !== "all" ||
     typeFilter !== "all" ||
+    trendTypeBucket != null ||
+    phaseInFilter.length > 0 ||
     Boolean(dateFrom) ||
     Boolean(dateTo) ||
     staffFilter !== "all"
@@ -46,6 +52,22 @@ export function AllIncidentsFilterBar({ incidents, f }: { incidents: ResidentInc
       )}
     >
       <div className="flex items-start justify-between gap-2 border-b border-border/25 px-3 py-2.5 sm:px-4 sm:py-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          {trendTypeBucket ? (
+            <p className="text-xs text-muted-foreground">
+              Trend type group: <span className="font-semibold text-foreground">{trendBucketLabel(trendTypeBucket)}</span>{" "}
+              (from link)
+            </p>
+          ) : null}
+          {phaseInFilter.length > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Phases from link:{" "}
+              <span className="font-medium text-foreground">
+                {phaseInFilter.map((p) => displayIncidentPhaseShort(p)).join(", ")}
+              </span>
+            </p>
+          ) : null}
+        </div>
 
         {hasFilters
           ? (

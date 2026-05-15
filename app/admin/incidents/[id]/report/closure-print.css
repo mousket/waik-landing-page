@@ -1,0 +1,10 @@
+@media print {
+  @page {
+    margin: 1in;
+  }
+
+  .closure-report-root {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

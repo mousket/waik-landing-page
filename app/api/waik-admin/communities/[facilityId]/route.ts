@@ -136,8 +136,10 @@ export async function GET(
   const totalFb = fb.length
   let sumScale1to2 = 0
   for (const x of fb) {
-    const r = x as unknown as Record<string, unknown>
-    sumScale1to2 += r.rating === 1 ? 2 : 1
+    const rec = x as unknown as Record<string, unknown>
+    const rNum = Number(rec.rating)
+    const scale = rNum <= -1 ? 0 : rNum === 0 ? 1 : 2
+    sumScale1to2 += scale
   }
   const averageRating1to2 = totalFb ? Math.round((sumScale1to2 / totalFb) * 10) / 10 : 0
   const last5 = fb.slice(0, 5).map((raw) => {

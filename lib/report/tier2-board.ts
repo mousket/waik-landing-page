@@ -49,7 +49,7 @@ export function supplementTier2Questions(
 }
 
 export function allocateNewTier2Ids(existing: PendingQuestion[], needed: number): string[] {
-  let max = existing.reduce((m, q) => {
+  const max = existing.reduce((m, q) => {
     const match = /^t2-q(\d+)$/.exec(q.id)
     return match ? Math.max(m, Number(match[1])) : m
   }, 0)

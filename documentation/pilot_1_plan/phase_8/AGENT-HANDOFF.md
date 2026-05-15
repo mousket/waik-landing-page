@@ -1,5 +1,13 @@
 # Phase 8 — Agent handoff
 
+## Status
+
+- Tasks 18, 19, and 20 are implemented in code as of 2026-05-14.
+- Task 21 verification completed for lint, typecheck, build, RBAC/context code checks, and shell/scroll spot checks.
+- Live browser smoke testing against seed users was attempted but blocked by Clerk email verification on a new device; see Task 21 notes.
+
+---
+
 ## Start here
 
 You are implementing **Phase 8: Staff–admin operational surface parity** for WAiK (Next.js App Router).
@@ -7,10 +15,10 @@ You are implementing **Phase 8: Staff–admin operational surface parity** for W
 1. Read **`documentation/pilot_1_plan/phase_8/README.md`** (goal, non-goals, constraints).
 2. Read **`.cursor/rules/waik-ui-ux-patterns.mdc`** before changing layout or incidents list shape.
 3. Execute tasks in order:
-   - [`task-18-incidents-staff-admin-parity.md`](./task-18-incidents-staff-admin-parity.md)
-   - [`task-19-residents-staff-admin-parity.md`](./task-19-residents-staff-admin-parity.md)
-   - [`task-20-assessments-staff-admin-parity.md`](./task-20-assessments-staff-admin-parity.md)
-   - [`task-21-phase-8-integration-verification.md`](./task-21-phase-8-integration-verification.md)
+   - [`task-18-incidents-staff-admin-parity-done.md`](./task-18-incidents-staff-admin-parity-done.md)
+   - [`task-19-residents-staff-admin-parity-done.md`](./task-19-residents-staff-admin-parity-done.md)
+   - [`task-20-assessments-staff-admin-parity-done.md`](./task-20-assessments-staff-admin-parity-done.md)
+   - [`task-21-phase-8-integration-verification-done.md`](./task-21-phase-8-integration-verification-done.md)
 
 Paste each task’s **`## Implementation Prompt`** block into the agent as the authoritative instruction for that chunk of work.
 

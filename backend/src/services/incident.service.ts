@@ -2,7 +2,10 @@ import type { Document } from "mongoose"
 import connectMongo from "../lib/mongodb"
 import IncidentModel, { type IncidentDocument } from "../models/incident.model"
 import type { QuestionDocument, AnswerSubdocument } from "../models/question.model"
-import NotificationModel, { type NotificationDocument } from "../models/notification.model"
+import type { NotificationPriority, NotificationCategory, NotificationEventType } from "../models/notification.model"
+import type { DualPushText } from "@/lib/push-service"
+import { persistOneNotification } from "@/lib/notification-service"
+import NotificationModel from "../models/notification.model"
 
 export interface CreateIncidentInput {
   id?: string
@@ -194,20 +197,35 @@ export class IncidentService {
   }
 
   static async createNotification(
-    input: Pick<NotificationDocument, "incidentId" | "type" | "message" | "targetUserId"> & {
+    input: {
+      incidentId: string
+      type: NotificationEventType
+      message: string
+      targetUserId: string
       id?: string
       createdAt?: Date
+      facilityId?: string
+      actionUrl?: string
+      actorName?: string
+      priority?: NotificationPriority
+      category?: NotificationCategory
+      push?: DualPushText | null
     },
   ) {
-    await connectMongo()
-
-    const notification = await NotificationModel.create({
-      ...input,
-      id: input.id ?? `notif-${Date.now()}`,
-      createdAt: input.createdAt ?? new Date(),
+    return persistOneNotification({
+      incidentId: input.incidentId,
+      type: input.type,
+      message: input.message,
+      targetUserId: input.targetUserId,
+      id: input.id,
+      createdAt: input.createdAt,
+      facilityId: input.facilityId,
+      actionUrl: input.actionUrl,
+      actorName: input.actorName,
+      priority: input.priority,
+      category: input.category,
+      push: input.push,
     })
-
-    return notification.toJSON()
   }
 
   static async getNotificationsForUser(userId: string) {
