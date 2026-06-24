@@ -28,8 +28,10 @@ to a Cursor agent or Claude Code agent as a build instruction.
 | 4b | [phase_4b/](./phase_4b/phase_4b_readme.md) | after task-09 | **Phase 2 + Intelligence completion** (gaps) | 4b-01 … 4b-06 |
 | 5 | phase_5/ | 23–26 | Admin Settings & User Management | task-10, task-11 |
 | 6 | phase_6/ | 27–30 | Push Notifications & Pilot Hardening | task-12, task-13 |
-| 7 | phase_7/ | ongoing | Navigation, Intelligence & Imports | task-14, task-15, task-16, task-17 |
+| 7 | [phase_7/](./phase_7/README.md) | ongoing | Navigation, Intelligence & Imports | task-14, task-15, task-16, [task-17](./phase_7/README.md#task-17--bulk-import-v1-create-only) (import v1 done) |
 | 8 | [phase_8/](./phase_8/README.md) | ongoing | **Staff–admin operational surface parity** (incidents, residents, assessments) | [task-18 … task-21](./phase_8/README.md) |
+| 9 | [phase_9/](./phase_9/README.md) | **IMPLEMENTED (v1)** | **Report persistence & resume** (Redis session → Mongo Q&A, continue report) | [task-22 … task-28](./phase_9/README.md) — manual QA pending |
+| 10 | [phase_10/](./phase_10/README.md) | **IMPLEMENTED (v1)** | **Tier 2 gap analysis quality** (extraction, missing-field alignment, retry UX) | [task-29 … task-33](./phase_10/README.md) — manual QA pending |
 
 ---
 
@@ -45,8 +47,8 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/auth/after-sign-in
 DATABASE_URL=mongodb+srv://...
 MONGODB_DB_NAME=waik-pilot
 OPENAI_API_KEY=sk-...
-OPENAI_LLM_MODEL=gpt-4o-mini
-OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
+LLM_MODEL=gpt-4o-mini
+TEXT_EMBEDDING_MODEL=text-embedding-3-small
 REDIS_URL=redis://...
 VAPID_PUBLIC_KEY=...
 VAPID_PRIVATE_KEY=...

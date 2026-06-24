@@ -116,6 +116,28 @@ Work through each section in order. For each item:
 
 ---
 
+## Phase 9 — Report persistence & resume
+
+- [ ] task-22: `ReportSession` syncs to `incident.questions[]` with stable IDs and tier metadata
+- [ ] task-23: `report/start` seeds Tier 1 questions; `report/answer` checkpoints Q&A to Mongo
+- [ ] task-24: `report/complete` flushes full questions array before Redis session delete
+- [ ] task-25: `activeReportSessionId` on incident; `GET /api/report/resume` works within and after TTL
+- [ ] task-26: `/staff/report?incidentId=` resumes; Answer Now and dashboard in-progress use same link
+- [ ] task-27: Empty Tier 2 after gap analysis error shows Retry and recovers questions
+- [ ] task-28: Manual QA matrix signed; `npm run test` / build pass
+
+---
+
+## Phase 10 — Tier 2 gap analysis quality
+
+- [ ] task-29: `analyzeNarrativeAndScore` uses structured tool output (not heuristics-only when OpenAI is configured)
+- [ ] task-30: `collectMissingFields` aligned with critical Gold Standard / completeness fields
+- [ ] task-31: Normalization runs on `AgentState` immediately before Tier 2 gap generation on Tier 1 complete
+- [ ] task-32: Empty Tier 2 after gap analysis error shows Retry and recovers questions (or verified via Phase 9 task-27)
+- [ ] task-33: Tier 2 follow-up wording is specific, non-redundant with Tier 1; outdoor/context rules hold
+
+---
+
 ## Phase 7 — Navigation, Intelligence & Imports
 
 - [ ] task-14: Staff can see incidents assigned to them from other reporters

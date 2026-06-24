@@ -29,7 +29,13 @@ import {
 import type { ResidentDirectoryRow } from "@/lib/types/resident-directory"
 import { residentFullName } from "@/lib/types/resident-directory"
 import type { IncidentSummary } from "@/lib/types/incident-summary"
-import { Plus } from "lucide-react"
+import { Plus, Upload } from "lucide-react"
+import { BulkImportDialog } from "@/components/admin/bulk-import-dialog"
+import {
+  RESIDENT_IMPORT_EXAMPLE_ROW,
+  RESIDENT_IMPORT_TEMPLATE_HEADERS,
+  type ResidentImportPreviewRow,
+} from "@/lib/import/resident-rows"
 
 const CARE_OPTIONS = [
   { value: "independent", label: "Independent" },
@@ -52,6 +58,7 @@ export default function AdminResidentsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusF, setStatusF] = useState<"all" | "active" | "discharged" | "on-leave" | "inactive">("all")
+  const [importOpen, setImportOpen] = useState(false)
 
   const trendsDrilldown = useMemo(() => parseAdminResidentsTrendsDrilldown(searchParams), [searchParams.toString()])
   const [cohortIncidents, setCohortIncidents] = useState<IncidentSummary[] | null>(null)
@@ -185,10 +192,21 @@ export default function AdminResidentsPage() {
           title="Residents"
           description="Residents at your facility."
           actions={
-            <Button className="min-h-12 shadow-lg shadow-primary/20" onClick={() => setOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add resident
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button className="min-h-12 shadow-lg shadow-primary/20" onClick={() => setOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add resident
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-12"
+                onClick={() => setImportOpen(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import CSV / Excel
+              </Button>
+            </div>
           }
         />
 
@@ -261,6 +279,41 @@ export default function AdminResidentsPage() {
           </WaikCardContent>
         </WaikCard>
       </div>
+
+      <BulkImportDialog<ResidentImportPreviewRow>
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import residents"
+        description={
+          <>
+            Required:{" "}
+            <code className="rounded bg-muted px-1 text-xs">first_name, last_name, room_number, care_level</code>.
+            Other columns in the template are optional. Dates: YYYY-MM-DD or MM/DD/YYYY.
+          </>
+        }
+        templateHeaders={RESIDENT_IMPORT_TEMPLATE_HEADERS}
+        templateExampleRow={RESIDENT_IMPORT_EXAMPLE_ROW}
+        templateFilename="waik-residents-template.csv"
+        parseUrl={`/api/admin/residents/import${apiCtx}`}
+        confirmUrl={`/api/admin/residents/import/confirm${apiCtx}`}
+        columns={[
+          { header: "Name", cell: (r) => `${r.first_name} ${r.last_name}` },
+          { header: "Room", cell: (r) => r.room_number },
+          { header: "Care", cell: (r) => r.care_level },
+        ]}
+        rowKey={(r, i) => `${r.first_name}-${r.last_name}-${r.room_number}-${i}`}
+        isImportable={(r) => r.status_row === "valid" || r.status_row === "warning"}
+        hasBlockingErrors={(rows) => rows.some((r) => r.status_row === "error")}
+        statusLabel={(r) => {
+          if (r.status_row === "valid") return { text: "Valid", className: "text-green-600" }
+          if (r.status_row === "warning") return { text: "Warning", className: "text-amber-600" }
+          if (r.status_row === "duplicate") return { text: "Duplicate", className: "text-amber-600" }
+          return { text: "Error", className: "text-destructive" }
+        }}
+        confirmButtonLabel={(n) => `Import ${n} residents`}
+        onComplete={() => void load()}
+        mapConfirmPayload={(rows) => ({ rows })}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

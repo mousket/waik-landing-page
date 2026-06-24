@@ -3,7 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAdminUrlSearchParams } from "@/hooks/use-admin-url-search-params"
-import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
+import {
+  adminIncidentsNavHref,
+  buildAdminPathWithContext,
+  isAdminIncidentsNavActive,
+} from "@/lib/admin-nav-context"
 import {
   ClipboardCheck,
   ClipboardList,
@@ -14,28 +18,36 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const tabs = [
-  { href: "/admin/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/admin/incidents", label: "Incidents", icon: ClipboardList },
-  { href: "/admin/assessments", label: "Assessments", icon: ClipboardCheck },
-  { href: "/admin/residents", label: "Residents", icon: Users },
-  { href: "/admin/intelligence", label: "Intelligence", icon: Lightbulb },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
-] as const
+const TABS = [
+  { href: "/admin/dashboard", label: "Home", icon: LayoutDashboard, key: "dashboard" as const },
+  {
+    href: adminIncidentsNavHref(),
+    label: "Incidents",
+    icon: ClipboardList,
+    key: "incidents" as const,
+  },
+  { href: "/admin/assessments", label: "Assessments", icon: ClipboardCheck, key: "assessments" as const },
+  { href: "/admin/residents", label: "Residents", icon: Users, key: "residents" as const },
+  { href: "/admin/intelligence", label: "Intelligence", icon: Lightbulb, key: "intelligence" as const },
+  { href: "/admin/settings", label: "Settings", icon: Settings, key: "settings" as const },
+]
 
-function tabActive(pathname: string, href: string): boolean {
-  if (href === "/admin/dashboard") {
+function tabActive(pathname: string, key: string, href: string): boolean {
+  if (key === "dashboard") {
     return pathname === "/admin/dashboard"
   }
-  if (href === "/admin/settings") {
+  if (key === "settings") {
     return pathname.startsWith("/admin/settings")
   }
-  if (href === "/admin/residents") {
+  if (key === "residents") {
     return (
       pathname === "/admin/residents" ||
       pathname.startsWith("/admin/residents/") ||
       pathname.startsWith("/residents/")
     )
+  }
+  if (key === "incidents") {
+    return isAdminIncidentsNavActive(pathname)
   }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
@@ -53,12 +65,12 @@ export function AdminBottomNav() {
       aria-label="Admin navigation"
     >
       <div className="mx-auto flex min-h-[64px] w-full max-w-2xl items-stretch justify-between gap-0.5 px-0.5">
-        {tabs.map(({ href, label, icon: Icon }) => {
-          const active = tabActive(pathname, href)
+        {TABS.map(({ href, label, icon: Icon, key }) => {
+          const active = tabActive(pathname, key, href)
           const hrefWithContext = buildAdminPathWithContext(href, searchParams)
           return (
             <Link
-              key={href}
+              key={key}
               href={hrefWithContext}
               className={cn(
                 "flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1 text-[9px] font-semibold leading-[1.15] transition-colors sm:text-[11px]",

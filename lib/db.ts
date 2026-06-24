@@ -22,6 +22,7 @@ import type {
   UserRole,
 } from "./types"
 import { toUiRole } from "@/lib/waik-roles"
+import { staffCanReadIncident } from "@/lib/staff-incident-access"
 import { getQuestionEmbedding } from "./embeddings"
 import { isOpenAIConfigured } from "./openai"
 
@@ -68,6 +69,52 @@ const serializeQuestion = (question: any): Question => ({
   metadata: question.metadata,
 })
 
+function serializeInitialReport(ir: Record<string, unknown>): IncidentInitialReport {
+  const sig = ir.signature as Record<string, unknown> | undefined
+  const snapshot = ir.phase1SignoffSnapshot as Record<string, unknown> | undefined
+  const clinicalRecord = snapshot?.clinicalRecord as Record<string, string> | undefined
+
+  return {
+    capturedAt: toIsoString(ir.capturedAt) ?? new Date().toISOString(),
+    narrative: String(ir.narrative ?? ""),
+    residentState: ir.residentState as string | undefined,
+    environmentNotes: ir.environmentNotes as string | undefined,
+    enhancedNarrative: ir.enhancedNarrative as string | undefined,
+    recordedById: String(ir.recordedById ?? ""),
+    recordedByName: String(ir.recordedByName ?? ""),
+    recordedByRole: ir.recordedByRole as IncidentInitialReport["recordedByRole"],
+    signature: sig
+      ? {
+          signedBy: String(sig.signedBy ?? ""),
+          signedByName: String(sig.signedByName ?? ""),
+          signedAt: toIsoString(sig.signedAt) ?? new Date().toISOString(),
+          role: String(sig.role ?? ""),
+          declaration: String(sig.declaration ?? ""),
+          ipAddress: typeof sig.ipAddress === "string" ? sig.ipAddress : undefined,
+          signatureImage:
+            typeof sig.signatureImage === "string" ? sig.signatureImage : sig.signatureImage ?? null,
+          reportPdfUrl: typeof sig.reportPdfUrl === "string" ? sig.reportPdfUrl : sig.reportPdfUrl ?? null,
+        }
+      : undefined,
+    phase1SignoffSnapshot: snapshot
+      ? {
+          expertNurseSummary: String(snapshot.expertNurseSummary ?? ""),
+          nurseRecommendations: String(snapshot.nurseRecommendations ?? ""),
+          administratorRecommendations: String(snapshot.administratorRecommendations ?? ""),
+          clinicalRecord: {
+            narrative: String(clinicalRecord?.narrative ?? ""),
+            residentStatement: String(clinicalRecord?.residentStatement ?? ""),
+            interventions: String(clinicalRecord?.interventions ?? ""),
+            contributingFactors: String(clinicalRecord?.contributingFactors ?? ""),
+            recommendations: String(clinicalRecord?.recommendations ?? ""),
+            environmentalAssessment: String(clinicalRecord?.environmentalAssessment ?? ""),
+          },
+          signedAt: toIsoString(snapshot.signedAt) ?? new Date().toISOString(),
+        }
+      : undefined,
+  }
+}
+
 const serializeIncident = (incident: any): Incident => ({
   id: incident.id,
   title: incident.title,
@@ -83,16 +130,7 @@ const serializeIncident = (incident: any): Incident => ({
   summary: incident.summary ?? null,
   questions: (incident.questions ?? []).map(serializeQuestion),
   initialReport: incident.initialReport
-    ? {
-        capturedAt: toIsoString(incident.initialReport.capturedAt) ?? new Date().toISOString(),
-        narrative: incident.initialReport.narrative,
-        residentState: incident.initialReport.residentState,
-        environmentNotes: incident.initialReport.environmentNotes,
-        enhancedNarrative: incident.initialReport.enhancedNarrative,
-        recordedById: incident.initialReport.recordedById,
-        recordedByName: incident.initialReport.recordedByName,
-        recordedByRole: incident.initialReport.recordedByRole,
-      }
+    ? serializeInitialReport(incident.initialReport as Record<string, unknown>)
     : undefined,
   investigation: incident.investigation
     ? {
@@ -384,12 +422,8 @@ export async function getIncidentForUser(
   if (!user.facilityId || !raw.facilityId || raw.facilityId !== user.facilityId) {
     return { kind: "forbidden" }
   }
-  // Non-admin staff may only read incidents they filed (reporter = Mongo userId).
-  if (!user.isAdminTier) {
-    const reporter = String((raw as { staffId?: string }).staffId ?? "")
-    if (reporter && reporter !== user.userId) {
-      return { kind: "forbidden" }
-    }
+  if (!user.isAdminTier && !staffCanReadIncident(raw, user)) {
+    return { kind: "forbidden" }
   }
   return { kind: "ok", incident: serializeIncident(raw) }
 }

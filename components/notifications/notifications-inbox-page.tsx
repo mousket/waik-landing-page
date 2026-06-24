@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
+import { Archive } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { WaikCard, WaikCardContent } from "@/components/ui/waik-card"
@@ -47,31 +48,53 @@ export function NotificationsInboxPage(props: {
   const [filter, setFilter] = useState<FilterTab>("all")
   const [items, setItems] = useState<NotificationRowDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const qs = filter === "unread" ? "limit=50&unreadOnly=true" : "limit=50"
+  const applyCategoryFilter = useCallback(
+    (rows: NotificationRowDto[]) => {
+      if (filter === "incident") return rows.filter((n) => n.category === "incident")
+      if (filter === "investigation") return rows.filter((n) => n.category === "investigation")
+      if (filter === "assessment") return rows.filter((n) => n.category === "assessment")
+      if (filter === "system") return rows.filter((n) => n.category === "system" || n.category === "intelligence")
+      return rows
+    },
+    [filter],
+  )
 
-      const r = await fetch(`/api/notifications?${qs}`, { credentials: "include" })
-      const j = (await r.json()) as { notifications?: NotificationRowDto[] }
-      const rows = Array.isArray(j.notifications) ? j.notifications : []
+  const load = useCallback(
+    async (opts?: { append?: boolean; pageOverride?: number }) => {
+      const nextPage = opts?.pageOverride ?? (opts?.append ? page + 1 : 1)
+      setLoading(true)
+      try {
+        const base = filter === "unread" ? "limit=50&unreadOnly=true" : "limit=50"
+        const r = await fetch(`/api/notifications?${base}&page=${nextPage}`, { credentials: "include" })
+        const j = (await r.json()) as {
+          notifications?: NotificationRowDto[]
+          hasMore?: boolean
+        }
+        const rows = applyCategoryFilter(Array.isArray(j.notifications) ? j.notifications : [])
 
-      let next = rows
-      if (filter === "incident") next = rows.filter((n) => n.category === "incident")
-      if (filter === "investigation") next = rows.filter((n) => n.category === "investigation")
-      if (filter === "assessment") next = rows.filter((n) => n.category === "assessment")
-      if (filter === "system") next = rows.filter((n) => n.category === "system" || n.category === "intelligence")
-
-      setItems(next)
-    } finally {
-      setLoading(false)
-    }
-  }, [filter, fallbackHref])
+        if (opts?.append) {
+          setItems((prev) => {
+            const seen = new Set(prev.map((p) => p.id))
+            return [...prev, ...rows.filter((row) => !seen.has(row.id))]
+          })
+        } else {
+          setItems(rows)
+        }
+        setPage(nextPage)
+        setHasMore(Boolean(j.hasMore))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [filter, page, applyCategoryFilter],
+  )
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void load({ pageOverride: 1 })
+  }, [filter])
 
   const tabs = useMemo(
     () =>
@@ -100,6 +123,14 @@ export function NotificationsInboxPage(props: {
     router.push(href.startsWith("/") ? href : `/${href}`)
   }
 
+  const handleArchive = async (n: NotificationRowDto) => {
+    await fetch(`/api/notifications/${encodeURIComponent(n.id)}/archive`, {
+      method: "PATCH",
+      credentials: "include",
+    })
+    setItems((prev) => prev.filter((row) => row.id !== n.id))
+  }
+
   return (
     <div className="mx-auto flex min-h-0 min-w-0 max-w-3xl flex-1 flex-col gap-6 px-3 py-4 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -108,9 +139,9 @@ export function NotificationsInboxPage(props: {
           type="button"
           variant="outline"
           className="h-10 rounded-xl"
-          onClick={async () => {
+            onClick={async () => {
             await fetch("/api/notifications/read-all", { method: "PATCH", credentials: "include" })
-            void load()
+            void load({ pageOverride: 1 })
           }}
         >
           Mark all read
@@ -143,10 +174,10 @@ export function NotificationsInboxPage(props: {
           ) : (
             <ul className="divide-y divide-border/50">
               {items.map((n) => (
-                <li key={n.id}>
+                <li key={n.id} className="group flex items-stretch">
                   <button
                     type="button"
-                    className="flex w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-muted/60"
+                    className="flex min-w-0 flex-1 gap-3 px-4 py-4 text-left transition-colors hover:bg-muted/60"
                     onClick={() => void handleRow(n)}
                   >
                     <span className="mt-2 inline-flex shrink-0">
@@ -167,10 +198,35 @@ export function NotificationsInboxPage(props: {
                       </span>
                     </span>
                   </button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="my-auto mr-2 h-9 w-9 shrink-0 rounded-xl text-muted-foreground opacity-70 hover:text-foreground group-hover:opacity-100"
+                    aria-label="Archive notification"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void handleArchive(n)
+                    }}
+                  >
+                    <Archive className="h-4 w-4" strokeWidth={1.75} />
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
+          {hasMore && !loading ? (
+            <div className="border-t border-border/50 p-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 w-full rounded-xl"
+                onClick={() => void load({ append: true })}
+              >
+                Load more
+              </Button>
+            </div>
+          ) : null}
         </WaikCardContent>
       </WaikCard>
     </div>

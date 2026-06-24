@@ -1,7 +1,7 @@
-import { ChatOpenAI } from "@langchain/openai"
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import { PromptTemplate, ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts"
 import type { Incident } from "../types"
-import { AI_CONFIG, generateChatCompletion, isOpenAIConfigured } from "../openai"
+import { createLangChainChatModel, generateChatCompletion, isOpenAIConfigured, modelForTask } from "../openai"
 import { queryFacilityIncidentStats, searchFacilityIncidents } from "./vector-search"
 import type { SearchResponse } from "./vector-search"
 import { searchSimilarQuestions } from "../embeddings"
@@ -12,16 +12,16 @@ import { getUserById } from "../db"
  * Answers questions about incidents using RAG
  */
 export class IntelligenceQAAgent {
-  private model: ChatOpenAI
+  private model: BaseChatModel
 
   constructor() {
     if (!isOpenAIConfigured()) {
-      throw new Error("OpenAI API key not configured")
+      throw new Error("LLM provider is not configured")
     }
 
-    this.model = new ChatOpenAI({
-      modelName: AI_CONFIG.model,
-      temperature: 0.3, // Lower temperature for more factual answers
+    this.model = createLangChainChatModel({
+      modelName: modelForTask("ragAnswer"),
+      temperature: 0.3,
       maxTokens: 500,
     })
   }
@@ -225,11 +225,11 @@ Instructions:
 Enhanced Answer:`)
 
     const enhancementChain = enhancementPrompt.pipe(
-      new ChatOpenAI({
-        modelName: AI_CONFIG.model,
-        temperature: 0.5, // Slightly higher for more helpful responses
+      createLangChainChatModel({
+        modelName: modelForTask("ragAnswer"),
+        temperature: 0.5,
         maxTokens: 600,
-      })
+      }),
     )
     
     const enhancedResponse = await enhancementChain.invoke({ 
@@ -335,6 +335,8 @@ export async function answerCrossFacilityIntelligence(opts: {
   queryingUserId: string
   question: string
   scope: FacilityIntelligenceScope
+  /** Reporter ids for personal scope (Mongo userId + Clerk id when both exist). */
+  staffIds?: string[]
   /** Max retrieved incidents wired into citations + prompt context */
   searchLimit?: number
 }): Promise<CrossFacilityIntelligenceResult> {
@@ -342,11 +344,25 @@ export async function answerCrossFacilityIntelligence(opts: {
   const timestamp = new Date().toISOString()
   const staffOnly = opts.scope === "personal"
 
-  const searchFilters = staffOnly ? { staffId: opts.queryingUserId } : undefined
+  const reporterIds =
+    opts.staffIds?.filter(Boolean) ??
+    (opts.queryingUserId ? [opts.queryingUserId] : [])
+
+  const searchFilters =
+    staffOnly && reporterIds.length > 0
+      ? reporterIds.length === 1
+        ? { staffId: reporterIds[0] }
+        : { staffIds: reporterIds }
+      : undefined
 
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-  const statsOpts = staffOnly ? { staffId: opts.queryingUserId } : undefined
+  const statsOpts =
+    staffOnly && reporterIds.length > 0
+      ? reporterIds.length === 1
+        ? { staffId: reporterIds[0] }
+        : { staffIds: reporterIds }
+      : undefined
 
   const statsPromise = queryFacilityIncidentStats(opts.facilityId, thirtyDaysAgo, now, undefined, statsOpts)
 
@@ -459,7 +475,7 @@ export async function answerCrossFacilityIntelligence(opts: {
     {
       temperature: 0.3,
       maxTokens: 900,
-      model: AI_CONFIG.model,
+      model: modelForTask("ragAnswer"),
     },
   )
   const answer = res.choices[0]?.message?.content?.trim() ?? ""

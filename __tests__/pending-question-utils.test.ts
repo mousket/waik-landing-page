@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 import type { StaffIncidentSummary } from "@/lib/types/staff-incident-summary"
-import { getPendingQuestionCount, getPhaseDotColor, hasPendingQuestions } from "@/lib/utils/pending-question-utils"
+import {
+  buildPendingQuestionPhaseLines,
+  formatTier2PendingDetail,
+  getPendingQuestionCount,
+  getPendingQuestionHeadline,
+  getPhaseDotColor,
+  hasAssignedIdtQuestions,
+  hasPendingQuestions,
+} from "@/lib/utils/pending-question-utils"
 
 function baseIncident(overrides: Partial<StaffIncidentSummary> = {}): StaffIncidentSummary {
   return {
@@ -12,13 +20,23 @@ function baseIncident(overrides: Partial<StaffIncidentSummary> = {}): StaffIncid
     hasInjury: false,
     phase: "phase_1_in_progress",
     staffId: "user-1",
+    reporterName: "Jane Nurse",
     startedAt: new Date().toISOString(),
     phase1SignedAt: null,
     completenessScore: 88,
     completenessAtSignoff: 0,
-    tier2QuestionsGenerated: 6,
-    questionsAnswered: 5,
+    tier2QuestionsGenerated: 10,
+    questionsAnswered: 8,
     questionsDeferred: 0,
+    pendingQuestionCount: 13,
+    pendingTier1Count: 0,
+    pendingTier2Count: 10,
+    pendingTier2UnansweredCount: 0,
+    pendingTier2DeferredCount: 10,
+    pendingClosingCount: 3,
+    tier2Generated: true,
+    isOwnReport: true,
+    hasAssignedTask: false,
     ...overrides,
   }
 }
@@ -28,20 +46,96 @@ describe("pending-question-utils", () => {
     expect(hasPendingQuestions(baseIncident({ phase: "phase_1_in_progress", completenessScore: 88 }))).toBe(true)
   })
 
-  it("hasPendingQuestions: complete → false", () => {
-    expect(hasPendingQuestions(baseIncident({ phase: "phase_1_complete", completenessScore: 82 }))).toBe(false)
+  it("getPendingQuestionCount: uses API pendingQuestionCount (all tiers)", () => {
+    expect(getPendingQuestionCount(baseIncident({ pendingQuestionCount: 13 }))).toBe(13)
   })
 
-  it("hasPendingQuestions: in_progress + score=100 → false", () => {
-    expect(hasPendingQuestions(baseIncident({ phase: "phase_1_in_progress", completenessScore: 100 }))).toBe(false)
+  it("formatTier2PendingDetail: deferred-only", () => {
+    expect(formatTier2PendingDetail(true, 0, 1)).toBe("1 deferred")
+    expect(formatTier2PendingDetail(true, 2, 3)).toBe("2 left · 3 deferred")
   })
 
-  it("getPendingQuestionCount: 6 generated - 5 answered → 1", () => {
-    expect(getPendingQuestionCount(baseIncident({ tier2QuestionsGenerated: 6, questionsAnswered: 5 }))).toBe(1)
+  it("buildPendingQuestionPhaseLines: Helen-style (all tier2 deferred)", () => {
+    expect(buildPendingQuestionPhaseLines(baseIncident())).toEqual([
+      { label: "Tier 1", detail: "complete" },
+      { label: "Tier 2", detail: "10 deferred", tone: "deferred" },
+      { label: "Closing", detail: "3 left" },
+    ])
   })
 
-  it("getPendingQuestionCount: 0 generated → 1 (minimum)", () => {
-    expect(getPendingQuestionCount(baseIncident({ tier2QuestionsGenerated: 0, questionsAnswered: 0 }))).toBe(1)
+  it("buildPendingQuestionPhaseLines: injuries deferred only", () => {
+    expect(
+      buildPendingQuestionPhaseLines(
+        baseIncident({
+          pendingQuestionCount: 4,
+          pendingTier2Count: 1,
+          pendingTier2UnansweredCount: 0,
+          pendingTier2DeferredCount: 1,
+          pendingClosingCount: 3,
+        }),
+      ),
+    ).toEqual([
+      { label: "Tier 1", detail: "complete" },
+      { label: "Tier 2", detail: "1 deferred", tone: "deferred" },
+      { label: "Closing", detail: "3 left" },
+    ])
+  })
+
+  it("getPendingQuestionHeadline: phase 2 IDT assignment shows team questions", () => {
+    expect(
+      getPendingQuestionHeadline(
+        baseIncident({
+          phase: "phase_2_in_progress",
+          completenessScore: 100,
+          pendingQuestionCount: 1,
+          hasAssignedTask: true,
+          isOwnReport: false,
+        }),
+      ),
+    ).toEqual({ text: "1 team question for you", tone: "urgent" })
+    expect(
+      hasAssignedIdtQuestions(
+        baseIncident({
+          phase: "phase_2_in_progress",
+          pendingQuestionCount: 2,
+          hasAssignedTask: true,
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it("getPendingQuestionHeadline: deferred-only uses amber tone", () => {
+    expect(
+      getPendingQuestionHeadline(
+        baseIncident({
+          pendingQuestionCount: 1,
+          pendingTier2Count: 1,
+          pendingTier2UnansweredCount: 0,
+          pendingTier2DeferredCount: 1,
+          pendingClosingCount: 0,
+        }),
+      ),
+    ).toEqual({ text: "1 deferred question", tone: "deferred" })
+  })
+
+  it("buildPendingQuestionPhaseLines: Dorothy-style (tier1 pending, tier2 not generated)", () => {
+    expect(
+      buildPendingQuestionPhaseLines(
+        baseIncident({
+          pendingQuestionCount: 11,
+          pendingTier1Count: 8,
+          pendingTier2Count: 0,
+          pendingTier2UnansweredCount: 0,
+          pendingTier2DeferredCount: 0,
+          pendingClosingCount: 3,
+          tier2Generated: false,
+        }),
+      ),
+    ).toEqual([
+      { label: "Tier 1", detail: "8 left" },
+      { label: "Tier 2", detail: "not generated", tone: "default" },
+      { label: "Closing", detail: "3 left" },
+    ])
   })
 
   it("getPhaseDotColor: all phases map to expected colors", () => {
@@ -51,4 +145,3 @@ describe("pending-question-utils", () => {
     expect(getPhaseDotColor("closed")).toBe("#0D7377")
   })
 })
-

@@ -50,6 +50,7 @@ export async function GET() {
       const a = incAgg[0]
       return {
         id,
+        organizationId: String(d.organizationId ?? ""),
         name: String(d.name),
         type: String(d.type),
         state: String(d.state),

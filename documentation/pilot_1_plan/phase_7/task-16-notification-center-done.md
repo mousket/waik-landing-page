@@ -1,3 +1,75 @@
+# Task 16 — Notification Center — DONE (v1)
+
+**Completed:** 2026-05-18 (v1), follow-up 2026-05-19
+
+---
+
+## Summary
+
+The in-app notification center was largely built under Phase 6 / Phase 4b. This pass **closed spec gaps**: new event types, injury + IDT triggers, archive API, and inbox pagination.
+
+---
+
+## Success criteria
+
+| Criterion | Status |
+|-----------|--------|
+| Bell shows correct unread count | Done — `GET /api/notifications/count`, `components/notification-bell.tsx` |
+| Count polls every 60s | Done |
+| Popover shows last 10, Today/Yesterday/Older | Done |
+| Click navigates + marks read | Done |
+| Mark all read | Done |
+| Full history `/staff/notifications`, `/admin/notifications` | Done — `NotificationsInboxPage` |
+| Phase 1 complete → DON/admin | Done — `report/complete` → `investigation-ready` |
+| Injury → DON/admin urgent | Done — `injury-reported` + `redFlags.notificationSentToAdmin` |
+| Question answer → investigator | Done — `answers` route → `idt-question-answered` |
+| IDT question sent → assignee | Done — `idt-questions` POST → `idt-question-assigned` |
+| Central `lib/notification-service.ts` | Done — `enqueueIncidentNotifications`, `persistOneNotification`; `lib/db.createNotification` delegates |
+| Assessment due in 3 days → assigned staff | Done — daily cron `processAssessmentDueReminders` |
+| Report completeness scored (LOW) → reporter | Done — `report/complete` → `report-completeness-scored` |
+| Archive from full inbox | Done — archive button on `NotificationsInboxPage` |
+
+---
+
+## Files created
+
+- `app/api/notifications/[id]/archive/route.ts`
+- `lib/process-assessment-reminders.ts`
+- `__tests__/process-assessment-reminders.test.ts`
+- `documentation/pilot_1_plan/phase_7/task-16-notification-center-done.md`
+
+## Files modified
+
+- `backend/src/models/notification.model.ts` — `injury-reported`, IDT types, `assessment-due-soon`, `report-completeness-scored`
+- `backend/src/models/assessment.model.ts` — `dueSoonReminderFor` dedupe field
+- `lib/notification-service.ts` — category/priority inference
+- `app/api/notifications/route.ts` — `page`, `hasMore`, `total`
+- `app/api/cron/assessment-reminders/route.ts` — wired to processor
+- `lib/agents/assessment_agent.ts` — clears `dueSoonReminderFor` on completion
+- `app/api/report/complete/route.ts` — injury notify, completeness scored notify
+- `app/api/incidents/[id]/idt-questions/route.ts` — notify assignee
+- `app/api/incidents/[id]/answers/route.ts` — notify question author
+- `components/notifications/notifications-inbox-page.tsx` — Load more, archive action
+
+---
+
+## Deferred / follow-up
+
+- **Rename** `notification-bell.tsx` → `notification-center.tsx` — optional; bell component is the center
+
+---
+
+## Manual QA
+
+1. Sign Phase 1 as staff with injury → admin bell shows urgent item.
+2. Admin sends IDT question → target staff receives inbox + optional push.
+3. Staff answers → admin investigator receives `idt-question-answered`.
+4. Mark all read / load more on `/admin/notifications`.
+
+---
+
+## Original task spec
+
 # Task 16 — Notification Center
 ## Phase: 7 — Navigation, Intelligence & Imports
 ## Estimated Time: 4–5 hours
@@ -88,10 +160,3 @@ I'm adding a persistent notification center to WAiK (Next.js 14).
    NORMAL — Assessment due in 3 days → notify assigned staff: "Assessment due soon for [resident]"
    LOW — Report completeness scored → notify reporter: "Your report scored [X]%"
 ```
-
----
-
-## Post-Task Documentation Update
-
-After passing all test cases:
-- Create `plan/pilot_1/phase_7/task-16-DONE.md`

@@ -1,4 +1,4 @@
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 import type { AgentState } from "@/lib/gold_standards"
 import {
   DEFAULT_GLOBAL_STATE,
@@ -219,6 +219,7 @@ export async function fillGapsWithAnswer(input: FillGapsInput): Promise<FillGaps
     {
       temperature: 0,
       maxTokens: 600,
+      model: modelForTask("gapFill"),
       tools: [
         {
           type: "function",

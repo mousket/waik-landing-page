@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { loadPhase2Incident } from "@/lib/phase2-server"
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 
 const MAX_CITE = 2500
 
@@ -58,7 +58,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    { temperature: 0.3, maxTokens: 500 },
+    { temperature: 0.3, maxTokens: 500, model: modelForTask("rootCause") },
   )
   const text = (completion.choices[0]?.message?.content ?? "").trim()
   if (!text) {

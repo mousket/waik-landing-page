@@ -33,3 +33,6 @@ next-env.d.ts
 # Serwist
 public/sw*
 public/swe-worker*
+
+# Fallow (local reports / cache)
+.fallow/

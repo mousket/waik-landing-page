@@ -10,6 +10,7 @@ export type ActivityLogAction =
   | "role_changed"
   | "user_deactivated"
   | "assessment_completed"
+  | "resident_created"
 
 export interface ActivityLogDocument extends Document {
   id: string

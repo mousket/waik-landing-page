@@ -1,4 +1,4 @@
-import type { Breadcrumb, Event } from "@sentry/nextjs"
+import type { Breadcrumb, ErrorEvent } from "@sentry/nextjs"
 
 /** Keys that may hold PHI or long clinical strings — redact from Sentry payloads. */
 export const SENTRY_PHI_KEYS = new Set([
@@ -67,7 +67,7 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
 /**
  * `beforeSend`: remove / truncate fields that could carry PHI or long clinical text.
  */
-export function scrubSentryEvent(event: Event): Event | null {
+export function scrubSentryEvent(event: ErrorEvent): ErrorEvent | null {
   try {
     const seen = new WeakSet<object>()
 

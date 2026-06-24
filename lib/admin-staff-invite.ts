@@ -16,12 +16,9 @@ import { sendStaffWelcomeEmail } from "@/lib/send-welcome-email"
 import { isRoleAssignableByInviter } from "@/lib/role-assignment-permissions"
 import { generateTempPassword, generateUserId } from "@/lib/waik-admin-utils"
 import type { WaikRoleSlug } from "@/lib/waik-roles"
+import { isValidEmail } from "@/lib/validate-email"
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-export function isValidEmail(email: string): boolean {
-  return EMAIL_RE.test(email.trim().toLowerCase())
-}
+export { isValidEmail }
 
 export type InviteStaffSuccess = {
   ok: true
@@ -51,6 +48,9 @@ export async function inviteStaffMember(opts: {
   inviterRoleSlug: string
   invitedByUserId: string
   sendWelcomeEmail: boolean
+  phone?: string
+  deviceType?: "personal" | "work"
+  selectedUnit?: string
 }): Promise<InviteStaffResult> {
   const email = opts.email.trim().toLowerCase()
   const firstName = (opts.firstName ?? "").trim() || "Invited"
@@ -133,7 +133,14 @@ export async function inviteStaffMember(opts: {
     isWaikSuperAdmin: false,
     isActive: true,
     mustChangePassword: true,
-    deviceType: "personal" as const,
+    deviceType: opts.deviceType === "work" ? "work" : "personal",
+    ...(opts.phone?.trim() ? { phone: opts.phone.trim() } : {}),
+    ...(opts.selectedUnit?.trim()
+      ? {
+          selectedUnit: opts.selectedUnit.trim(),
+          selectedUnitDate: new Date().toISOString().slice(0, 10),
+        }
+      : {}),
     name: `${firstName} ${lastName}`.trim(),
     invitedByUserId: opts.invitedByUserId,
     invitedByName: opts.inviterName,

@@ -14,6 +14,7 @@ const ACTIONS: Set<string> = new Set([
   "role_changed",
   "user_deactivated",
   "assessment_completed",
+  "resident_created",
 ])
 
 export async function GET(request: NextRequest) {

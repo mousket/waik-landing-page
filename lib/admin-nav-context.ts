@@ -33,15 +33,37 @@ export function getAdminContextQueryString(searchParams: URLSearchParams): strin
   return q ? `?${q}` : ""
 }
 
+/** URL bar only — safe for SSR/hydration (no sessionStorage). */
+export function getFacilityIdFromUrl(sp: URLSearchParams): string | undefined {
+  const id = (sp.get("facilityId") || "").trim()
+  return id || undefined
+}
+
+/** URL bar only — safe for SSR/hydration (no sessionStorage). */
+export function getOrganizationIdFromUrl(sp: URLSearchParams): string | undefined {
+  const id = (sp.get("organizationId") || "").trim()
+  return id || undefined
+}
+
 /**
  * Preserves admin facility + org context when moving between /admin/* routes.
+ * Uses URL params only so server HTML matches the first client render (no sessionStorage).
  */
+/** Admin shell Incidents nav — always the facility-wide admin list. */
+export function adminIncidentsNavHref(): string {
+  return "/admin/incidents"
+}
+
+export function isAdminIncidentsNavActive(pathname: string): boolean {
+  return pathname === "/admin/incidents" || pathname.startsWith("/admin/incidents/")
+}
+
 export function buildAdminPathWithContext(path: string, searchParams: URLSearchParams): string {
   const sp = new URLSearchParams()
-  const facilityId = getEffectiveFacilityIdForApi(searchParams)
-  const organizationId = getEffectiveOrganizationIdForApi(searchParams)
-  if (facilityId?.trim()) sp.set("facilityId", facilityId.trim())
-  if (organizationId?.trim()) sp.set("organizationId", organizationId.trim())
+  const facilityId = getFacilityIdFromUrl(searchParams)
+  const organizationId = getOrganizationIdFromUrl(searchParams)
+  if (facilityId) sp.set("facilityId", facilityId)
+  if (organizationId) sp.set("organizationId", organizationId)
   const q = sp.toString()
   if (!q) return path
   return path.includes("?") ? `${path}&${q}` : `${path}?${q}`

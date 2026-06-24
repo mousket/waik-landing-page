@@ -1,5 +1,10 @@
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 import type { AgentState, FallSubtypeStandards } from "@/lib/gold_standards"
+
+/**
+ * Global keys tracked for Tier 2 gap questions. Keep aligned with `CRITICAL_FIELDS` in
+ * `analyze.ts` (plus post-fall notification fields nurses often omit in Tier 1).
+ */
 
 export interface GapQuestionResult {
   questions: string[]
@@ -67,6 +72,42 @@ const GLOBAL_FIELD_DESCRIPTORS: Record<string, MissingFieldDescriptor> = {
     label: "Resident statement",
     context: "Capture what the resident said happened or how they felt after the fall.",
     category: "narrative",
+  },
+  fall_witnessed: {
+    key: "global.fall_witnessed",
+    label: "Whether the fall was witnessed",
+    context: "State if staff saw the fall occur or if it was unwitnessed.",
+    category: "narrative",
+  },
+  head_impact_suspected: {
+    key: "global.head_impact_suspected",
+    label: "Head impact suspected",
+    context: "Clarify if there was any suspected or observed head impact, or if it was ruled out.",
+    category: "post_fall",
+  },
+  vitals_taken_post_fall: {
+    key: "global.vitals_taken_post_fall",
+    label: "Vitals after fall",
+    context: "Note whether vitals were taken after the fall and any notable findings.",
+    category: "post_fall",
+  },
+  neuro_checks_initiated: {
+    key: "global.neuro_checks_initiated",
+    label: "Neuro checks",
+    context: "Indicate if neurological checks were started per protocol.",
+    category: "post_fall",
+  },
+  physician_notified: {
+    key: "global.physician_notified",
+    label: "Physician notified",
+    context: "Confirm whether the physician or provider was notified and when.",
+    category: "post_fall",
+  },
+  family_notified: {
+    key: "global.family_notified",
+    label: "Family notified",
+    context: "Confirm whether family or responsible party was notified.",
+    category: "post_fall",
   },
 }
 
@@ -212,17 +253,20 @@ function adjustQuestionsForContext(questions: string[], state: AgentState): stri
   return filtered.length > 0 ? filtered : questions
 }
 
-function isStringMissing(value: unknown): boolean {
+/** Matches `valueFilled` in `analyze.ts`: null/empty string = missing; booleans true/false = filled. */
+function isGoldStandardFieldMissing(value: unknown): boolean {
   if (value === null || value === undefined) return true
+  if (typeof value === "boolean") return false
   if (typeof value === "string") return value.trim().length === 0
-  return false
+  if (typeof value === "number") return Number.isNaN(value)
+  return true
 }
 
 export function collectMissingFields(state: AgentState): MissingFieldDescriptor[] {
   const missing: MissingFieldDescriptor[] = []
   const global = state.global_standards
   Object.entries(GLOBAL_FIELD_DESCRIPTORS).forEach(([field, descriptor]) => {
-    if (isStringMissing((global as any)[field])) {
+    if (isGoldStandardFieldMissing((global as unknown as Record<string, unknown>)[field])) {
       missing.push(descriptor)
     }
   })
@@ -230,8 +274,9 @@ export function collectMissingFields(state: AgentState): MissingFieldDescriptor[
   if (state.sub_type && state.sub_type_data) {
     const subtypeDescriptors = SUBTYPE_FIELD_DESCRIPTORS[state.sub_type]
     if (subtypeDescriptors) {
+      const subtypeRecord = state.sub_type_data as unknown as Record<string, unknown>
       Object.entries(subtypeDescriptors).forEach(([field, descriptor]) => {
-        if (isStringMissing((state.sub_type_data as any)[field])) {
+        if (isGoldStandardFieldMissing(subtypeRecord[field])) {
           missing.push(descriptor)
         }
       })
@@ -255,8 +300,12 @@ function buildFallbackQuestions(missing: MissingFieldDescriptor[], maxQuestions:
   if (current.length > 0) chunks.push(current)
 
   return chunks.slice(0, maxQuestions).map((chunk) => {
-    const topics = chunk.map((m) => m.label.toLowerCase()).join(", ")
-    return `Could you describe ${topics}?`
+    if (chunk.length === 1) {
+      const only = chunk[0]
+      return `What can you share about ${only.label.toLowerCase()}? ${only.context}`
+    }
+    const topics = chunk.map((m) => m.label.toLowerCase()).join(" and ")
+    return `Can you walk me through ${topics}?`
   })
 }
 
@@ -299,8 +348,9 @@ export async function generateGapQuestions(
   }
 
   if (!isOpenAIConfigured()) {
+    const fallback = buildFallbackQuestions(missing, maxQuestions)
     return {
-      questions: buildFallbackQuestions(missing, maxQuestions),
+      questions: adjustQuestionsForContext(fallback, state),
       missingFields: missing,
     }
   }
@@ -341,18 +391,18 @@ export async function generateGapQuestions(
     ? `The nurse just said: "${options.lastAnswer}". Build directly on this insight.`
     : ""
 
-const systemPrompt = `You are an expert clinical investigator running a focused interview with a nurse.
-- Keep a warm, professional tone while staying concise.
-- Go straight to the essential question without prefacing statements.
-- Bundle multiple related missing data points into a single follow-up question when it makes sense.
-- Ask for specifics (measurements, timelines, observations) where useful.
+const systemPrompt = `You are an expert clinical investigator running a focused interview with a nurse after their initial fall report.
+- Warm, professional, concise — one essential question per line, no greetings or acknowledgements.
+- Bundle only missing items in the **same category** (e.g. post-fall care) into one question; do not mash unrelated topics.
+- Reference the fall subtype or location when it helps the question feel specific, not generic.
+- Never ask about details already covered in Tier 1 questions listed below.
 - ${responderName}
 - ${subtypeContext}
 - ${locationContext}
 - ${timeContext}
 - ${continuityHint}
 - ${lastAnswerHint}
-- Vary your sentence structure so every question feels distinct.`
+- Vary sentence structure; avoid templates like "environmental factors" or "anything else to add".`
 
   const desiredQuestionCount = Math.min(
     maxQuestions,
@@ -376,6 +426,7 @@ Return ${desiredQuestionCount} open-ended questions, each on its own line. Each 
     {
       temperature: 0.4,
       maxTokens: 600,
+      model: modelForTask("gapQuestions"),
     },
   )
 

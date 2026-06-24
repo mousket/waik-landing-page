@@ -155,6 +155,7 @@ export async function GET(
   return NextResponse.json({
     facility: {
       id: String(facD.id),
+      organizationId: String(facD.organizationId ?? ""),
       name: String(facD.name),
       type: facD.type,
       state: facD.state,

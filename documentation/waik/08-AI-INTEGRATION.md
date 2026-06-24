@@ -94,17 +94,19 @@ WAiK uses OpenAI's API for all AI capabilities:
 OPENAI_API_KEY=sk-...
 
 # Optional (with defaults)
-OPENAI_LLM_MODEL=gpt-4o-mini
-OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
+LLM_MODEL=gpt-4o-mini
+LLM_MODEL_REASONING=gpt-4o
+TEXT_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
 ### AI Configuration Object
 
 ```typescript
-// lib/openai.ts
+// lib/ai-config.ts
 export const AI_CONFIG = {
-  model: process.env.OPENAI_LLM_MODEL || "gpt-4o-mini",
-  embeddingModel: process.env.OPENAI_TEXT_EMBEDDING_MODEL || "text-embedding-3-small",
+  model: process.env.LLM_MODEL || "gpt-4o-mini",
+  reasoningModel: process.env.LLM_MODEL_REASONING || model,
+  embeddingModel: process.env.TEXT_EMBEDDING_MODEL || "text-embedding-3-small",
   temperature: 0.7,
   maxTokens: 2000,
 }

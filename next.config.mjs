@@ -63,6 +63,20 @@ const withSerwist = withSerwistInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // Keep @react-pdf on Node's module graph so PDF elements use the same React as the reconciler.
+  serverExternalPackages: ["@react-pdf/renderer"],
+  outputFileTracingIncludes: {
+    "/api/incidents/*/report/email": [
+      "./scripts/render-phase1-pdf.ts",
+      "./components/staff/phase1-pdf-template.tsx",
+      "./public/waik-logo.png",
+    ],
+    "/api/incidents/*/report/pdf": [
+      "./scripts/render-phase1-pdf.ts",
+      "./components/staff/phase1-pdf-template.tsx",
+      "./public/waik-logo.png",
+    ],
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

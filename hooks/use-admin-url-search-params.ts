@@ -32,7 +32,10 @@ export function useAdminUrlSearchParams(): URLSearchParams {
   }, [pathname, fromNextStr])
   return useMemo(() => {
     if (pathname.startsWith("/admin")) {
-      return new URLSearchParams(bar)
+      // Until useLayoutEffect syncs the address bar, fall back to Next's search params
+      // so SSR and the first client paint agree (avoids hydration mismatch on logo/nav links).
+      const source = bar || fromNextStr
+      return new URLSearchParams(source)
     }
     return new URLSearchParams(fromNextStr)
   }, [bar, fromNextStr, pathname])

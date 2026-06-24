@@ -9,7 +9,17 @@ import { Shield } from "lucide-react"
 import { clerkAppearance } from "@/lib/clerk-appearance"
 import { getClerkAfterSignOutUrl } from "@/lib/clerk-routes"
 import { cn } from "@/lib/utils"
-import { buildAdminPathWithContext } from "@/lib/admin-nav-context"
+import {
+  adminIncidentsNavHref,
+  buildAdminPathWithContext,
+  isAdminIncidentsNavActive,
+} from "@/lib/admin-nav-context"
+import {
+  getEffectiveFacilityIdForApi,
+  getEffectiveOrganizationIdForApi,
+} from "@/lib/admin-session-scope"
+import { buildStaffReportHref } from "@/lib/staff-report-links"
+import { userCanReportIncidents } from "@/lib/waik-roles"
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav"
 import { AdminFacilitySwitcher } from "@/components/admin/admin-facility-switcher"
 import { SuperAdminAdminEntryTelemetry } from "@/components/admin/super-admin-admin-entry-telemetry"
@@ -18,28 +28,32 @@ import { NotificationBell } from "@/components/notification-bell"
 import { WaikLogo } from "@/components/waik-logo"
 
 const NAV_LINKS = [
-  { label: "Dashboard", href: "/admin/dashboard" },
-  { label: "Incidents", href: "/admin/incidents" },
-  { label: "Assessments", href: "/admin/assessments" },
-  { label: "Residents", href: "/admin/residents" },
-  { label: "Intelligence", href: "/admin/intelligence" },
-  { label: "Settings", href: "/admin/settings" },
+  { label: "Dashboard", href: "/admin/dashboard", key: "dashboard" },
+  { label: "Incidents", href: "/admin/incidents", key: "incidents" },
+  { label: "Assessments", href: "/admin/assessments", key: "assessments" },
+  { label: "Residents", href: "/admin/residents", key: "residents" },
+  { label: "Intelligence", href: "/admin/intelligence", key: "intelligence" },
+  { label: "Settings", href: "/admin/settings", key: "settings" },
 ] as const
 
-function navActive(pathname: string, href: string): boolean {
-  if (href === "/admin/dashboard") {
+function navActive(pathname: string, key: string): boolean {
+  if (key === "dashboard") {
     return pathname === "/admin/dashboard"
   }
-  if (href === "/admin/settings") {
+  if (key === "settings") {
     return pathname.startsWith("/admin/settings")
   }
-  if (href === "/admin/residents") {
+  if (key === "residents") {
     return (
       pathname === "/admin/residents" ||
       pathname.startsWith("/admin/residents/") ||
       pathname.startsWith("/residents/")
     )
   }
+  if (key === "incidents") {
+    return isAdminIncidentsNavActive(pathname)
+  }
+  const href = NAV_LINKS.find((l) => l.key === key)?.href ?? ""
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
@@ -49,6 +63,7 @@ export function AdminAppShell({
   defaultFacilityId,
   showFacilitySwitcher,
   isWaikSuperAdmin = false,
+  roleSlug = "",
   children,
 }: {
   firstName: string
@@ -56,6 +71,7 @@ export function AdminAppShell({
   defaultFacilityId?: string
   showFacilitySwitcher: boolean
   isWaikSuperAdmin?: boolean
+  roleSlug?: string
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -77,6 +93,17 @@ export function AdminAppShell({
     ) : null
 
   const dashboardHref = buildAdminPathWithContext("/admin/dashboard", searchParams)
+  const effectiveFacilityId =
+    getEffectiveFacilityIdForApi(searchParams) || (defaultFacilityId ?? "").trim() || undefined
+  const effectiveOrganizationId = getEffectiveOrganizationIdForApi(searchParams)
+  const canReportIncidents = userCanReportIncidents(
+    { roleSlug, isWaikSuperAdmin, facilityId: defaultFacilityId },
+    effectiveFacilityId,
+  )
+  const reportHref = buildStaffReportHref({
+    facilityId: effectiveFacilityId,
+    organizationId: effectiveOrganizationId,
+  })
 
   return (
     <div className="flex h-dvh min-h-0 max-h-dvh flex-col overflow-hidden bg-brand-shell-bg text-brand-body">
@@ -96,11 +123,12 @@ export function AdminAppShell({
 
           <nav className="absolute left-1/2 top-1/2 hidden w-auto max-w-[min(100%,52rem)] -translate-x-1/2 -translate-y-1/2 md:block">
             <ul className="flex flex-wrap items-center justify-center gap-6 lg:gap-8">
-              {NAV_LINKS.map(({ label, href }) => {
-                const active = navActive(pathname, href)
-                const hrefWithContext = buildAdminPathWithContext(href, searchParams)
+              {NAV_LINKS.map(({ label, href, key }) => {
+                const resolvedHref = key === "incidents" ? adminIncidentsNavHref() : href
+                const active = navActive(pathname, key)
+                const hrefWithContext = buildAdminPathWithContext(resolvedHref, searchParams)
                 return (
-                  <li key={href}>
+                  <li key={key}>
                     <Link
                       href={hrefWithContext}
                       className={cn(
@@ -119,6 +147,22 @@ export function AdminAppShell({
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-3">
+            {canReportIncidents ? (
+              <div className="hidden items-center gap-1 sm:flex">
+                <Link
+                  href={reportHref}
+                  className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15 md:text-xs"
+                >
+                  New report
+                </Link>
+                <Link
+                  href="/staff/assessments"
+                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary md:text-xs"
+                >
+                  Take assessment
+                </Link>
+              </div>
+            ) : null}
             {isWaikSuperAdmin ? (
               <Link
                 href="/waik-admin"

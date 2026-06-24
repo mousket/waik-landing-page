@@ -1,6 +1,7 @@
 import type React from "react"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
+import { userCanUseStaffOperationalSurface } from "@/lib/waik-roles"
 import { StaffAppShell } from "@/components/staff/staff-app-shell"
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
@@ -8,11 +9,8 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   if (!user) {
     redirect("/sign-in")
   }
-  if (user.isWaikSuperAdmin) {
-    redirect("/waik-admin")
-  }
-  if (user.isAdminTier) {
-    redirect("/admin/dashboard")
+  if (!userCanUseStaffOperationalSurface(user) && !user.isWaikSuperAdmin) {
+    redirect("/sign-in")
   }
 
   const todayYmd = new Date().toISOString().slice(0, 10)
@@ -22,7 +20,12 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       : null
 
   return (
-    <StaffAppShell firstName={user.firstName} lastName={user.lastName} unitLabel={unitLabel}>
+    <StaffAppShell
+      firstName={user.firstName}
+      lastName={user.lastName}
+      unitLabel={unitLabel}
+      showAdminWorkspaceLink={user.isAdminTier && !user.isWaikSuperAdmin}
+    >
       {children}
     </StaffAppShell>
   )

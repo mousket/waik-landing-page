@@ -4,9 +4,10 @@ import connectMongo from "@/backend/src/lib/mongodb"
 import AssessmentModel from "@/backend/src/models/assessment.model"
 import { mapAssessmentDocToSummary } from "@/lib/assessments/presentation"
 import { withAuth } from "@/lib/api-handler"
+import { userCanUseStaffOperationalSurface } from "@/lib/waik-roles"
 
 export const GET = withAuth(async (_request, { currentUser }) => {
-  if (currentUser.isAdminTier || currentUser.isWaikSuperAdmin) {
+  if (!userCanUseStaffOperationalSurface(currentUser)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
   if (!currentUser.facilityId) {

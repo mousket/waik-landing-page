@@ -60,6 +60,23 @@ export interface Question {
   }
 }
 
+export interface Phase1ClinicalRecordSnapshot {
+  narrative: string
+  residentStatement: string
+  interventions: string
+  contributingFactors: string
+  recommendations: string
+  environmentalAssessment: string
+}
+
+export interface Phase1SignoffSnapshot {
+  expertNurseSummary: string
+  nurseRecommendations: string
+  administratorRecommendations: string
+  clinicalRecord: Phase1ClinicalRecordSnapshot
+  signedAt: string
+}
+
 export interface IncidentInitialReport {
   capturedAt: string
   narrative: string
@@ -69,6 +86,8 @@ export interface IncidentInitialReport {
   recordedById: string
   recordedByName: string
   recordedByRole: UserRole
+  signature?: InvestigationSignature
+  phase1SignoffSnapshot?: Phase1SignoffSnapshot
 }
 
 export type InvestigationStatus = "not-started" | "in-progress" | "completed"
@@ -83,6 +102,8 @@ export interface InvestigationSignature {
   role: string
   declaration: string
   ipAddress?: string
+  signatureImage?: string | null
+  reportPdfUrl?: string | null
 }
 
 export interface IncidentInvestigationMetadata {

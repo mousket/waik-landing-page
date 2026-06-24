@@ -33,6 +33,8 @@ type SpeechRecognitionEventLike = {
 export interface VoiceInputScreenProps {
   question: string
   questionLabel?: string
+  /** e.g. "Helen Thompson · Fall" */
+  reportContextLine?: string
   areaHint?: string
   initialTranscript?: string
   allowDefer?: boolean
@@ -92,6 +94,7 @@ const MIC_GLYPH =
 export function VoiceInputScreen({
   question,
   questionLabel,
+  reportContextLine,
   areaHint,
   initialTranscript = "",
   allowDefer = false,
@@ -433,13 +436,19 @@ export function VoiceInputScreen({
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              {questionLabel ? (
-                <span className="line-clamp-1 flex-1 text-center text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-primary/80 sm:text-xs sm:tracking-[0.2em]">
-                  {questionLabel}
-                </span>
-              ) : (
-                <span className="flex-1" />
-              )}
+              <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1">
+                {questionLabel ? (
+                  <span className="line-clamp-1 w-full text-center text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-primary/80 sm:text-xs sm:tracking-[0.2em]">
+                    {questionLabel}
+                  </span>
+                ) : null}
+                {reportContextLine ? (
+                  <span className="line-clamp-1 w-full text-center text-[0.65rem] font-medium text-muted-foreground sm:text-xs">
+                    {reportContextLine}
+                  </span>
+                ) : null}
+                {!questionLabel && !reportContextLine ? <span className="flex-1" /> : null}
+              </div>
               <div className="flex h-9 w-9 shrink-0 items-center justify-center">
                 {completionRingPercent != null ? (
                   <CompletionRing percent={completionRingPercent} size={34} strokeWidth={3} showLabel />
@@ -450,7 +459,7 @@ export function VoiceInputScreen({
             <div className="min-h-0 flex-1 max-md:flex-none max-md:overflow-visible md:min-h-0 md:overflow-y-auto md:overscroll-contain md:[scrollbar-gutter:stable]">
               <div
                 className={cn(
-                  "space-y-3 px-3 pb-10 pt-3 sm:space-y-3.5 sm:px-4 sm:pt-4 md:pb-28",
+                  "space-y-3 px-3 pb-6 pt-3 sm:space-y-3.5 sm:px-4 sm:pt-4 md:pb-8",
                   "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-safe:fill-mode-both motion-safe:[animation-delay:80ms] motion-reduce:animate-none",
                 )}
               >
@@ -611,38 +620,6 @@ export function VoiceInputScreen({
                   ) : null}
                 </div>
 
-                {!voiceUnavailable ? (
-                  <div
-                    className={cn(
-                      "sticky bottom-0 z-[5] -mx-3 mt-2 border-t border-border/45 bg-gradient-to-t from-muted/25 to-background px-3 pt-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/92 md:hidden",
-                      "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
-                    )}
-                  >
-                    <Button
-                      type="button"
-                      disabled={!isDoneActive}
-                      aria-label="Save answer"
-                      className={cn(
-                        "h-12 w-full shrink-0 rounded-xl text-base font-semibold shadow-md",
-                        !isDoneActive && "cursor-not-allowed bg-muted text-muted-foreground shadow-none ring-0 hover:scale-100",
-                        isDoneActive && PRIMARY_CTA,
-                      )}
-                      onClick={handleDone}
-                    >
-                      {isDoneActive ? (
-                        <span className="relative inline-flex w-full items-center justify-center gap-2">
-                          Save answer
-                          <ArrowRight className="h-4 w-4" aria-hidden />
-                        </span>
-                      ) : (
-                        <span className="inline-flex w-full items-center justify-center gap-2 text-muted-foreground">
-                          Save answer (10+ characters)
-                          <ArrowRight className="h-4 w-4 opacity-50" aria-hidden />
-                        </span>
-                      )}
-                    </Button>
-                  </div>
-                ) : null}
               </div>
             </div>
 
@@ -658,7 +635,7 @@ export function VoiceInputScreen({
                 disabled={!isDoneActive}
                 className={cn(
                   "w-full",
-                  !voiceUnavailable && "hidden md:inline-flex",
+                  !voiceUnavailable && "inline-flex",
                   voiceUnavailable && "inline-flex",
                   !isDoneActive && "cursor-not-allowed bg-muted text-muted-foreground shadow-none ring-0 hover:scale-100",
                   isDoneActive && PRIMARY_CTA,

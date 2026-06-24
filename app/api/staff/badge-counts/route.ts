@@ -19,13 +19,35 @@ export const GET = withAuth(async (_req, { currentUser }) => {
   const conductedQ =
     byIds.length > 1 ? { conductedById: { $in: byIds } } : { conductedById: byIds[0] || currentUser.userId }
 
-  const [pendingCount, assessmentCount] = await Promise.all([
+  const idtAccessOr: Record<string, unknown>[] = []
+  if (byIds.length > 0) {
+    idtAccessOr.push(
+      { idtTeam: { $elemMatch: { userId: { $in: byIds }, status: "pending" } } },
+      {
+        questions: {
+          $elemMatch: {
+            "metadata.idt": true,
+            assignedTo: { $in: byIds },
+            answer: { $exists: false },
+          },
+        },
+      },
+    )
+  }
+
+  const [phase1PendingCount, idtAssignedCount, assessmentCount] = await Promise.all([
     IncidentModel.countDocuments({
       facilityId: currentUser.facilityId,
       ...staffIdMatch(currentUser),
       phase: "phase_1_in_progress",
       completenessScore: { $lt: 100 },
     }),
+    idtAccessOr.length > 0
+      ? IncidentModel.countDocuments({
+          facilityId: currentUser.facilityId,
+          $or: idtAccessOr,
+        })
+      : Promise.resolve(0),
     AssessmentModel
       ? AssessmentModel.countDocuments({
           facilityId: currentUser.facilityId,
@@ -34,6 +56,8 @@ export const GET = withAuth(async (_req, { currentUser }) => {
         })
       : Promise.resolve(0),
   ])
+
+  const pendingCount = phase1PendingCount + idtAssignedCount
 
   return Response.json({
     pendingQuestions: pendingCount,

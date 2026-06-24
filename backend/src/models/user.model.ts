@@ -9,6 +9,7 @@ export interface UserDocument extends Document {
   firstName?: string
   lastName?: string
   email: string
+  phone?: string
   roleSlug: string
   isWaikSuperAdmin: boolean
   deviceType: "personal" | "work"
@@ -39,6 +40,7 @@ const UserSchema = new Schema<UserDocument>(
     firstName: { type: String, default: "" },
     lastName: { type: String, default: "" },
     email: { type: String, required: true, unique: true, index: true },
+    phone: { type: String, required: false },
     roleSlug: { type: String, required: true, index: true },
     isWaikSuperAdmin: { type: Boolean, default: false },
     deviceType: { type: String, enum: ["personal", "work"], default: "personal" },

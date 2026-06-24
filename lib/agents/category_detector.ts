@@ -5,7 +5,7 @@
  * and suggests appropriate subtype for further investigation.
  */
 
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 import {
   IncidentCategory,
   IncidentCategoryResult,
@@ -82,7 +82,7 @@ Respond in JSON format:
       { role: "system", content: systemPrompt },
       { role: "user", content: `Classify this incident narrative:\n\n${narrative}` },
     ],
-    { temperature: 0.1, maxTokens: 200 }
+    { temperature: 0.1, maxTokens: 200, model: modelForTask("classify") }
   )
 
   const content = response.choices[0]?.message?.content || ""

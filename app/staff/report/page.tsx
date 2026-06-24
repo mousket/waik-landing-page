@@ -1,9 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { readAdminScopeFromSession } from "@/lib/admin-session-scope"
+import { computeWorkflowFromAnswerMap } from "@/lib/report/phase1-workflow-progress"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { Bandage, Footprints, Loader2, Pill, Zap, type LucideIcon } from "lucide-react"
+import { Bandage, Footprints, FileText, Loader2, Pill, Zap, type LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -16,10 +18,33 @@ import { StaffResidentSearch, type StaffResidentSearchOption } from "@/component
 import { StaffFlowFrame } from "@/components/staff/staff-flow-backdrop"
 import { ReportStepHeader } from "@/components/staff/report-step-header"
 import { ReportCompletionFeedback } from "@/components/staff/report-completion-feedback"
+import {
+  ClinicalReportPreview,
+  type PreviewResponse,
+} from "@/components/staff/clinical-report-preview"
+import type { ClinicalRecord } from "@/lib/agents/clinical-record-generator"
 import { cn } from "@/lib/utils"
 
 const FLOW_CARD =
   "rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.06] via-background to-accent/[0.04] shadow-md"
+
+function formatIncidentTypeLabel(typeKey: string | null | undefined): string {
+  if (!typeKey?.trim()) return "Incident"
+  return typeKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function buildReportContextLine(
+  residentName: string | null,
+  residentRoom: string | null,
+  incidentType: string | null,
+): string | undefined {
+  const name = (residentName ?? "").trim()
+  const room = (residentRoom ?? "").trim()
+  const resident = name || (room ? `Room ${room}` : "")
+  const type = formatIncidentTypeLabel(incidentType)
+  if (resident && type) return `${resident} · ${type}`
+  return resident || type || undefined
+}
 
 /** Backend Tier 1 packs exist only for these keys today (`lib/config/tier1-questions`). */
 const REPORT_START_SUPPORTED_TYPES = new Set(["fall"])
@@ -32,7 +57,9 @@ export type ReportPhase =
   | "gap_analysis"
   | "tier2_board"
   | "closing"
-  | "signoff"
+  | "preview_loading"
+  | "clinical_preview"
+  | "preview_error"
   | "reportcard"
 
 export type ActiveQuestion = {
@@ -65,6 +92,7 @@ type ReportCardPayload = {
   totalQuestionsAsked: number
   totalActiveSeconds: number
   dataPointsCaptured: number
+  pdfStatus?: string
 }
 
 const INCIDENT_TYPE_PRESETS: Array<{
@@ -165,6 +193,8 @@ function ResidentSplashScreen({
   onBack,
   disabled,
   isStarting,
+  facilityId,
+  organizationId,
 }: {
   incidentTitle: string
   selectedResident: StaffResidentSearchOption | null
@@ -173,6 +203,8 @@ function ResidentSplashScreen({
   onBack: () => void
   disabled: boolean
   isStarting: boolean
+  facilityId?: string
+  organizationId?: string
 }) {
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col px-3 pb-6 pt-3 sm:px-4 sm:pb-8 sm:pt-4">
@@ -191,6 +223,8 @@ function ResidentSplashScreen({
             value={selectedResident}
             onChange={onResidentChange}
             disabled={disabled || isStarting}
+            facilityId={facilityId}
+            organizationId={organizationId}
           />
         </div>
         <Button
@@ -213,11 +247,61 @@ function ResidentSplashScreen({
   )
 }
 
+function mapServerReportPhase(reportPhase: string): ReportPhase {
+  switch (reportPhase) {
+    case "tier1":
+      return "tier1_board"
+    case "tier2":
+      return "tier2_board"
+    case "closing":
+      return "closing"
+    default:
+      return "tier1_board"
+  }
+}
+
+function applyEditsToClinicalRecord(
+  record: ClinicalRecord,
+  edits: Record<string, string>,
+): ClinicalRecord {
+  return { ...record, ...edits }
+}
+
+function isClosingBoardComplete(
+  questions: BoardQuestion[],
+  answeredIds: Set<string>,
+  answers: Record<string, string>,
+): boolean {
+  return (
+    questions.length > 0 &&
+    questions.every((q) => answeredIds.has(q.id) && (answers[q.id] ?? "").trim().length > 0)
+  )
+}
+
 export default function StaffReportPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { userId, role } = useWaikUser()
 
-  const [phase, setPhase] = useState<ReportPhase>("type_select")
+  const resumeIncidentId = searchParams.get("incidentId")?.trim() ?? ""
+
+  const reportFacilityScope = useMemo(() => {
+    const fromUrlFacility = searchParams.get("facilityId")?.trim() ?? ""
+    const fromUrlOrg = searchParams.get("organizationId")?.trim() ?? ""
+    if (fromUrlFacility) {
+      return { facilityId: fromUrlFacility, organizationId: fromUrlOrg || undefined }
+    }
+    const saved = readAdminScopeFromSession()
+    if (saved?.facilityId) {
+      return {
+        facilityId: saved.facilityId,
+        organizationId: saved.organizationId || undefined,
+      }
+    }
+    return null
+  }, [searchParams])
+
+  const [phase, setPhase] = useState<ReportPhase>(resumeIncidentId ? "gap_analysis" : "type_select")
   const [selectedTypeKey, setSelectedTypeKey] = useState<string | null>(null)
   const [selectedResident, setSelectedResident] = useState<StaffResidentSearchOption | null>(null)
   const [activeQuestion, setActiveQuestion] = useState<ActiveQuestion | null>(null)
@@ -228,6 +312,7 @@ export default function StaffReportPage() {
   const [completionPercent, setCompletionPercent] = useState(0)
   const [isCreating, setIsCreating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [resumeLoading, setResumeLoading] = useState(Boolean(resumeIncidentId))
   const [currentQuestionStartMs, setCurrentQuestionStartMs] = useState(0)
 
   const [tier1Questions, setTier1Questions] = useState<BoardQuestion[]>([])
@@ -235,10 +320,32 @@ export default function StaffReportPage() {
   const [closingQuestions, setClosingQuestions] = useState<BoardQuestion[]>([])
   const [tier2RemovedIds, setTier2RemovedIds] = useState<string[]>([])
   const [tier2NewIds, setTier2NewIds] = useState<string[]>([])
+  const [gapRetryNeeded, setGapRetryNeeded] = useState(false)
+  const [gapWarningMessage, setGapWarningMessage] = useState<string | null>(null)
+  const [reportResidentName, setReportResidentName] = useState<string | null>(null)
+  const [reportResidentRoom, setReportResidentRoom] = useState<string | null>(null)
+  const [reportIncidentType, setReportIncidentType] = useState<string | null>(null)
 
   const [reportCardData, setReportCardData] = useState<ReportCardPayload | null>(null)
+  const [clinicalRecord, setClinicalRecord] = useState<ClinicalRecord | null>(null)
+  const [previewData, setPreviewData] = useState<PreviewResponse | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   const gapTransitionRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const workflowPercent = useMemo(() => {
+    const tier2Ids = new Set(tier2Questions.map((q) => q.id))
+    for (const id of Object.keys(answers)) {
+      if (id.startsWith("t2-q")) tier2Ids.add(id)
+    }
+    return computeWorkflowFromAnswerMap({
+      tier1Ids: tier1Questions.map((q) => q.id),
+      tier2Ids: [...tier2Ids],
+      closingIds: closingQuestions.map((q) => q.id),
+      answers,
+      tier2Generated: tier2Ids.size > 0,
+    })
+  }, [answers, closingQuestions, tier1Questions, tier2Questions])
 
   useEffect(() => {
     return () => {
@@ -265,7 +372,152 @@ export default function StaffReportPage() {
     setClosingQuestions([])
     setTier2RemovedIds([])
     setTier2NewIds([])
+    setGapRetryNeeded(false)
+    setGapWarningMessage(null)
+    setReportResidentName(null)
+    setReportResidentRoom(null)
+    setReportIncidentType(null)
     setReportCardData(null)
+    setClinicalRecord(null)
+    setPreviewData(null)
+    setPreviewError(null)
+  }, [])
+
+  const loadClinicalPreview = useCallback(async (sid: string) => {
+    setPreviewError(null)
+    setPhase("preview_loading")
+    try {
+      const previewRes = await fetch("/api/report/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sid }),
+      })
+      const previewPayload = (await previewRes.json()) as PreviewResponse & { error?: string }
+      if (!previewRes.ok) {
+        throw new Error(
+          typeof previewPayload.error === "string"
+            ? previewPayload.error
+            : "Failed to prepare clinical preview",
+        )
+      }
+      setPreviewData(previewPayload)
+      setClinicalRecord(previewPayload.clinicalRecord)
+      setPhase("clinical_preview")
+    } catch (previewErr) {
+      console.error(previewErr)
+      const msg =
+        previewErr instanceof Error ? previewErr.message : "Could not prepare clinical preview"
+      setPreviewError(msg)
+      setPhase("preview_error")
+      toast.error(msg)
+    }
+  }, [])
+
+  const hydrateFromResume = useCallback((data: Record<string, unknown>): boolean => {
+    const sid = typeof data.sessionId === "string" ? data.sessionId : null
+    const iid = typeof data.incidentId === "string" ? data.incidentId : null
+    if (!sid || !iid) return false
+
+    setSessionId(sid)
+    setIncidentId(iid)
+    setReportResidentName(typeof data.residentName === "string" ? data.residentName : null)
+    setReportResidentRoom(typeof data.residentRoom === "string" ? data.residentRoom : null)
+    setReportIncidentType(typeof data.incidentType === "string" ? data.incidentType : null)
+    setTier1Questions((data.tier1Questions as BoardQuestion[] | undefined) ?? [])
+    setTier2Questions((data.tier2Questions as BoardQuestion[] | undefined) ?? [])
+    setClosingQuestions((data.closingQuestions as BoardQuestion[] | undefined) ?? [])
+
+    const answerMap = (data.answers as Record<string, string> | undefined) ?? {}
+    setAnswers(answerMap)
+    const ids = (data.answeredIds as string[] | undefined) ?? []
+    setAnsweredIds(new Set(ids))
+
+    if (typeof data.completenessScore === "number") {
+      setCompletionPercent(data.completenessScore)
+    }
+
+    const warning = typeof data.warning === "string" ? data.warning : null
+    if (warning) {
+      toast.message(warning)
+    }
+
+    const tier2 = (data.tier2Questions as BoardQuestion[] | undefined) ?? []
+    setGapRetryNeeded(tier2.length === 0)
+    setGapWarningMessage(warning)
+
+    const serverPhase = typeof data.reportPhase === "string" ? data.reportPhase : "tier1"
+    if (serverPhase === "signoff") {
+      return true
+    }
+    setPhase(mapServerReportPhase(serverPhase))
+    return false
+  }, [])
+
+  useEffect(() => {
+    if (!resumeIncidentId || !userId) {
+      setResumeLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setResumeLoading(true)
+
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/report/resume?incidentId=${encodeURIComponent(resumeIncidentId)}`,
+          { credentials: "include" },
+        )
+        const data = (await res.json()) as Record<string, unknown>
+        if (cancelled) return
+
+        if (!res.ok) {
+          const err = typeof data.error === "string" ? data.error : "Could not resume this report"
+          toast.error(err)
+          setPhase("type_select")
+          return
+        }
+
+        if (data.status === "session_active" || data.sessionId) {
+          const needsPreview = hydrateFromResume(data)
+          const sid = typeof data.sessionId === "string" ? data.sessionId : null
+          if (needsPreview && sid) {
+            await loadClinicalPreview(sid)
+          }
+        }
+      } catch (err) {
+        console.error(err)
+        if (!cancelled) {
+          toast.error("Could not load saved report progress")
+          setPhase("type_select")
+        }
+      } finally {
+        if (!cancelled) setResumeLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [hydrateFromResume, loadClinicalPreview, resumeIncidentId, userId])
+
+  const applyGapAnalysisComplete = useCallback((data: Record<string, unknown>) => {
+    const nextTier2 = (data.tier2Questions as BoardQuestion[] | undefined) ?? []
+    const warning = typeof data.warning === "string" ? data.warning : null
+    if (typeof data.completenessScore === "number") {
+      setCompletionPercent(data.completenessScore)
+    }
+    setTier2Questions(nextTier2)
+    setTier2NewIds(nextTier2.map((q) => q.id))
+    setGapWarningMessage(warning)
+    setGapRetryNeeded(nextTier2.length === 0)
+    setPhase("gap_analysis")
+    if (gapTransitionRef.current) clearTimeout(gapTransitionRef.current)
+    gapTransitionRef.current = setTimeout(() => {
+      setPhase("tier2_board")
+      setTier2NewIds([])
+      gapTransitionRef.current = null
+    }, 1500)
   }, [])
 
   const openQuestion = useCallback((q: BoardQuestion) => {
@@ -316,6 +568,48 @@ export default function StaffReportPage() {
     }
   }, [router, sessionId])
 
+  const handleRetryGap = useCallback(async () => {
+    if (!sessionId) {
+      toast.error("Session expired. Start again from the dashboard.")
+      return
+    }
+    setIsSubmitting(true)
+    setPhase("gap_analysis")
+    try {
+      const res = await fetch("/api/report/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          questionId: "__RETRY_GAP__",
+          transcript: "",
+          tier: "tier2",
+        }),
+      })
+      const data = (await res.json()) as Record<string, unknown>
+      if (!res.ok) {
+        const retryable = data.retryable === true
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : retryable
+              ? "Could not regenerate questions. Try again."
+              : "Failed to regenerate follow-up questions",
+        )
+      }
+      if (data.status !== "gap_analysis_complete") {
+        throw new Error("Unexpected response from server.")
+      }
+      applyGapAnalysisComplete(data)
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : "Could not regenerate follow-up questions")
+      setPhase("tier2_board")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [applyGapAnalysisComplete, sessionId])
+
   const handleAnswer = useCallback(
     async (question: ActiveQuestion, transcript: string) => {
       if (!sessionId) {
@@ -334,6 +628,8 @@ export default function StaffReportPage() {
             transcript: transcript.trim(),
             tier: question.tier,
             activeMs,
+            questionText: question.text,
+            areaHint: question.areaHint ?? (question.tier === "tier2" ? "Follow-up" : "General"),
           }),
         })
         const data = (await res.json()) as Record<string, unknown>
@@ -355,19 +651,9 @@ export default function StaffReportPage() {
             setPhase("tier1_board")
             break
 
-          case "gap_analysis_complete": {
-            const nextTier2 = (data.tier2Questions as BoardQuestion[] | undefined) ?? []
-            setTier2Questions(nextTier2)
-            setTier2NewIds(nextTier2.map((q) => q.id))
-            setPhase("gap_analysis")
-            if (gapTransitionRef.current) clearTimeout(gapTransitionRef.current)
-            gapTransitionRef.current = setTimeout(() => {
-              setPhase("tier2_board")
-              setTier2NewIds([])
-              gapTransitionRef.current = null
-            }, 1500)
+          case "gap_analysis_complete":
+            applyGapAnalysisComplete(data)
             break
-          }
 
           case "tier2_updated": {
             const removed = (data.questionsRemoved as string[] | undefined) ?? []
@@ -404,7 +690,11 @@ export default function StaffReportPage() {
           case "closing_updated": {
             const allDone = data.allClosingComplete === true
             setActiveQuestion(null)
-            setPhase(allDone ? "signoff" : "closing")
+            if (allDone && sessionId) {
+              await loadClinicalPreview(sessionId)
+            } else {
+              setPhase("closing")
+            }
             break
           }
 
@@ -420,53 +710,104 @@ export default function StaffReportPage() {
         setIsSubmitting(false)
       }
     },
-    [currentQuestionStartMs, returnToBoard, sessionId, tier2Questions],
+    [applyGapAnalysisComplete, currentQuestionStartMs, loadClinicalPreview, returnToBoard, sessionId, tier2Questions],
+  )
+
+  const handleDeferOne = useCallback(
+    async (question: ActiveQuestion) => {
+      if (!sessionId) {
+        toast.error("Session expired. Start again from the dashboard.")
+        return
+      }
+      setIsSubmitting(true)
+      try {
+        const res = await fetch("/api/report/answer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            questionId: "__DEFER_ONE__",
+            deferQuestionId: question.id,
+            transcript: "",
+            tier: "tier2",
+          }),
+        })
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        if (!res.ok) {
+          throw new Error(data.error || "Could not defer this question")
+        }
+        setAnswers((prev) => ({ ...prev, [question.id]: "__DEFERRED__" }))
+        setActiveQuestion(null)
+        returnToBoard("tier2")
+        toast.success("Question deferred. Continue other follow-ups or return when ready.")
+      } catch (e) {
+        console.error(e)
+        toast.error(e instanceof Error ? e.message : "Could not defer this question.")
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [returnToBoard, sessionId],
   )
 
   const handleVoiceDefer = useCallback(
     (question: ActiveQuestion) => {
       if (question.tier === "tier2") {
-        void handleDeferAll()
+        void handleDeferOne(question)
       }
     },
-    [handleDeferAll],
+    [handleDeferOne],
   )
 
-  const handleSignOff = useCallback(async () => {
-    if (!sessionId) {
-      toast.error("Session missing.")
-      return
-    }
-    setIsSubmitting(true)
-    try {
-      const res = await fetch("/api/report/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          editedSections: undefined,
-          signature: {
-            declaration: "I confirm this report reflects my observations and actions.",
-            signedAt: new Date().toISOString(),
-          },
-        }),
-      })
-      const data = (await res.json()) as { error?: string; reportCard?: ReportCardPayload }
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to complete report")
+  const submitSignedReport = useCallback(
+    async (
+      sigImage: string,
+      edits: Record<string, string>,
+      record: ClinicalRecord,
+    ) => {
+      if (!sessionId) {
+        toast.error("Session missing.")
+        return
       }
-      if (data.reportCard) {
-        setReportCardData(data.reportCard)
+      if (!sigImage.trim()) {
+        toast.error("Signature required before submitting.")
+        return
       }
-      setPhase("reportcard")
-      toast.success("Report signed and submitted.")
-    } catch (err) {
-      console.error(err)
-      toast.error(err instanceof Error ? err.message : "Failed to sign off")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [sessionId])
+      setClinicalRecord(record)
+      setIsSubmitting(true)
+      try {
+        const res = await fetch("/api/report/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            editedSections: Object.keys(edits).length > 0 ? edits : undefined,
+            clinicalRecord: record,
+            signatureImage: sigImage,
+            signature: {
+              declaration: "I confirm this report reflects my observations and actions.",
+              signedAt: new Date().toISOString(),
+            },
+          }),
+        })
+        const data = (await res.json()) as { error?: string; reportCard?: ReportCardPayload }
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to complete report")
+        }
+        if (data.reportCard) {
+          setReportCardData(data.reportCard)
+        }
+        setPhase("reportcard")
+        toast.success("Report signed and submitted.")
+      } catch (err) {
+        console.error(err)
+        toast.error(err instanceof Error ? err.message : "Failed to submit report")
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [sessionId],
+  )
 
   const handleTypeSelect = useCallback((typeKey: string) => {
     setSelectedTypeKey(typeKey)
@@ -504,6 +845,14 @@ export default function StaffReportPage() {
           incidentTime: new Date().toTimeString().slice(0, 5),
           hasInjury: null,
           witnessesPresent: undefined,
+          ...(reportFacilityScope
+            ? {
+                facilityId: reportFacilityScope.facilityId,
+                ...(reportFacilityScope.organizationId
+                  ? { organizationId: reportFacilityScope.organizationId }
+                  : {}),
+              }
+            : {}),
         }),
       })
       const data = (await res.json()) as {
@@ -521,6 +870,9 @@ export default function StaffReportPage() {
       }
       setSessionId(data.sessionId)
       setIncidentId(data.incidentId)
+      setReportResidentName(fullName)
+      setReportResidentRoom(room || null)
+      setReportIncidentType(selectedTypeKey)
       setTier1Questions(data.tier1Questions)
       setTier2Questions([])
       setClosingQuestions([])
@@ -534,7 +886,7 @@ export default function StaffReportPage() {
     } finally {
       setIsCreating(false)
     }
-  }, [userId, selectedTypeKey, selectedResident])
+  }, [userId, selectedTypeKey, selectedResident, reportFacilityScope])
 
   const handleBackFromResident = useCallback(() => {
     setSelectedResident(null)
@@ -547,7 +899,26 @@ export default function StaffReportPage() {
     router.push(destination)
   }, [role, router])
 
+  const reportContextLine = buildReportContextLine(
+    reportResidentName,
+    reportResidentRoom,
+    reportIncidentType,
+  )
+  const incidentDetailHref = incidentId ? `/staff/incidents/${incidentId}` : undefined
+
   function renderPhase() {
+    if (resumeLoading) {
+      return (
+        <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center px-4 py-8">
+          <div className={cn(FLOW_CARD, "flex max-w-sm flex-col items-center gap-3 px-6 py-8")}>
+            <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            <p className="text-center text-sm font-medium text-foreground">Loading your report…</p>
+            <p className="text-center text-xs text-muted-foreground">Restoring saved progress</p>
+          </div>
+        </div>
+      )
+    }
+
     switch (phase) {
       case "type_select":
         return <TypeSelectScreen onSelectType={handleTypeSelect} disabled={isCreating} />
@@ -564,6 +935,8 @@ export default function StaffReportPage() {
             onBack={handleBackFromResident}
             disabled={isCreating}
             isStarting={isCreating}
+            facilityId={reportFacilityScope?.facilityId}
+            organizationId={reportFacilityScope?.organizationId}
           />
         )
       }
@@ -572,10 +945,11 @@ export default function StaffReportPage() {
         return (
           <QuestionBoard
             title="Initial Questions"
+            contextLine={reportContextLine}
             questions={tier1Questions}
             answeredIds={answeredIds}
             answers={answers}
-            completenessScore={completionPercent}
+            completenessScore={workflowPercent}
             onQuestionTap={openQuestion}
             isSubmitting={isSubmitting}
           />
@@ -588,11 +962,16 @@ export default function StaffReportPage() {
         const vi: VoiceInputScreenProps = {
           question: activeQuestion.text,
           questionLabel: activeQuestion.label,
+          reportContextLine,
           areaHint: activeQuestion.areaHint,
-          initialTranscript: answers[activeQuestion.id],
+          initialTranscript: (() => {
+            const raw = answers[activeQuestion.id]?.trim() ?? ""
+            if (raw === "__DEFERRED__" || raw === "__UNKNOWN__") return undefined
+            return answers[activeQuestion.id]
+          })(),
           allowDefer: activeQuestion.allowDefer,
           showEncouragement: activeQuestion.tier === "tier2",
-          completionRingPercent: completionPercent,
+          completionRingPercent: workflowPercent,
           onSubmit: (transcript) => {
             void handleAnswer(activeQuestion, transcript)
           },
@@ -634,13 +1013,37 @@ export default function StaffReportPage() {
         )
 
       case "tier2_board":
+        if (tier2Questions.length === 0 && gapRetryNeeded) {
+          return (
+            <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center px-4 py-8">
+              <div className={cn(FLOW_CARD, "flex max-w-sm flex-col items-center gap-4 px-6 py-8 text-center")}>
+                <p className="text-sm font-medium text-foreground">Follow-up questions not ready</p>
+                <p className="text-xs text-muted-foreground">
+                  {gapWarningMessage ??
+                    "We couldn't generate follow-up questions. Check your connection and try again."}
+                </p>
+                <Button
+                  type="button"
+                  className="rounded-xl"
+                  disabled={isSubmitting}
+                  onClick={() => void handleRetryGap()}
+                >
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )
+        }
         return (
           <QuestionBoard
             title="Follow-up Questions"
+            contextLine={reportContextLine}
+            detailBackHref={incidentDetailHref}
             questions={tier2Questions}
             answeredIds={answeredIds}
             answers={answers}
-            completenessScore={completionPercent}
+            completenessScore={workflowPercent}
             onQuestionTap={openQuestion}
             onDeferAll={handleDeferAll}
             isSubmitting={isSubmitting}
@@ -649,51 +1052,92 @@ export default function StaffReportPage() {
           />
         )
 
-      case "closing":
+      case "closing": {
+        const closingComplete = isClosingBoardComplete(closingQuestions, answeredIds, answers)
         return (
           <QuestionBoard
             title="Closing Questions"
+            contextLine={reportContextLine}
+            detailBackHref={incidentDetailHref}
             questions={closingQuestions}
             answeredIds={answeredIds}
             answers={answers}
-            completenessScore={completionPercent}
+            completenessScore={workflowPercent}
             onQuestionTap={openQuestion}
             isSubmitting={isSubmitting}
+            footerAction={
+              closingComplete && sessionId
+                ? {
+                    label: "Review & sign report",
+                    onClick: () => void loadClinicalPreview(sessionId),
+                    disabled: isSubmitting,
+                  }
+                : undefined
+            }
           />
         )
+      }
 
-      case "signoff":
+      case "preview_loading":
         return (
-          <div className="flex min-h-0 flex-1 flex-col px-3 py-6 sm:px-4 sm:py-8">
-            <WaikCard className={cn("mx-auto w-full max-w-lg border-primary/20 shadow-md", FLOW_CARD)}>
-              <WaikCardContent className="space-y-3 px-5 py-6 text-center sm:px-6 sm:py-7">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-primary/80">Sign off</p>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  By continuing, you confirm this report reflects your observations and actions. Your narrative and
-                  structured record will be saved for Phase 2 review.
-                </p>
-                {incidentId ? (
-                  <p className="text-xs text-muted-foreground">
-                    Incident <span className="font-mono">{incidentId}</span>
-                  </p>
+          <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center px-4 py-8">
+            <div className={cn(FLOW_CARD, "flex max-w-sm flex-col items-center gap-3 px-6 py-8")}>
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
+              <div className="flex justify-center text-foreground">
+                <WaikLogo size="md" />
+              </div>
+              <p className="text-center text-sm font-medium text-foreground">
+                WAiK is preparing your clinical summary and record for review…
+              </p>
+              <p className="text-center text-xs text-muted-foreground">This may take a few seconds</p>
+            </div>
+          </div>
+        )
+
+      case "clinical_preview":
+        return previewData ? (
+          <ClinicalReportPreview
+            previewData={previewData}
+            isSubmitting={isSubmitting}
+            onBack={() => setPhase("closing")}
+            onSubmit={(sigImage, edits) => {
+              const base = clinicalRecord ?? previewData.clinicalRecord
+              void submitSignedReport(sigImage, edits, applyEditsToClinicalRecord(base, edits))
+            }}
+          />
+        ) : null
+
+      case "preview_error":
+        return (
+          <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center px-4 py-8">
+            <div className={cn(FLOW_CARD, "flex max-w-sm flex-col items-center gap-4 px-6 py-8 text-center")}>
+              <p className="text-sm font-medium text-foreground">Could not prepare your clinical record</p>
+              <p className="text-xs text-muted-foreground">
+                {previewError ??
+                  "Check your connection and try again. You must review and sign your report before submitting."}
+              </p>
+              <div className="flex w-full flex-col gap-2">
+                {sessionId ? (
+                  <Button
+                    type="button"
+                    className="rounded-xl"
+                    disabled={isSubmitting}
+                    onClick={() => void loadClinicalPreview(sessionId)}
+                  >
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Retry preview
+                  </Button>
                 ) : null}
                 <Button
                   type="button"
-                  className="min-h-11 w-full rounded-xl text-sm font-semibold shadow-md sm:min-h-12 sm:text-base"
-                  onClick={() => void handleSignOff()}
-                  disabled={isSubmitting}
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setPhase("closing")}
                 >
-                  {isSubmitting ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Submitting…
-                    </span>
-                  ) : (
-                    "Sign and submit report"
-                  )}
+                  Back to closing questions
                 </Button>
-              </WaikCardContent>
-            </WaikCard>
+              </div>
+            </div>
           </div>
         )
 
@@ -743,6 +1187,12 @@ export default function StaffReportPage() {
                 ) : (
                   <p className="text-sm text-muted-foreground">Your report was submitted successfully.</p>
                 )}
+                {card?.pdfStatus ? (
+                  <p className="text-sm text-muted-foreground mt-2 flex items-center justify-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5" />
+                    {card.pdfStatus}
+                  </p>
+                ) : null}
                 {incidentId ? (
                   <p className="text-xs text-muted-foreground">
                     Incident <span className="font-mono">{incidentId}</span>

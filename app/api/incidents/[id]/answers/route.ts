@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { answerQuestion, getIncidentForUser } from "@/lib/db"
+import { persistOneNotification } from "@/lib/notification-service"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const sessionUser = await getCurrentUser()
@@ -42,6 +43,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!updatedQuestion) {
       return NextResponse.json({ error: "Incident or question not found" }, { status: 404 })
+    }
+
+    const investigatorId = updatedQuestion.askedBy
+    const answererName =
+      [sessionUser.firstName, sessionUser.lastName].filter(Boolean).join(" ").trim() || sessionUser.email
+    if (investigatorId && investigatorId !== sessionUser.userId) {
+      const residentName = String(scope.incident.residentName ?? "").trim()
+      const room = String(scope.incident.residentRoom ?? "").trim() || "—"
+      void persistOneNotification({
+        incidentId: id,
+        facilityId,
+        type: "idt-question-answered",
+        message: `${answererName} answered your question${residentName ? ` on ${residentName}` : ""} (Room ${room}).`,
+        targetUserId: investigatorId,
+        actionUrl: `/admin/incidents/${id}`,
+        actorName: answererName,
+        priority: "normal",
+        push: null,
+      }).catch((e) => console.error("[answers] investigator notification:", e))
     }
 
     return NextResponse.json({ success: true, answer: updatedQuestion.answer })

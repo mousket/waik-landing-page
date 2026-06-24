@@ -2,14 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, ClipboardList, ClipboardCheck, Lightbulb, Users } from "lucide-react"
+import { Home, ClipboardList, ClipboardCheck, Lightbulb } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useBadges } from "@/components/staff/badge-context"
 
 const tabs = [
   { href: "/staff/dashboard", label: "Home", icon: Home },
   { href: "/staff/incidents", label: "Incidents", icon: ClipboardList },
-  { href: "/staff/residents", label: "Residents", icon: Users },
   { href: "/staff/assessments", label: "Assessments", icon: ClipboardCheck },
   { href: "/staff/intelligence", label: "Intelligence", icon: Lightbulb },
 ] as const
@@ -21,9 +20,6 @@ function tabActive(pathname: string, href: string): boolean {
       pathname === "/staff" ||
       pathname.startsWith("/staff/report")
     )
-  }
-  if (href === "/staff/residents") {
-    return pathname.startsWith("/staff/residents") || pathname.startsWith("/residents/")
   }
   return pathname === href || pathname.startsWith(`${href}/`)
 }

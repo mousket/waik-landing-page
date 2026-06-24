@@ -172,4 +172,4 @@ Notes with visibility "admin_only" must never appear in staff views.
 ## Post-Task Documentation Update
 
 After passing all test cases:
-- Create `plan/pilot_1/phase_7/task-14-DONE.md`
+- Mark complete: `documentation/pilot_1_plan/phase_7/task-14-navigation-history-done.md`

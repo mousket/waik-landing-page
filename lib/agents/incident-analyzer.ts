@@ -1,22 +1,22 @@
-import { ChatOpenAI } from "@langchain/openai"
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import { PromptTemplate } from "@langchain/core/prompts"
 import type { Incident, AIReport } from "../types"
-import { AI_CONFIG, isOpenAIConfigured } from "../openai"
+import { AI_CONFIG, createLangChainChatModel, isOpenAIConfigured, modelForTask } from "../openai"
 
 /**
  * Incident Analyzer Agent
  * Generates comprehensive AI reports from incident data
  */
 export class IncidentAnalyzerAgent {
-  private model: ChatOpenAI
+  private model: BaseChatModel
 
   constructor() {
     if (!isOpenAIConfigured()) {
-      throw new Error("OpenAI API key not configured. Set OPENAI_API_KEY environment variable.")
+      throw new Error("LLM provider is not configured. Set LLM_PROVIDER and its API key.")
     }
 
-    this.model = new ChatOpenAI({
-      modelName: AI_CONFIG.model,
+    this.model = createLangChainChatModel({
+      modelName: modelForTask("incidentAnalyzer"),
       temperature: AI_CONFIG.temperature,
       maxTokens: AI_CONFIG.maxTokens,
     })
@@ -44,7 +44,7 @@ export class IncidentAnalyzerAgent {
       recommendations,
       actions,
       generatedAt: new Date().toISOString(),
-      model: AI_CONFIG.model,
+      model: modelForTask("incidentAnalyzer"),
       confidence: 0.9, // You can implement confidence scoring later
     }
 

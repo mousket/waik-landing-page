@@ -1,4 +1,5 @@
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import type OpenAI from "openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 import {
   AgentState,
   FallSubtypeStandards,
@@ -513,6 +514,56 @@ const ANALYZER_FUNCTION_DEFINITION = {
   },
 } as const
 
+function parseAnalyzerToolArguments(
+  message: OpenAI.Chat.ChatCompletionMessage,
+): Record<string, unknown> | null {
+  const rawToolCalls = message.tool_calls
+  if (Array.isArray(rawToolCalls) && rawToolCalls.length > 0) {
+    const withArgs = rawToolCalls.find((call) => {
+      const fn = (call as { function?: { arguments?: string } }).function
+      return Boolean(fn?.arguments)
+    })
+    const toolArgs = (withArgs as { function?: { arguments?: string } } | undefined)?.function?.arguments
+    if (toolArgs) {
+      try {
+        return JSON.parse(toolArgs) as Record<string, unknown>
+      } catch (error) {
+        console.error("[Analyzer] Failed to parse tool_calls arguments", error, toolArgs)
+        return null
+      }
+    }
+  }
+
+  if (message.function_call?.arguments) {
+    try {
+      return JSON.parse(message.function_call.arguments) as Record<string, unknown>
+    } catch (error) {
+      console.error("[Analyzer] Failed to parse function_call arguments", error, message.function_call.arguments)
+      return null
+    }
+  }
+
+  return null
+}
+
+function mapParsedAnalyzerOutput(parsed: Record<string, unknown>): AgentState {
+  const sanitizedGlobal = sanitizeGlobalStandards(
+    parsed.global_standards as Partial<GoldStandardFallReport> | undefined,
+  )
+  const inferredSubtype = normalizeSubtypeValue(
+    typeof parsed.sub_type === "string" ? parsed.sub_type : null,
+  )
+  const sanitizedSubtype = sanitizeSubtype(
+    inferredSubtype,
+    parsed.sub_type_data as Record<string, unknown> | undefined,
+  )
+  return {
+    global_standards: sanitizedGlobal,
+    sub_type: inferredSubtype,
+    sub_type_data: sanitizedSubtype,
+  }
+}
+
 export async function analyzeNarrativeAndScore(narrative: string, seedState?: AgentState): Promise<AnalyzerNodeResult> {
   const baseState = seedState ?? createEmptyState()
 
@@ -569,6 +620,17 @@ export async function analyzeNarrativeAndScore(narrative: string, seedState?: Ag
     {
       temperature: 0,
       maxTokens: 1200,
+      model: modelForTask("extract"),
+      tools: [
+        {
+          type: "function",
+          function: ANALYZER_FUNCTION_DEFINITION,
+        },
+      ],
+      tool_choice: {
+        type: "function",
+        function: { name: ANALYZER_FUNCTION_DEFINITION.name },
+      },
     },
   )
 
@@ -576,25 +638,16 @@ export async function analyzeNarrativeAndScore(narrative: string, seedState?: Ag
   let mappedState = createEmptyState()
   let rawModelOutput: unknown
 
-  if (message?.function_call?.arguments) {
-    try {
-      const parsed = JSON.parse(message.function_call.arguments)
+  if (message) {
+    const parsed = parseAnalyzerToolArguments(message)
+    if (parsed) {
       rawModelOutput = parsed
-      const sanitizedGlobal = sanitizeGlobalStandards(parsed.global_standards)
-      const inferredSubtype = normalizeSubtypeValue(parsed.sub_type)
-      const sanitizedSubtype = sanitizeSubtype(inferredSubtype, parsed.sub_type_data)
-
-      mappedState = {
-        global_standards: sanitizedGlobal,
-        sub_type: inferredSubtype,
-        sub_type_data: sanitizedSubtype,
-      }
-    } catch (error) {
-      console.error("[Analyzer] Failed to parse function call arguments", error, message.function_call?.arguments)
+      mappedState = mapParsedAnalyzerOutput(parsed)
     }
   }
 
   applyHeuristicExtraction(narrative, mappedState)
+  normalizeExtractionFromNarrative(narrative, mappedState)
   const { completenessScore, filled, missing } = computeCompleteness(mappedState)
   const finalScore = completenessScore
   const feedback = buildFeedback({

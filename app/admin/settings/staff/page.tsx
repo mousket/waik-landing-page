@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
@@ -34,9 +33,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { STAFF_CSV_TEMPLATE_HEADERS } from "@/lib/csv-staff"
+import { BulkImportDialog } from "@/components/admin/bulk-import-dialog"
+import {
+  STAFF_IMPORT_EXAMPLE_ROW,
+  STAFF_IMPORT_TEMPLATE_HEADERS,
+  type StaffImportPreviewRow,
+} from "@/lib/import/staff-rows"
 import { isAdminTierRole, isClinicalStaffRole } from "@/lib/role-assignment-permissions"
-import { Download, Loader2, Search, Upload } from "lucide-react"
+import { Loader2, Search, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 
@@ -52,16 +56,6 @@ type StaffMember = {
   lastLoginAt: string | null
   invitedByName?: string
   dateSent?: string | null
-}
-
-type ImportRow = {
-  first_name: string
-  last_name: string
-  email: string
-  role_slug: string
-  phone?: string
-  status: "valid" | "error" | "duplicate"
-  error?: string
 }
 
 const ROLE_HELP =
@@ -92,11 +86,6 @@ export default function AdminStaffSettingsPage() {
   const [inviteMsg, setInviteMsg] = useState<string | null>(null)
 
   const [importOpen, setImportOpen] = useState(false)
-  const [importStep, setImportStep] = useState(1)
-  const [importRows, setImportRows] = useState<ImportRow[]>([])
-  const [importBusy, setImportBusy] = useState(false)
-  const [importProgress, setImportProgress] = useState(0)
-  const [importResults, setImportResults] = useState<Array<{ email: string; status: string; error?: string }>>([])
 
   const [deactivateId, setDeactivateId] = useState<string | null>(null)
   const [viewTab, setViewTab] = useState<"signed-in" | "awaiting" | "inactive">("signed-in")
@@ -251,70 +240,6 @@ export default function AdminStaffSettingsPage() {
     await load()
   }
 
-  function downloadTemplate() {
-    const blob = new Blob([`${STAFF_CSV_TEMPLATE_HEADERS}\nJane,Doe,jane.doe@example.com,rn\n`], {
-      type: "text/csv;charset=utf-8",
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "waik-staff-template.csv"
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  async function onImportFile(file: File) {
-    setImportBusy(true)
-    setImportRows([])
-    try {
-      const fd = new FormData()
-      fd.set("file", file)
-      const res = await fetch(`/api/admin/staff/import${apiCtx}`, { method: "POST", body: fd })
-      const j = (await res.json()) as { rows?: ImportRow[]; error?: string }
-      if (!res.ok) {
-        setImportRows([])
-        return
-      }
-      setImportRows(j.rows ?? [])
-      setImportStep(2)
-    } finally {
-      setImportBusy(false)
-    }
-  }
-
-  const hasImportErrors = importRows.some((r) => r.status === "error")
-  const validImportRows = importRows.filter((r) => r.status === "valid")
-
-  async function runImportConfirm() {
-    setImportBusy(true)
-    setImportStep(3)
-    setImportProgress(0)
-    setImportResults([])
-    try {
-      const res = await fetch(`/api/admin/staff/import/confirm${apiCtx}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: validImportRows }),
-      })
-      const j = (await res.json()) as {
-        results?: Array<{ email: string; status: string; error?: string }>
-      }
-      setImportResults(j.results ?? [])
-      setImportProgress(100)
-      await load()
-    } finally {
-      setImportBusy(false)
-    }
-  }
-
-  function closeImport() {
-    setImportOpen(false)
-    setImportStep(1)
-    setImportRows([])
-    setImportResults([])
-    setImportProgress(0)
-  }
-
   return (
     <div className="relative flex w-full flex-1 flex-col">
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
@@ -400,7 +325,7 @@ export default function AdminStaffSettingsPage() {
                     onClick={() => setImportOpen(true)}
                   >
                     <Upload className="mr-2 h-4 w-4" />
-                    Import from CSV
+                    Import CSV / Excel
                   </Button>
                   {inviteMsg ? (
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -822,125 +747,42 @@ export default function AdminStaffSettingsPage() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={importOpen} onOpenChange={(o) => !o && closeImport()}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Import from CSV</DialogTitle>
-            </DialogHeader>
-
-            {importStep === 1 ? (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Required columns: <code className="text-xs bg-muted px-1 rounded">{STAFF_CSV_TEMPLATE_HEADERS}</code>
-                  . Optional: <code className="text-xs bg-muted px-1 rounded">phone</code>
-                </p>
-                <p className="text-xs text-muted-foreground">Valid role values: {ROLE_HELP}</p>
-                <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download template
-                </Button>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-10 cursor-pointer hover:bg-muted/50 transition">
-                  <Upload className="h-10 w-10 text-muted-foreground mb-2" />
-                  <span className="text-sm font-medium">Drop CSV here or click to upload</span>
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0]
-                      if (f) void onImportFile(f)
-                      e.target.value = ""
-                    }}
-                  />
-                </label>
-                {importBusy ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Parsing…
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {importStep === 2 ? (
-              <div className="space-y-4">
-                <p className="text-sm">
-                  <strong>{validImportRows.length}</strong> will be created,{" "}
-                  <span className="text-destructive">{importRows.filter((r) => r.status === "error").length}</span> have
-                  errors,{" "}
-                  <span className="text-amber-600">{importRows.filter((r) => r.status === "duplicate").length}</span>{" "}
-                  already exist.
-                </p>
-                <div className="rounded-md border max-h-64 overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {importRows.map((r, i) => (
-                        <TableRow key={`${r.email}-${i}`}>
-                          <TableCell className="text-sm">{r.email}</TableCell>
-                          <TableCell className="text-sm">
-                            {r.first_name} {r.last_name}
-                          </TableCell>
-                          <TableCell className="text-sm">{r.role_slug}</TableCell>
-                          <TableCell
-                            className={
-                              r.status === "valid"
-                                ? "text-green-600 text-sm"
-                                : r.status === "duplicate"
-                                  ? "text-amber-600 text-sm"
-                                  : "text-destructive text-sm"
-                            }
-                          >
-                            {r.status === "valid" ? "Valid" : r.status === "duplicate" ? "Exists" : r.error ?? "Error"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <DialogFooter className="gap-2 sm:gap-0">
-                  <Button type="button" variant="outline" onClick={() => setImportStep(1)}>
-                    Back
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={hasImportErrors || validImportRows.length === 0 || importBusy}
-                    onClick={() => void runImportConfirm()}
-                  >
-                    Import {validImportRows.length} staff
-                  </Button>
-                </DialogFooter>
-              </div>
-            ) : null}
-
-            {importStep === 3 ? (
-              <div className="space-y-4">
-                <Progress value={importProgress} className="h-2" />
-                <p className="text-sm font-medium">Results</p>
-                <ul className="text-sm space-y-1 max-h-48 overflow-auto">
-                  {importResults.map((r, i) => (
-                    <li key={`${r.email}-${i}`} className={r.status === "failed" ? "text-destructive" : "text-green-600"}>
-                      {r.email} — {r.status}
-                      {r.error ? ` (${r.error})` : ""}
-                    </li>
-                  ))}
-                </ul>
-                <DialogFooter>
-                  <Button type="button" onClick={closeImport}>
-                    Done
-                  </Button>
-                </DialogFooter>
-              </div>
-            ) : null}
-          </DialogContent>
-        </Dialog>
+        <BulkImportDialog<StaffImportPreviewRow>
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          title="Import staff"
+          description={
+            <>
+              Required columns:{" "}
+              <code className="rounded bg-muted px-1 text-xs">{STAFF_IMPORT_TEMPLATE_HEADERS}</code>. Valid{" "}
+              <code className="rounded bg-muted px-1 text-xs">role_slug</code> values: {ROLE_HELP}. Optional:{" "}
+              <code className="rounded bg-muted px-1 text-xs">phone</code>,{" "}
+              <code className="rounded bg-muted px-1 text-xs">device_type</code> (personal|work),{" "}
+              <code className="rounded bg-muted px-1 text-xs">unit</code>.
+            </>
+          }
+          templateHeaders={STAFF_IMPORT_TEMPLATE_HEADERS}
+          templateExampleRow={STAFF_IMPORT_EXAMPLE_ROW}
+          templateFilename="waik-staff-template.csv"
+          parseUrl={`/api/admin/staff/import${apiCtx}`}
+          confirmUrl={`/api/admin/staff/import/confirm${apiCtx}`}
+          columns={[
+            { header: "Email", cell: (r) => r.email },
+            { header: "Name", cell: (r) => `${r.first_name} ${r.last_name}` },
+            { header: "Role", cell: (r) => r.role_slug },
+          ]}
+          rowKey={(r, i) => `${r.email}-${i}`}
+          isImportable={(r) => r.status === "valid"}
+          hasBlockingErrors={(rows) => rows.some((r) => r.status === "error")}
+          statusLabel={(r) => {
+            if (r.status === "valid") return { text: "Valid", className: "text-green-600" }
+            if (r.status === "duplicate") return { text: "Exists", className: "text-amber-600" }
+            return { text: "Error", className: "text-destructive" }
+          }}
+          confirmButtonLabel={(n) => `Import ${n} staff`}
+          onComplete={() => void load()}
+          mapConfirmPayload={(rows) => ({ rows })}
+        />
       </div>
     </div>
   )

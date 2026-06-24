@@ -13,6 +13,11 @@ export type NotificationEventType =
   | "phase2-all-sections-complete"
   | "phase2-pending-signature"
   | "investigation-reporter-closed"
+  | "injury-reported"
+  | "idt-question-assigned"
+  | "idt-question-answered"
+  | "assessment-due-soon"
+  | "report-completeness-scored"
 
 export interface NotificationDocument extends Document {
   id: string
@@ -46,6 +51,11 @@ const NotificationSchema = new Schema<NotificationDocument>(
         "phase2-all-sections-complete",
         "phase2-pending-signature",
         "investigation-reporter-closed",
+        "injury-reported",
+        "idt-question-assigned",
+        "idt-question-answered",
+        "assessment-due-soon",
+        "report-completeness-scored",
       ],
     },
     message: { type: String, required: true },

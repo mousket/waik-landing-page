@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import IncidentModel from "@/backend/src/models/incident.model"
 import { addQuestionToIncident, getIncidentById } from "@/lib/db"
+import { enqueueIncidentNotifications } from "@/lib/notification-service"
 import { loadPhase2Incident } from "@/lib/phase2-server"
 
 const MAX_LEN = 4000
@@ -75,6 +76,27 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     },
     { arrayFilters: [{ "m.userId": targetUserId }] },
   ).exec()
+
+  const residentName = String(doc["residentName"] ?? "").trim()
+  const room = String(doc["residentRoom"] ?? "").trim() || "—"
+  enqueueIncidentNotifications({
+    facilityId: incFacilityId,
+    incidentId,
+    type: "idt-question-assigned",
+    message: `${askedByName} sent you an IDT question${residentName ? ` for ${residentName}` : ""} (Room ${room}).`,
+    actionUrl: `/staff/incidents/${incidentId}`,
+    actorName: askedByName,
+    priority: "normal",
+    targetUserIds: [targetUserId],
+    push: {
+      titlePersonal: `IDT question — Room ${room}`,
+      titleWork: residentName ? `IDT question — ${residentName}` : `IDT question — Room ${room}`,
+      bodyPersonal: "Tap to view and answer.",
+      bodyWork: "Tap to view and answer.",
+      url: `/staff/incidents/${incidentId}`,
+    },
+    deliverPush: true,
+  })
 
   const out = await getIncidentById(incidentId, incFacilityId)
   if (!out) {

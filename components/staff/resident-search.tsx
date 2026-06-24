@@ -47,6 +47,8 @@ export function StaffResidentSearch({
   placeholder = "Search resident by name or room…",
   className,
   inputId: inputIdProp,
+  facilityId,
+  organizationId,
 }: {
   value: StaffResidentSearchOption | null
   onChange: (r: StaffResidentSearchOption | null) => void
@@ -54,6 +56,9 @@ export function StaffResidentSearch({
   placeholder?: string
   className?: string
   inputId?: string
+  /** Super admin acting in a community — scopes `/api/residents`. */
+  facilityId?: string
+  organizationId?: string
 }) {
   const genId = useId()
   const listboxId = `${genId}-listbox`
@@ -83,6 +88,8 @@ export function StaffResidentSearch({
     try {
       const u = new URL("/api/residents", window.location.origin)
       u.searchParams.set("search", search)
+      if (facilityId?.trim()) u.searchParams.set("facilityId", facilityId.trim())
+      if (organizationId?.trim()) u.searchParams.set("organizationId", organizationId.trim())
       const res = await fetch(u.toString(), { credentials: "same-origin" })
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string }
@@ -105,7 +112,7 @@ export function StaffResidentSearch({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [facilityId, organizationId])
 
   useEffect(() => {
     if (value) {

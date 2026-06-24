@@ -26,6 +26,7 @@ type OverviewStats = {
 
 type FacilityRow = {
   id: string
+  organizationId: string
   name: string
   type: string
   state: string
@@ -198,19 +199,20 @@ export default function WaikAdminHomePage() {
                     <th className="px-4 py-3">Avg completeness</th>
                     <th className="px-4 py-3">Last activity</th>
                     <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {facilitiesLoading && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                         Loading…
                       </td>
                     </tr>
                   )}
                   {!facilitiesLoading && facilities.length === 0 && !facilitiesError && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                         No active facilities in the database.
                       </td>
                     </tr>
@@ -235,6 +237,38 @@ export default function WaikAdminHomePage() {
                           {row.lastActivity ? new Date(row.lastActivity).toLocaleString() : "—"}
                         </td>
                         <td className="px-4 py-3">{row.plan ?? "—"}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="min-h-10 border-primary text-primary hover:bg-primary/5"
+                              asChild
+                            >
+                              <Link href={`/waik-admin/${row.id}`}>View</Link>
+                            </Button>
+                            {row.organizationId ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-h-10 border-primary text-primary hover:bg-primary/5"
+                                asChild
+                              >
+                                <Link
+                                  href={`/admin/dashboard?organizationId=${encodeURIComponent(
+                                    row.organizationId,
+                                  )}&facilityId=${encodeURIComponent(row.id)}`}
+                                >
+                                  Open admin dashboard
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button variant="outline" size="sm" className="min-h-10" disabled>
+                                Open admin dashboard
+                              </Button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                 </tbody>

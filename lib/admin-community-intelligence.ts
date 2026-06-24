@@ -3,8 +3,7 @@ import IncidentModel from "@/backend/src/models/incident.model"
 import { answerCrossFacilityIntelligence } from "@/lib/agents/intelligence-qa"
 import { getRedis } from "@/lib/redis"
 import { queryFacilityIncidentStats } from "@/lib/agents/vector-search"
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
-import { AI_CONFIG } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 
 /**
  * **Canonical public HTTP paths** (prefer `/api/admin/...` for the web app; `/api/intelligence/...` are thin re-exports).
@@ -217,7 +216,7 @@ export async function buildOrGetInsights(facilityId: string): Promise<InsightPay
             content: `Draft sentences from these stats only:\nthisWeek: ${w.length} incidents (7d)\ncompleteness: avg ${Math.round(avgComp)}% over ${m.length} incidents (30d)\nattention: ${attention} flagged in sample\nstaff: top ${topReporter} with ${topN} (7d)`,
           },
         ],
-        { model: AI_CONFIG.model, maxTokens: 400, response_format: { type: "json_object" } },
+        { model: modelForTask("communityIntelligence"), maxTokens: 400, response_format: { type: "json_object" } },
       )
       const txt = pol.choices[0]?.message?.content
       if (txt) {
@@ -326,7 +325,7 @@ export async function buildOrGetDailyBrief(
       },
       { role: "user", content: `Recent reports:\n${pack}\n` },
     ],
-    { model: AI_CONFIG.model, maxTokens: 500 },
+    { model: modelForTask("communityIntelligence"), maxTokens: 500 },
   )
   const text = res.choices[0]?.message?.content?.trim() ?? "Could not generate brief."
   const p: BriefPayload = { facilityId, generatedAt: new Date().toISOString(), text }

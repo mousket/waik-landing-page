@@ -28,6 +28,9 @@ export const GET = withAuth(async (request, { currentUser }) => {
   const unreadOnly = sp.get("unreadOnly") === "true"
   const rawLimit = Number(sp.get("limit") ?? 50)
   const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 50) : 50
+  const rawPage = Number(sp.get("page") ?? 1)
+  const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1
+  const skip = (page - 1) * limit
 
   await connectMongo()
   const query: Record<string, unknown> = {
@@ -38,11 +41,23 @@ export const GET = withAuth(async (request, { currentUser }) => {
     query.readAt = null
   }
 
-  const rows = await NotificationModel.find(query)
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .lean()
-    .exec()
+  const [rows, total] = await Promise.all([
+    NotificationModel.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec(),
+    NotificationModel.countDocuments(query).exec(),
+  ])
 
-  return NextResponse.json({ notifications: rows.map((x) => toRow(x as Record<string, unknown>)) })
+  const hasMore = skip + rows.length < total
+
+  return NextResponse.json({
+    notifications: rows.map((x) => toRow(x as Record<string, unknown>)),
+    page,
+    limit,
+    total,
+    hasMore,
+  })
 })

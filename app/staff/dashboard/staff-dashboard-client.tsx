@@ -72,6 +72,7 @@ export function StaffDashboardClient({
   selectedUnit: string | null
 }) {
   const router = useRouter()
+  const assignedAnchorRef = useRef<HTMLDivElement | null>(null)
   const workAnchorRef = useRef<HTMLDivElement | null>(null)
   const idDateFrom = useId()
   const idDateTo = useId()
@@ -79,12 +80,19 @@ export function StaffDashboardClient({
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [incidents, setIncidents] = useState<StaffIncidentSummary[]>([])
+  const [assignedToMe, setAssignedToMe] = useState<StaffIncidentSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [assessments, setAssessments] = useState<AssessmentRow[]>([])
   const [assessmentsLoading, setAssessmentsLoading] = useState(true)
   const [perf, setPerf] = useState<Perf | null>(null)
   const [perfLoading, setPerfLoading] = useState(true)
+
+  const scrollToAssigned = useCallback(() => {
+    requestAnimationFrame(() => {
+      assignedAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }, [])
 
   const scrollToWork = useCallback(() => {
     setWorkOpen(true)
@@ -103,9 +111,15 @@ export function StaffDashboardClient({
           if (alive) setLoadError("Could not load your incidents. Try again.")
           return
         }
-        const data = (await res.json()) as { incidents?: StaffIncidentSummary[] }
+        const data = (await res.json()) as {
+          incidents?: StaffIncidentSummary[]
+          myHistory?: StaffIncidentSummary[]
+          assignedToMe?: StaffIncidentSummary[]
+        }
         if (!alive) return
-        setIncidents(Array.isArray(data.incidents) ? data.incidents : [])
+        const history = data.myHistory ?? data.incidents ?? []
+        setIncidents(Array.isArray(history) ? history : [])
+        setAssignedToMe(Array.isArray(data.assignedToMe) ? data.assignedToMe : [])
       } catch {
         if (alive) setLoadError("Network error while loading incidents.")
       } finally {
@@ -208,9 +222,11 @@ export function StaffDashboardClient({
                 firstName={firstName}
                 selectedUnit={selectedUnit}
                 pendingCount={pendingAction.length}
+                assignedTaskCount={assignedToMe.length}
                 inProgressCount={inProgress.length}
                 assessmentsDueCount={assessments.length}
                 onPendingClick={scrollToWork}
+                onAssignedClick={scrollToAssigned}
                 onInProgressClick={scrollToWork}
                 onAssessmentsClick={() => router.push("/staff/assessments")}
               />
@@ -232,7 +248,45 @@ export function StaffDashboardClient({
         </div>
       ) : null}
 
-      <StaffDashboardAssessmentsSpotlight assessments={assessments} loading={assessmentsLoading} />
+      <div ref={assignedAnchorRef} className="min-h-0 scroll-mt-6">
+        <div className="min-h-0 overflow-hidden rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-500/[0.08] via-background to-primary/[0.06] shadow-md">
+          <div className="border-b border-border/50 px-4 py-3.5 sm:px-5 sm:py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-800/90 dark:text-blue-200/90">
+              Questions for you
+            </p>
+            <h2 className="mt-1 font-semibold text-foreground">Team follow-up from leadership</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Phase 2 investigation questions sent to you — open the incident and answer on the Status tab.
+            </p>
+          </div>
+          <div className="px-3 py-4 sm:px-5 sm:py-5">
+            <div className={TAB_PANEL_LIST_SCROLL}>
+              {loading ? (
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 min-[1200px]:grid-cols-4">
+                  <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
+                  <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
+                </div>
+              ) : assignedToMe.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                  No team questions right now — when leadership sends you a follow-up, it appears here.
+                </p>
+              ) : (
+                <ul className="m-0 grid list-none grid-cols-2 gap-2.5 p-0 sm:grid-cols-3 min-[1200px]:grid-cols-4">
+                  {assignedToMe.map((inc) => (
+                    <li key={inc.id} className="min-w-0">
+                      <StaffIncidentPill
+                        incident={inc}
+                        mode="work"
+                        onSelect={() => router.push(`/staff/incidents/${encodeURIComponent(inc.id)}`)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div ref={workAnchorRef} className="min-h-0 scroll-mt-6">
         <Collapsible open={workOpen} onOpenChange={setWorkOpen}>
@@ -340,8 +394,8 @@ export function StaffDashboardClient({
                     <div className={TAB_PANEL_LIST_SCROLL}>
                       {loading ? (
                         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 min-[1200px]:grid-cols-4">
-                          <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
-                          <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
+                          <Skeleton className="h-52 w-full min-w-0 rounded-2xl" />
+                          <Skeleton className="h-52 w-full min-w-0 rounded-2xl" />
                         </div>
                       ) : inProgress.length === 0 ? (
                         <div className="rounded-lg border-l-4 border-l-emerald-500 bg-emerald-50/90 p-4 text-emerald-900 shadow-sm sm:p-5">
@@ -376,7 +430,9 @@ export function StaffDashboardClient({
                               <StaffIncidentPill
                                 incident={inc}
                                 mode="work"
-                                onSelect={() => router.push(`/staff/incidents/${inc.id}`)}
+                                onSelect={() =>
+                                  router.push(`/staff/incidents/${encodeURIComponent(inc.id)}`)
+                                }
                               />
                             </li>
                           ))}
@@ -392,8 +448,8 @@ export function StaffDashboardClient({
                     <div className={TAB_PANEL_LIST_SCROLL}>
                       {loading ? (
                         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 min-[1200px]:grid-cols-4">
-                          <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
-                          <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
+                          <Skeleton className="h-52 w-full min-w-0 rounded-2xl" />
+                          <Skeleton className="h-52 w-full min-w-0 rounded-2xl" />
                         </div>
                       ) : pendingAction.length === 0 ? (
                         <div className="p-4 text-center sm:p-6">
@@ -442,8 +498,8 @@ export function StaffDashboardClient({
                     <div className={TAB_PANEL_LIST_SCROLL}>
                       {loading ? (
                         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 min-[1200px]:grid-cols-4">
-                          <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
-                          <Skeleton className="h-36 w-full min-w-0 rounded-2xl" />
+                          <Skeleton className="h-52 w-full min-w-0 rounded-2xl" />
+                          <Skeleton className="h-52 w-full min-w-0 rounded-2xl" />
                         </div>
                       ) : allRecent.length === 0 ? (
                         <p className="p-6 text-center text-sm text-muted-foreground">You have not submitted a report yet.</p>
@@ -489,6 +545,8 @@ export function StaffDashboardClient({
           </div>
         </Collapsible>
       </div>
+
+      <StaffDashboardAssessmentsSpotlight assessments={assessments} loading={assessmentsLoading} />
     </div>
   )
 

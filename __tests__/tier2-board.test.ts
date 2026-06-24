@@ -4,6 +4,7 @@ import type { ReportSession } from "@/lib/config/report-session"
 import {
   allocateNewTier2Ids,
   buildNextTier2Board,
+  countPendingTier2OnBoard,
   completenessToPercent,
   goldFieldDisplayKeys,
   normalizeQuestionText,
@@ -136,5 +137,37 @@ describe("buildNextTier2Board", () => {
       supplementedTexts: [],
     })
     expect(nextBoard.map((q) => q.id)).toEqual(["t2-q2"])
+  })
+
+  it("carries forward unanswered questions not replaced by gap regen", () => {
+    const now = new Date().toISOString()
+    const session = minimalSession({
+      tier2Questions: [
+        { id: "t2-q1", text: "Q1", askedAt: now },
+        { id: "t2-q2", text: "Q2", askedAt: now },
+        { id: "t2-q3", text: "Q3", askedAt: now },
+      ],
+    })
+    const { nextBoard, questionsRemoved } = buildNextTier2Board({
+      session,
+      answeredQuestionId: "t2-q1",
+      transcript: "answer one",
+      supplementedTexts: ["Only one new gap question"],
+    })
+    expect(nextBoard.map((q) => q.id)).toEqual(expect.arrayContaining(["t2-q2", "t2-q3"]))
+    expect(questionsRemoved).toEqual([])
+  })
+})
+
+describe("countPendingTier2OnBoard", () => {
+  it("ignores answered and deferred", () => {
+    const board = [
+      { id: "t2-q1", text: "a" },
+      { id: "t2-q2", text: "b" },
+      { id: "t2-q3", text: "c" },
+    ]
+    expect(
+      countPendingTier2OnBoard(board, { "t2-q1": "done" }, ["t2-q3"]),
+    ).toBe(1)
   })
 })

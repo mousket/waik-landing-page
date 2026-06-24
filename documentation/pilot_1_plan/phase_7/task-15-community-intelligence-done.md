@@ -101,4 +101,4 @@ Every MongoDB query must include { facilityId } — no exceptions
 ## Post-Task Documentation Update
 
 After passing all test cases:
-- Create `plan/pilot_1/phase_7/task-15-DONE.md`
+- Mark complete: `documentation/pilot_1_plan/phase_7/task-15-community-intelligence-done.md`

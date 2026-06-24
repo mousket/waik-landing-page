@@ -47,7 +47,7 @@ export async function processDeferredQuestionReminders(now = new Date()): Promis
 
   for (const raw of incidents) {
     out.scanned++
-    const inc = raw as {
+    const inc = raw as unknown as {
       id: string
       facilityId?: string
       staffId?: string

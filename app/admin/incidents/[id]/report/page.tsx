@@ -55,9 +55,10 @@ export default async function IncidentClosureReportPage({ params }: { params: Pr
   const facility = facilityId
     ? await FacilityModel.findOne({ id: facilityId }).select(["name"]).lean().exec()
     : null
+  const facilityName = (facility as unknown as { name?: string } | null)?.name
   const communityName =
-    typeof (facility as { name?: string } | null)?.name === "string"
-      ? String((facility as { name: string }).name).trim() || "Community"
+    typeof facilityName === "string" && facilityName.trim()
+      ? facilityName.trim()
       : "Community"
 
   const generatedLabel = formatTs(new Date().toISOString())

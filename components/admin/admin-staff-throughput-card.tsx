@@ -97,7 +97,7 @@ export function AdminStaffThroughputCard({
           {model.units.length > 0 ? (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Unit strain</p>
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {model.units.map((u) => (
                   <li key={u.unit}>
                     <Link
@@ -105,9 +105,9 @@ export function AdminStaffThroughputCard({
                         `/admin/incidents?range=today&unit=${encodeURIComponent(u.unit)}`,
                         searchParams,
                       )}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-card/60 px-3 py-2 text-xs hover:border-primary/30 hover:bg-primary/5"
+                      className="flex h-full flex-col gap-1 rounded-lg border border-border/50 bg-card/60 px-3 py-2.5 text-xs hover:border-primary/30 hover:bg-primary/5 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <span className="font-medium text-foreground">{u.unit}</span>
+                      <span className="font-medium text-foreground">Unit {u.unit}</span>
                       <span className="shrink-0 text-muted-foreground">
                         {u.strain} hot · {u.open} open
                       </span>
@@ -148,17 +148,17 @@ export function AdminStaffThroughputCard({
           {model.whoHelp.length > 0 ? (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Who may need help</p>
-              <ul className="mt-2 space-y-3">
+              <ul className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {model.whoHelp.map((w) => (
                   <li
                     key={w.name}
-                    className="rounded-xl border border-border/50 bg-card/60 p-3 text-xs sm:flex sm:items-center sm:justify-between sm:gap-3"
+                    className="flex h-full flex-col rounded-xl border border-border/50 bg-card/60 p-3 text-xs"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold text-foreground">{w.name}</p>
                       <p className="mt-1 text-muted-foreground">{w.detail}</p>
                     </div>
-                    <div className="mt-2 flex shrink-0 flex-wrap gap-2 sm:mt-0">
+                    <div className="mt-3 flex shrink-0 flex-wrap gap-2">
                       <Link
                         href={activityHref}
                         className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-[11px] font-semibold text-foreground hover:border-primary/35"

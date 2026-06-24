@@ -2,8 +2,11 @@ import { NextResponse } from "next/server"
 import { v4 as uuidv4 } from "uuid"
 import connectMongo from "@/backend/src/lib/mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
+import { canUseStaffOperationalSurface } from "@/lib/waik-roles"
 import { CLOSING_QUESTIONS, TIER1_BY_TYPE } from "@/lib/config/tier1-questions"
 import { createReportSession, type ReportSession } from "@/lib/config/report-session"
+import { persistReportCheckpoint } from "@/lib/report/checkpoint-incident"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -36,15 +39,34 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  if (!user.facilityId?.trim()) {
-    return NextResponse.json({ error: "Facility ID required" }, { status: 400 })
-  }
 
   let body: Record<string, unknown>
   try {
     body = (await request.json()) as Record<string, unknown>
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
+
+  const bodyFacilityId = typeof body.facilityId === "string" ? body.facilityId : undefined
+  const bodyOrganizationId = typeof body.organizationId === "string" ? body.organizationId : undefined
+
+  let facilityId = (user.facilityId ?? "").trim()
+  let organizationId = (user.organizationId ?? "").trim()
+
+  if (user.isWaikSuperAdmin) {
+    const resolved = await resolveEffectiveAdminFacility(request, user, {
+      bodyFacilityId,
+      bodyOrganizationId,
+    })
+    if (isEffectiveAdminFacilityError(resolved)) {
+      return resolved.error
+    }
+    facilityId = resolved.facilityId
+    organizationId = resolved.organizationId
+  } else if (!canUseStaffOperationalSurface(user.roleSlug)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  } else if (!facilityId) {
+    return NextResponse.json({ error: "Facility ID required" }, { status: 400 })
   }
 
   const incidentType = typeof body.incidentType === "string" ? body.incidentType.trim() : ""
@@ -99,9 +121,9 @@ export async function POST(request: Request) {
 
     const incidentPayload: Record<string, unknown> = {
       id: incidentId,
-      facilityId: user.facilityId,
-      organizationId: user.organizationId || undefined,
-      companyId: user.organizationId || undefined,
+      facilityId,
+      organizationId: organizationId || undefined,
+      companyId: organizationId || undefined,
       incidentType,
       title,
       description,
@@ -159,7 +181,7 @@ export async function POST(request: Request) {
     const session: ReportSession = {
       sessionId,
       incidentId,
-      facilityId: user.facilityId,
+      facilityId,
       userId: user.userId,
       userName: staffName,
       userRole: user.roleSlug,
@@ -201,6 +223,7 @@ export async function POST(request: Request) {
     }
 
     await createReportSession(session)
+    await persistReportCheckpoint(session)
 
     return NextResponse.json({
       sessionId,

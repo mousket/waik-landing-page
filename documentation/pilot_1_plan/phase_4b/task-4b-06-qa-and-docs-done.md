@@ -24,7 +24,7 @@ Regulatory and pilot readiness require a **traceable** verification that Task 09
   - [phase_4b_readme.md](./phase_4b_readme.md) **Status** line → “Complete” with date when signed off.
   - Link from [../README.md](../README.md) in pilot plan table if that file lists phases (edit only that row).
   - Optional: add `documentation/pilot_1_plan/phase_4/task-09-phase2-intelligence-done.md` by **renaming** the original task file (user preference in prior thread: no duplicate “-done” as a second file — rename in place if product wants).
-- **OpenAI / Redis** one-pager: env vars: `OPENAI_API_KEY`, `OPENAI_LLM_MODEL` (or `AI_CONFIG` in `lib/openai.ts`), `REDIS_URL` (if used) — in this file or `phase_4b_readme` appendix.
+- **OpenAI / Redis** one-pager: env vars: `OPENAI_API_KEY`, `LLM_MODEL` (or `AI_CONFIG` in `lib/openai.ts`), `REDIS_URL` (if used) — in this file or `phase_4b_readme` appendix.
 
 ## Out of scope
 
@@ -63,7 +63,7 @@ Regulatory and pilot readiness require a **traceable** verification that Task 09
 | Name | Purpose |
 |------|--------|
 | `OPENAI_API_KEY` | Community Q&A, insight text polish, daily brief narrative |
-| `AI_CONFIG` in `lib/openai.ts` / `OPENAI_LLM_MODEL` | Model id for those call sites |
+| `AI_CONFIG` in `lib/openai.ts` / `LLM_MODEL` | Model id for those call sites |
 | `REDIS_URL` | Optional; 1h cache keys: `waik:intel:insights:<facilityId>`, `waik:admin:daily-brief:<facilityId>` (see `lib/admin-community-intelligence.ts` header) |
 
 ---

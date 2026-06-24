@@ -1,6 +1,6 @@
 import { getIncidentById, updateIncident, queueInvestigationQuestions } from "../db"
 import type { Incident } from "../types"
-import { generateChatCompletion, isOpenAIConfigured } from "../openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "../openai"
 
 export type InvestigationAgentEvent =
   | { type: "log"; node: string; message: string }
@@ -214,7 +214,7 @@ Pick the label that best matches the scenario. If unsure, respond with fall-unkn
         { role: "system", content: "Return only the classification label." },
         { role: "user", content: prompt },
       ],
-      { temperature: 0, maxTokens: 10 },
+      { temperature: 0, maxTokens: 10, model: modelForTask("classify") },
     )
 
     const raw = response.choices?.[0]?.message?.content?.trim().toLowerCase()
@@ -262,7 +262,7 @@ Guidelines:
         { role: "system", content: "Return only the list of questions." },
         { role: "user", content: prompt },
       ],
-      { temperature: 0.3, maxTokens: 500 },
+      { temperature: 0.3, maxTokens: 500, model: modelForTask("investigationQuestions") },
     )
 
     const content = response.choices?.[0]?.message?.content || ""

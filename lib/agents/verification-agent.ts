@@ -1,4 +1,4 @@
-import { AI_CONFIG, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 
 export interface VerificationInput {
   originalNarrative: string
@@ -115,7 +115,7 @@ Perform the fidelity check and return JSON only.`
       {
         temperature: 0,
         maxTokens: 1200,
-        model: AI_CONFIG.model,
+        model: modelForTask("verify"),
         response_format: { type: "json_object" },
       },
     )

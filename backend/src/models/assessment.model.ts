@@ -21,6 +21,8 @@ export interface AssessmentDocument extends Document {
   narrativeRaw?: string
   structuredOutput?: Record<string, unknown>
   nextDueAt?: Date
+  /** Set when a 3-day-due inbox reminder was sent for the current `nextDueAt`. */
+  dueSoonReminderFor?: Date
   createdAt?: Date
   updatedAt?: Date
 }
@@ -40,6 +42,7 @@ const AssessmentSchema = new Schema<AssessmentDocument>(
     completenessScore: { type: Number, required: true },
     status: { type: String, required: true, enum: ASSESSMENT_STATUS, default: "completed" },
     nextDueAt: { type: Date },
+    dueSoonReminderFor: { type: Date },
     narrativeRaw: { type: String, required: false },
     structuredOutput: { type: Schema.Types.Mixed, required: false },
     createdAt: { type: Date, required: false },

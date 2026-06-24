@@ -2,13 +2,11 @@ import { NextResponse } from "next/server"
 import connectMongo from "@/backend/src/lib/mongodb"
 import RoleModel from "@/backend/src/models/role.model"
 import UserModel from "@/backend/src/models/user.model"
-import { isValidEmail } from "@/lib/admin-staff-invite"
-import { parseStaffCsv } from "@/lib/csv-staff"
+import { parseImportFile } from "@/lib/import-parser"
+import { staffImportMissingHeaders, validateStaffImportRows } from "@/lib/import/staff-rows"
 import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
 import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
-
-type RowStatus = "valid" | "error" | "duplicate"
 
 export async function POST(request: Request) {
   try {
@@ -26,11 +24,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing file field" }, { status: 400 })
     }
 
-    const text = await file.text()
-    const { headers, rows } = parseStaffCsv(text)
+    const fileName = file instanceof File ? file.name : "upload.csv"
+    const { headers, rows } = await parseImportFile(file, fileName)
 
-    const required = ["first_name", "last_name", "email", "role_slug"]
-    const missing = required.filter((h) => !headers.includes(h))
+    const missing = staffImportMissingHeaders(headers)
     if (missing.length) {
       return NextResponse.json(
         { error: `Missing columns: ${missing.join(", ")}`, rows: [] },
@@ -40,92 +37,12 @@ export async function POST(request: Request) {
 
     await connectMongo()
     const allRoles = await RoleModel.find({}).lean().exec()
-    const slugSet = new Set(allRoles.map((r) => r.slug))
+    const slugSet = new Set(allRoles.map((r) => String((r as { slug?: string }).slug ?? "")))
 
     const existingEmails = await UserModel.find({ facilityId }).select("email").lean().exec()
-    const emailSet = new Set(existingEmails.map((u) => u.email.toLowerCase()))
+    const emailSet = new Set(existingEmails.map((u) => String((u as { email?: string }).email ?? "").toLowerCase()))
 
-    const out: Array<{
-      first_name: string
-      last_name: string
-      email: string
-      role_slug: string
-      phone?: string
-      status: RowStatus
-      error?: string
-    }> = []
-
-    for (const raw of rows) {
-      const first_name = (raw["first_name"] ?? "").trim()
-      const last_name = (raw["last_name"] ?? "").trim()
-      const email = (raw["email"] ?? "").trim().toLowerCase()
-      const role_slug = (raw["role_slug"] ?? "").trim()
-      const phone = (raw["phone"] ?? "").trim() || undefined
-
-      if (!email) {
-        out.push({
-          first_name,
-          last_name,
-          email,
-          role_slug,
-          phone,
-          status: "error",
-          error: "Email is required",
-        })
-        continue
-      }
-      if (!isValidEmail(email)) {
-        out.push({
-          first_name,
-          last_name,
-          email,
-          role_slug,
-          phone,
-          status: "error",
-          error: "Invalid email format",
-        })
-        continue
-      }
-      if (!first_name || !last_name) {
-        out.push({
-          first_name,
-          last_name,
-          email,
-          role_slug,
-          phone,
-          status: "error",
-          error: "First and last name are required",
-        })
-        continue
-      }
-      if (!role_slug || !slugSet.has(role_slug)) {
-        out.push({
-          first_name,
-          last_name,
-          email,
-          role_slug,
-          phone,
-          status: "error",
-          error: "Invalid or unknown role_slug",
-        })
-        continue
-      }
-      if (emailSet.has(email)) {
-        out.push({
-          first_name,
-          last_name,
-          email,
-          role_slug,
-          phone,
-          status: "duplicate",
-          error: "Already exists in this facility",
-        })
-        continue
-      }
-
-      emailSet.add(email)
-      out.push({ first_name, last_name, email, role_slug, phone, status: "valid" })
-    }
+    const out = validateStaffImportRows(rows, { roleSlugs: slugSet, existingEmails: emailSet })
 
     return NextResponse.json({ rows: out })
   } catch (err) {

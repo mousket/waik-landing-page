@@ -2,7 +2,9 @@
 
 import { useHydrationSafeRelativeTime } from "@/hooks/use-hydration-safe-relative-time"
 import type { StaffIncidentSummary } from "@/lib/types/staff-incident-summary"
-import { getPendingQuestionCount } from "@/lib/utils/pending-question-utils"
+import { shortIncidentRef } from "@/lib/utils/pending-question-utils"
+import { PendingQuestionsBreakdown } from "@/components/staff/pending-questions-breakdown"
+import { format, isToday } from "date-fns"
 import { cn } from "@/lib/utils"
 import { CompletionRing } from "@/components/shared/completion-ring"
 import { Badge } from "@/components/ui/badge"
@@ -45,9 +47,12 @@ export function IncidentCard({
 }) {
   const timeAgo = useHydrationSafeRelativeTime(incident.startedAt)
   const { primary: headingPrimary, subRoom } = residentHeading(incident)
-  const qRemaining =
-    incident.phase === "phase_1_in_progress" ? getPendingQuestionCount(incident) : 0
   const typeLabel = formatIncidentType(incident.incidentType)
+  const started = new Date(incident.startedAt)
+  const reportedAtLabel = isToday(started)
+    ? `Today · ${format(started, "h:mm a")}`
+    : format(started, "MMM d, yyyy · h:mm a")
+  const reporter = (incident.reporterName || reporterLabel).trim() || "Staff"
 
   return (
     <article>
@@ -56,7 +61,7 @@ export function IncidentCard({
         hover="lift"
         className={cn("border-l-4 bg-card", leftBorderClass(incident))}
       >
-        <WaikCardContent className="py-4">
+        <WaikCardContent className="py-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="font-semibold text-foreground line-clamp-1">{headingPrimary}</p>
@@ -74,15 +79,14 @@ export function IncidentCard({
             )}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Reported by {reporterLabel} · {timeAgo}
+            Reported by {reporter} · {reportedAtLabel}
           </p>
-          {qRemaining > 0 ? (
-            <div className="mt-2">
-              <Badge variant="destructive" className="text-xs">
-                {qRemaining} question{qRemaining === 1 ? "" : "s"} remaining
-              </Badge>
-            </div>
-          ) : null}
+          <p className="text-[0.7rem] text-muted-foreground/90">
+            Ref {shortIncidentRef(incident.id)} · {timeAgo}
+          </p>
+          <div className="mt-2">
+            <PendingQuestionsBreakdown incident={incident} />
+          </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <CompletionRing
               percent={incident.completenessScore}

@@ -44,7 +44,7 @@ The pipeline currently has **two** “investigation” paths:
 
 All LLM calls route through `lib/openai.ts`:
 
-- **Model**: `process.env.OPENAI_LLM_MODEL || "gpt-4o-mini"`
+- **Model**: `process.env.LLM_MODEL || "gpt-4o-mini"`
 - **Temperature default**: `0.7` (most callsites override)
 - **Max tokens default**: `2000` (most callsites override)
 
@@ -60,7 +60,7 @@ All LLM calls route through `lib/openai.ts`:
 
 `runReportAgent` optionally calls internal `generateEnhancedNarrative(...)`:
 
-- **Model**: default (`OPENAI_LLM_MODEL` or `"gpt-4o-mini"`)
+- **Model**: default (`LLM_MODEL` or `"gpt-4o-mini"`)
 - **Temperature**: `0.2`
 - **System prompt summary**: clinical documentation assistant; rewrite staff notes into concise professional summary; highlight condition/events/injuries/environment; avoid speculation/new facts; return text w/o markdown.
 

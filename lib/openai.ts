@@ -1,69 +1,64 @@
-import OpenAI from "openai"
+import type OpenAI from "openai"
+import {
+  AI_CONFIG,
+  modelForTask,
+  resolveAiConfig,
+  tierForTask,
+  type AiConfig,
+  type AiTask,
+} from "@/lib/ai-config"
+import {
+  createChatCompletion,
+  createEmbedding,
+  createLangChainChatModel,
+  getOpenAI,
+  isEmbeddingConfigured,
+  isLlmConfigured,
+  openai,
+} from "@/lib/llm"
 
-// Initialize OpenAI client
-export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
-})
-
-/** Same instance as `openai` — use either import style. */
-export function getOpenAI(): OpenAI {
-  return openai
+export {
+  AI_CONFIG,
+  modelForTask,
+  resolveAiConfig,
+  tierForTask,
+  createLangChainChatModel,
+  getOpenAI,
+  isEmbeddingConfigured,
+  isLlmConfigured,
+  openai,
 }
 
-// Model configuration from environment variables with smart defaults
-export const AI_CONFIG = {
-  model: process.env.OPENAI_LLM_MODEL || "gpt-4o-mini",
-  embeddingModel: process.env.OPENAI_TEXT_EMBEDDING_MODEL || "text-embedding-3-small",
-  temperature: 0.7,
-  maxTokens: 2000,
-}
+export type { AiConfig, AiTask }
 
-/**
- * Check if OpenAI is configured
- */
+/** @deprecated Use isLlmConfigured — kept for existing call sites. */
 export function isOpenAIConfigured(): boolean {
-  return !!process.env.OPENAI_API_KEY
+  return isLlmConfigured()
 }
 
+export type { ChatCompletionOptions } from "@/lib/llm/types"
+
 /**
- * Generate a chat completion
+ * Generate a chat completion via the configured LLM provider facade.
  */
 export async function generateChatCompletion(
   messages: OpenAI.Chat.ChatCompletionMessageParam[],
-  options?: Partial<typeof AI_CONFIG> &
-    Pick<OpenAI.Chat.Completions.ChatCompletionCreateParams, "tools" | "tool_choice" | "response_format">,
+  options?: Parameters<typeof createChatCompletion>[1],
 ) {
-  if (!isOpenAIConfigured()) {
-    throw new Error("OpenAI API key not configured")
+  if (!isLlmConfigured()) {
+    throw new Error("LLM provider is not configured")
   }
-
-  const response = await openai.chat.completions.create({
-    model: options?.model || AI_CONFIG.model,
-    messages,
-    temperature: options?.temperature ?? AI_CONFIG.temperature,
-    max_tokens: options?.maxTokens || AI_CONFIG.maxTokens,
-    tools: options?.tools,
-    tool_choice: options?.tool_choice,
-    response_format: options?.response_format,
-  })
-
-  return response
+  return createChatCompletion(messages, options)
 }
 
 /**
- * Generate text embedding for semantic search
+ * Generate text embedding via the configured embedding provider facade.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  if (!isOpenAIConfigured()) {
-    throw new Error("OpenAI API key not configured")
+  if (!isEmbeddingConfigured()) {
+    throw new Error("Embedding provider is not configured")
   }
-
-  const response = await openai.embeddings.create({
-    model: AI_CONFIG.embeddingModel,
-    input: text,
-  })
-
-  return response.data[0].embedding
+  return createEmbedding(text)
 }
 
 /**
@@ -86,4 +81,3 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
 }
-

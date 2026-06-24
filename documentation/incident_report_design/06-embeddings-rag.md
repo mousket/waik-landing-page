@@ -15,7 +15,7 @@ A naive search for `rag` as a substring matches unrelated words (`storage`, `par
 | Source | Value |
 | --- | --- |
 | Config | `lib/openai.ts` → `AI_CONFIG.embeddingModel` |
-| Env override | `OPENAI_TEXT_EMBEDDING_MODEL` |
+| Env override | `TEXT_EMBEDDING_MODEL` |
 | Default | `text-embedding-3-small` |
 
 Embeddings are produced with `openai.embeddings.create({ model: AI_CONFIG.embeddingModel, input: text })`. Cosine similarity between two vectors is implemented in-process in `cosineSimilarity` in the same file.

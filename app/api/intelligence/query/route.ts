@@ -4,6 +4,7 @@ import {
   type FacilityIntelligenceScope,
 } from "@/lib/agents/intelligence-qa"
 import { getCurrentUser } from "@/lib/auth"
+import { sameIdsForOrMatch } from "@/lib/staff-identity"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -55,11 +56,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    const staffIds =
+      effective === "personal" ? sameIdsForOrMatch(user) : undefined
+
     const out = await answerCrossFacilityIntelligence({
       facilityId: user.facilityId,
       queryingUserId: user.userId,
       question: q,
       scope: effective,
+      staffIds: staffIds?.length ? staffIds : undefined,
     })
 
     return NextResponse.json({

@@ -3,11 +3,14 @@ import { cosineSimilarity, generateEmbedding } from "@/lib/openai"
 
 export interface SearchFilters {
   incidentType?: string
+  incidentId?: string
   dateFrom?: string
   dateTo?: string
   residentId?: string
   /** Restricts retrieval to incidents where `Incident.staffId` matches this user id */
   staffId?: string
+  /** Multiple reporter ids (Mongo + Clerk) for personal scope */
+  staffIds?: string[]
   phase?: string | string[]
 }
 
@@ -54,7 +57,11 @@ function baseFacilityFilters(facilityId: string, filters: SearchFilters | undefi
   const q: Record<string, unknown> = { facilityId }
   if (filters?.incidentType) q.incidentType = filters.incidentType
   if (filters?.residentId) q.residentId = filters.residentId
-  if (filters?.staffId) q.staffId = filters.staffId
+  if (filters?.staffIds?.length) {
+    q.staffId = filters.staffIds.length === 1 ? filters.staffIds[0] : { $in: filters.staffIds }
+  } else if (filters?.staffId) {
+    q.staffId = filters.staffId
+  }
   if (filters?.dateFrom || filters?.dateTo) {
     const incidentDate: Record<string, Date> = {}
     if (filters?.dateFrom) incidentDate.$gte = new Date(filters.dateFrom)
@@ -255,7 +262,7 @@ export async function queryFacilityIncidentStats(
   dateFrom: Date,
   dateTo: Date,
   incidentType?: string,
-  opts?: { staffId?: string },
+  opts?: { staffId?: string; staffIds?: string[] },
 ): Promise<{
   total: number
   byType: Record<string, number>
@@ -273,7 +280,11 @@ export async function queryFacilityIncidentStats(
     createdAt: { $gte: dateFrom, $lte: dateTo },
   }
   if (incidentType) query.incidentType = incidentType
-  if (opts?.staffId) query.staffId = opts.staffId
+  if (opts?.staffIds?.length) {
+    query.staffId = opts.staffIds.length === 1 ? opts.staffIds[0] : { $in: opts.staffIds }
+  } else if (opts?.staffId) {
+    query.staffId = opts.staffId
+  }
 
   const incidents = await IncidentModel.find(query)
     .select("incidentType location residentName residentRoom completenessAtSignoff activeDataCollectionSeconds")
@@ -320,5 +331,139 @@ export async function queryFacilityIncidentStats(
       incidents.length > 0 ? Math.round(totalCompleteness / incidents.length) : 0,
     avgActiveSeconds:
       incidents.length > 0 ? Math.round(totalActiveSeconds / incidents.length) : 0,
+  }
+}
+
+export interface IncidentAnswerSearchResult {
+  questionText: string
+  answerText: string
+  tier: string
+  areaHint: string
+  score: number
+}
+
+const INCIDENT_ANSWER_VECTOR_INDEX = "incident_answer_vectors_vector_index"
+
+function isAtlasIndexMissingError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /index not found|does not exist|unknown index/i.test(msg)
+}
+
+async function atlasIncidentAnswerSearch(
+  queryEmbedding: number[],
+  incidentId: string,
+  facilityId: string,
+  topK: number,
+): Promise<IncidentAnswerSearchResult[]> {
+  const IncidentAnswerVectorModel = (
+    await import("@/backend/src/models/incident-answer-vector.model")
+  ).default
+
+  const pipeline = [
+    {
+      $vectorSearch: {
+        index: INCIDENT_ANSWER_VECTOR_INDEX,
+        path: "vector",
+        queryVector: queryEmbedding,
+        numCandidates: Math.min(Math.max(topK * 10, topK), 200),
+        limit: Math.max(topK, 1),
+        filter: {
+          incidentId: { $eq: incidentId },
+          facilityId: { $eq: facilityId },
+        },
+      },
+    },
+    {
+      $project: {
+        questionText: 1,
+        answerText: 1,
+        tier: 1,
+        areaHint: 1,
+        score: { $meta: "vectorSearchScore" },
+      },
+    },
+  ]
+
+  const results = await IncidentAnswerVectorModel.aggregate(pipeline)
+  return (results as Array<{
+    questionText?: string
+    answerText?: string
+    tier?: string
+    areaHint?: string
+    score?: number
+  }>).map((r) => ({
+    questionText: r.questionText ?? "",
+    answerText: r.answerText ?? "",
+    tier: r.tier ?? "",
+    areaHint: r.areaHint ?? "",
+    score: typeof r.score === "number" ? r.score : 0,
+  }))
+}
+
+async function cosineIncidentAnswerSearch(
+  queryEmbedding: number[],
+  incidentId: string,
+  facilityId: string,
+  topK: number,
+): Promise<IncidentAnswerSearchResult[]> {
+  const IncidentAnswerVectorModel = (
+    await import("@/backend/src/models/incident-answer-vector.model")
+  ).default
+
+  const docs = await IncidentAnswerVectorModel.find({ incidentId, facilityId })
+    .select("questionText answerText tier areaHint vector")
+    .lean()
+
+  type Doc = {
+    questionText?: string
+    answerText?: string
+    tier?: string
+    areaHint?: string
+    vector?: number[]
+  }
+
+  return (docs as Doc[])
+    .filter((d) => d.vector && d.vector.length === queryEmbedding.length)
+    .map((d) => ({
+      doc: d,
+      score: cosineSimilarity(queryEmbedding, d.vector as number[]),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(topK, 1))
+    .map(({ doc, score }) => ({
+      questionText: doc.questionText ?? "",
+      answerText: doc.answerText ?? "",
+      tier: doc.tier ?? "",
+      areaHint: doc.areaHint ?? "",
+      score: Math.round(Math.max(0, Math.min(1, score)) * 1000) / 1000,
+    }))
+}
+
+export async function searchIncidentAnswers(
+  query: string,
+  incidentId: string,
+  facilityId: string,
+  topK = 10,
+): Promise<IncidentAnswerSearchResult[]> {
+  await connectMongo()
+
+  if (!query?.trim()) return []
+
+  const queryEmbedding = await generateEmbedding(query.trim())
+
+  try {
+    return await atlasIncidentAnswerSearch(queryEmbedding, incidentId, facilityId, topK)
+  } catch (atlasError) {
+    if (isAtlasIndexMissingError(atlasError)) {
+      console.log(
+        `[vector-search] Atlas index '${INCIDENT_ANSWER_VECTOR_INDEX}' not found. Create it in Atlas UI. Falling back to in-process cosine.`,
+      )
+    } else {
+      console.log(
+        "[vector-search] Atlas incident answer search failed, using in-process fallback:",
+        atlasError instanceof Error ? atlasError.message : atlasError,
+      )
+    }
+    return cosineIncidentAnswerSearch(queryEmbedding, incidentId, facilityId, topK)
   }
 }

@@ -7,9 +7,6 @@ export default async function StaffDashboardPage() {
   if (!user) {
     redirect("/sign-in")
   }
-  if (user.isAdminTier) {
-    redirect("/admin/dashboard")
-  }
 
   const todayYmd = new Date().toISOString().slice(0, 10)
   const selectedUnit =

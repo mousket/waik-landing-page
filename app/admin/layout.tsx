@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       defaultFacilityId={user.facilityId?.trim() || undefined}
       showFacilitySwitcher={Boolean(user.isAdminTier || user.isWaikSuperAdmin)}
       isWaikSuperAdmin={Boolean(user.isWaikSuperAdmin)}
+      roleSlug={user.roleSlug}
     >
       {children}
     </AdminAppShell>

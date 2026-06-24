@@ -1,3 +1,5 @@
+import type { ClinicalRecord } from "@/lib/agents/clinical-record-generator"
+import type { ClinicalPreviewInsights } from "@/lib/agents/clinical-preview-insights"
 import type { PendingQuestion } from "@/lib/agents/expert_investigator/session_store"
 import type { AgentState } from "@/lib/gold_standards"
 import { getRedis } from "@/lib/redis"
@@ -57,6 +59,10 @@ export interface ReportSession {
 
   startedAt: string
   lastActivityAt: string
+
+  /** Cached at preview time so refresh does not re-run the LLM. */
+  generatedClinicalRecord?: ClinicalRecord | null
+  generatedPreviewInsights?: ClinicalPreviewInsights | null
 }
 
 function key(sessionId: string): string {
@@ -109,5 +115,14 @@ export async function deleteReportSession(sessionId: string): Promise<void> {
     await getRedis().del(key(sessionId))
   } catch (e) {
     wrapError("DEL (deleteReportSession)", e)
+  }
+}
+
+/** Extends TTL so nurses have extra time to review the clinical preview before sign-off. */
+export async function extendReportSession(sessionId: string, additionalSeconds: number): Promise<void> {
+  try {
+    await getRedis().expire(key(sessionId), REPORT_SESSION_TTL_SEC + additionalSeconds)
+  } catch (e) {
+    wrapError("EXPIRE (extendReportSession)", e)
   }
 }

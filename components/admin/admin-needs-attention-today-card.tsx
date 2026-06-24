@@ -74,6 +74,23 @@ export function AdminNeedsAttentionTodayCard({
 
   const viewQueueHref = buildAdminPathWithContext("/admin/incidents?range=today&attention=1", searchParams)
 
+  const groupedRows = useMemo(() => {
+    const order: Array<keyof typeof GROUP_HEADINGS> = [
+      "ready_for_signoff",
+      "missing_info",
+      "awaiting_followup",
+    ]
+    const buckets = new Map<keyof typeof GROUP_HEADINGS, typeof rows>()
+    for (const row of rows) {
+      const list = buckets.get(row.group) ?? []
+      list.push(row)
+      buckets.set(row.group, list)
+    }
+    return order
+      .filter((group) => buckets.has(group))
+      .map((group) => ({ group, items: buckets.get(group)! }))
+  }, [rows])
+
   if (incidentsLoading) {
     return (
       <section
@@ -86,9 +103,9 @@ export function AdminNeedsAttentionTodayCard({
           <Skeleton className="h-5 w-44 rounded-md" />
           <Skeleton className="h-4 w-24 rounded-md" />
         </div>
-        <div className="space-y-2">
-          {[0, 1, 2, 3].map((k) => (
-            <Skeleton key={k} className="h-16 w-full rounded-xl" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((k) => (
+            <Skeleton key={k} className="h-28 rounded-xl" />
           ))}
         </div>
       </section>
@@ -142,79 +159,85 @@ export function AdminNeedsAttentionTodayCard({
               Showing {Math.min(MAX_VISIBLE, rows.length)} of {total} — use View queue for the full list.
             </p>
           ) : null}
-          <ul className="mt-3 space-y-4">
-            {rows.map((row, i) => {
-              const showHeading = i === 0 || rows[i - 1]!.group !== row.group
-              const meta = GROUP_HEADINGS[row.group]
+          <div className="mt-3 space-y-5">
+            {groupedRows.map(({ group, items }) => {
+              const meta = GROUP_HEADINGS[group]
               const groupHref = buildAdminPathWithContext(
                 `/admin/incidents?range=today&bottleneck=${encodeURIComponent(meta.bottleneck)}`,
                 searchParams,
               )
-              const detailHref = buildAdminPathWithContext(
-                `/admin/incidents/${encodeURIComponent(row.incident.id)}`,
-                searchParams,
-              )
-              const inc = row.incident
-
               return (
-                <li key={inc.id} className="list-none">
-                  {showHeading ? (
-                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                      <div>
-                        <Link
-                          href={groupHref}
-                          className="text-[11px] font-bold uppercase tracking-[0.16em] text-foreground/90 hover:text-primary hover:underline"
-                        >
-                          {meta.title}
-                        </Link>
-                        <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{meta.description}</p>
-                      </div>
+                <section key={group}>
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <div>
+                      <Link
+                        href={groupHref}
+                        className="text-[11px] font-bold uppercase tracking-[0.16em] text-foreground/90 hover:text-primary hover:underline"
+                      >
+                        {meta.title}
+                      </Link>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{meta.description}</p>
                     </div>
-                  ) : null}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border/50 bg-card/70 p-3 shadow-sm transition hover:border-primary/20 hover:bg-card sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-3.5"
-                    onClick={() => router.push(detailHref)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        router.push(detailHref)
-                      }
-                    }}
-                  >
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-semibold text-foreground">
-                          {formatIncidentType(inc.incidentType)}
-                        </span>
-                        <span className="text-xs font-semibold text-foreground">{inc.residentName || "Unknown"}</span>
-                        {inc.residentRoom ? (
-                          <span className="text-[11px] text-muted-foreground">Room {inc.residentRoom}</span>
-                        ) : null}
-                        <span className="text-[11px] tabular-nums text-muted-foreground">{row.ageLabel}</span>
-                      </div>
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {row.blockerLabel}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="relative z-10 h-9 w-full shrink-0 border-primary/25 bg-gradient-to-b from-primary/12 to-primary/5 font-semibold text-primary hover:from-primary/18 hover:to-primary/8 sm:h-8 sm:w-auto sm:min-w-[6.5rem]"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        router.push(row.cta.href)
-                      }}
-                    >
-                      {row.cta.label}
-                    </Button>
                   </div>
-                </li>
+                  <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {items.map((row) => {
+                      const detailHref = buildAdminPathWithContext(
+                        `/admin/incidents/${encodeURIComponent(row.incident.id)}`,
+                        searchParams,
+                      )
+                      const inc = row.incident
+                      return (
+                        <li key={inc.id}>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="flex h-full cursor-pointer flex-col gap-3 rounded-xl border border-border/50 bg-card/70 p-3 shadow-sm transition hover:border-primary/20 hover:bg-card sm:p-3.5"
+                            onClick={() => router.push(detailHref)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                router.push(detailHref)
+                              }
+                            }}
+                          >
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-semibold text-foreground">
+                                  {formatIncidentType(inc.incidentType)}
+                                </span>
+                                <span className="text-xs font-semibold text-foreground">
+                                  {inc.residentName || "Unknown"}
+                                </span>
+                                {inc.residentRoom ? (
+                                  <span className="text-[11px] text-muted-foreground">Room {inc.residentRoom}</span>
+                                ) : null}
+                                <span className="text-[11px] tabular-nums text-muted-foreground">{row.ageLabel}</span>
+                              </div>
+                              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {row.blockerLabel}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="relative z-10 mt-auto h-9 w-full shrink-0 border-primary/25 bg-gradient-to-b from-primary/12 to-primary/5 font-semibold text-primary hover:from-primary/18 hover:to-primary/8"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(row.cta.href)
+                              }}
+                            >
+                              {row.cta.label}
+                            </Button>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
               )
             })}
-          </ul>
+          </div>
         </>
       )}
     </section>

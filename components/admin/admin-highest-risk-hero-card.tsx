@@ -48,9 +48,10 @@ export function AdminHighestRiskHeroCard({
           <Skeleton className="h-5 w-48 rounded-md" />
           <Skeleton className="h-4 w-16 rounded-md" />
         </div>
-        <div className="space-y-3">
-          <Skeleton className="h-24 w-full rounded-xl" />
-          <Skeleton className="h-24 w-full rounded-xl" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
         </div>
       </section>
     )
@@ -99,12 +100,12 @@ export function AdminHighestRiskHeroCard({
           Nothing critical in this queue right now — a good moment to clear follow-ups in Open investigations below.
         </p>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {top.map((row) => (
             <li
               key={row.incident.id}
               className={cn(
-                "relative overflow-hidden rounded-xl border bg-card/80 p-3 pl-3.5 shadow-sm sm:p-4 sm:pl-4",
+                "relative flex h-full flex-col overflow-hidden rounded-xl border bg-card/80 p-3 pl-3.5 shadow-sm sm:p-4 sm:pl-4",
                 row.tier === 0
                   ? "border-destructive/25 ring-1 ring-destructive/10"
                   : "border-amber-500/20 ring-1 ring-amber-500/10",
@@ -117,7 +118,7 @@ export function AdminHighestRiskHeroCard({
                 )}
                 aria-hidden
               />
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <div className="min-w-0 flex-1 space-y-1 pl-0.5">
                   <p className="text-xs font-semibold text-foreground">{row.what}</p>
                   <p className="text-[11px] text-muted-foreground sm:text-xs">
@@ -140,7 +141,7 @@ export function AdminHighestRiskHeroCard({
                 <Button
                   asChild
                   size="sm"
-                  className="h-9 w-full shrink-0 border border-primary/25 bg-gradient-to-b from-primary/15 to-primary/5 font-semibold text-primary shadow-sm hover:from-primary/20 hover:to-primary/10 sm:h-8 sm:w-auto sm:min-w-[7.5rem]"
+                  className="mt-auto h-9 w-full shrink-0 border border-primary/25 bg-gradient-to-b from-primary/15 to-primary/5 font-semibold text-primary shadow-sm hover:from-primary/20 hover:to-primary/10"
                   variant="outline"
                 >
                   <Link href={row.ctaHref} className="inline-flex items-center justify-center gap-1">

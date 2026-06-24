@@ -1,5 +1,5 @@
 import type { Tier1Question } from "@/lib/config/tier1-questions"
-import { AI_CONFIG, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 
 export interface ClinicalRecordInput {
   fullNarrative: string
@@ -130,7 +130,7 @@ Generate the structured clinical record as JSON.`
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    { temperature: 0.2, maxTokens: 2000, model: AI_CONFIG.model },
+    { temperature: 0.2, maxTokens: 2000, model: modelForTask("clinicalRecord") },
   )
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? ""

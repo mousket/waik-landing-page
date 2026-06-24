@@ -1,4 +1,4 @@
-import { AI_CONFIG, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 
 export interface CoachingInput {
   completenessScore: number
@@ -69,7 +69,7 @@ Generate 2-3 coaching tips as JSON.`
       {
         temperature: 0.3,
         maxTokens: 400,
-        model: AI_CONFIG.model,
+        model: modelForTask("coaching"),
         response_format: { type: "json_object" },
       },
     )

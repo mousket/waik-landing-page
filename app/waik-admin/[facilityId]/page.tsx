@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 type DeepPayload = {
   facility: {
     id: string
+    organizationId: string
     name: string
     type: string
     state: string
@@ -102,9 +103,22 @@ export default function WaikAdminFacilityPage() {
             { label: data?.facility.name || "Community" },
           ]}
         />
-        <Button variant="outline" size="sm" className="w-fit" asChild>
-          <Link href="/waik-admin">Back to list</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {data?.facility.organizationId ? (
+            <Button variant="outline" size="sm" className="w-fit border-primary text-primary hover:bg-primary/5" asChild>
+              <Link
+                href={`/admin/dashboard?organizationId=${encodeURIComponent(
+                  data.facility.organizationId,
+                )}&facilityId=${encodeURIComponent(data.facility.id)}`}
+              >
+                Open admin dashboard
+              </Link>
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" className="w-fit" asChild>
+            <Link href="/waik-admin">Back to list</Link>
+          </Button>
+        </div>
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}

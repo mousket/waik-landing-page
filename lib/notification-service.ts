@@ -22,14 +22,31 @@ function inferCategory(type: NotificationEventType): NotificationCategory {
     case "phase2-all-sections-complete":
     case "phase2-pending-signature":
     case "investigation-reporter-closed":
+    case "idt-question-assigned":
+    case "idt-question-answered":
       return "investigation"
+    case "injury-reported":
+      return "incident"
+    case "assessment-due-soon":
+      return "assessment"
+    case "report-completeness-scored":
+      return "system"
     default:
       return "system"
   }
 }
 
 export function inferDefaultPriority(type: NotificationEventType): NotificationPriority {
-  if (type === "investigation-ready" || type === "phase2-all-sections-complete") return "urgent"
+  if (
+    type === "investigation-ready" ||
+    type === "phase2-all-sections-complete" ||
+    type === "injury-reported"
+  ) {
+    return "urgent"
+  }
+  if (type === "report-completeness-scored") {
+    return "low"
+  }
   return "normal"
 }
 

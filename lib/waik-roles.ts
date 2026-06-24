@@ -56,3 +56,37 @@ export function toUiRole(waikRole: string | undefined): UserRole | null {
 export function canAccessPhase2(role: string): boolean {
   return WAIK_PHASE2_ROLES.includes(role as WaikRoleSlug)
 }
+
+/** Admin + clinical roles that may file incidents and conduct assessments on `/staff/*`. */
+export function canUseStaffOperationalSurface(roleSlug: string): boolean {
+  return (
+    WAIK_ADMIN_ROLES.includes(roleSlug as WaikRoleSlug) ||
+    WAIK_STAFF_ROLES.includes(roleSlug as WaikRoleSlug)
+  )
+}
+
+/** Gate staff operational routes/APIs (super admins need a facility on their user record). */
+export function userCanUseStaffOperationalSurface(user: {
+  roleSlug: string
+  isWaikSuperAdmin?: boolean
+  facilityId?: string
+}): boolean {
+  if (user.isWaikSuperAdmin) {
+    return Boolean((user.facilityId ?? "").trim())
+  }
+  return canUseStaffOperationalSurface(user.roleSlug)
+}
+
+/**
+ * Whether the user may start an incident report.
+ * Super admins acting in a community use the scoped facility (URL / session), not only `user.facilityId`.
+ */
+export function userCanReportIncidents(
+  user: { roleSlug: string; isWaikSuperAdmin?: boolean; facilityId?: string },
+  effectiveFacilityId?: string,
+): boolean {
+  if (user.isWaikSuperAdmin) {
+    return Boolean((effectiveFacilityId ?? user.facilityId ?? "").trim())
+  }
+  return canUseStaffOperationalSurface(user.roleSlug)
+}

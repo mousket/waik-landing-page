@@ -398,8 +398,8 @@ MONGODB_DB_NAME=waik-demo
 
 # OpenAI (for AI features)
 OPENAI_API_KEY=sk-...
-OPENAI_LLM_MODEL=gpt-4o-mini
-OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
+LLM_MODEL=gpt-4o-mini
+TEXT_EMBEDDING_MODEL=text-embedding-3-small
 
 # Production
 NODE_ENV=production

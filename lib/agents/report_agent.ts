@@ -1,6 +1,6 @@
 import { createIncidentFromReport, createNotification, getUsers } from "../db"
 import type { IncidentNotification, UserRole } from "../types"
-import { generateChatCompletion, isOpenAIConfigured } from "../openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "../openai"
 import { runInvestigationAgent } from "./investigation_agent"
 
 const escapeHtml = (value: string) =>
@@ -295,7 +295,11 @@ Please produce a polished summary (2-3 paragraphs max) and, when helpful, follow
     },
   ]
 
-  const response = await generateChatCompletion(messages, { temperature: 0.2, maxTokens: 400 })
+  const response = await generateChatCompletion(messages, {
+    temperature: 0.2,
+    maxTokens: 400,
+    model: modelForTask("narrativePolish"),
+  })
   const summary = response.choices?.[0]?.message?.content?.trim()
   if (!summary) return null
 

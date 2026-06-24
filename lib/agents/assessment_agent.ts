@@ -9,8 +9,7 @@ import {
   openingQuestionText,
   scoreCompleteness,
 } from "@/lib/assessment_standards"
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
-import { AI_CONFIG } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 import {
   createAssessmentSession,
   deleteAssessmentSession,
@@ -134,7 +133,7 @@ Latest staff answer: ${lastAnswer}
       { role: "user", content: user },
     ],
     {
-      model: AI_CONFIG.model,
+      model: modelForTask("assessmentTurn"),
       maxTokens: 2000,
       response_format: { type: "json_object" },
     },
@@ -323,6 +322,7 @@ export async function answerAssessmentQuestion(input: AnswerAssessmentInput): Pr
           status: "completed",
           conductedAt: now,
           nextDueAt: nextDue,
+          dueSoonReminderFor: null,
           updatedAt: now,
         },
       },

@@ -24,18 +24,22 @@ export function StaffDashboardGreeting({
   firstName,
   selectedUnit,
   pendingCount,
+  assignedTaskCount,
   inProgressCount,
   assessmentsDueCount,
   onPendingClick,
+  onAssignedClick,
   onInProgressClick,
   onAssessmentsClick,
 }: {
   firstName: string
   selectedUnit: string | null
   pendingCount: number
+  assignedTaskCount: number
   inProgressCount: number
   assessmentsDueCount: number
   onPendingClick: () => void
+  onAssignedClick: () => void
   onInProgressClick: () => void
   onAssessmentsClick: () => void
 }) {
@@ -74,6 +78,15 @@ export function StaffDashboardGreeting({
             {selectedUnit}
           </span>
         ) : null}
+        {assignedTaskCount > 0 ? (
+          <button
+            type="button"
+            onClick={onAssignedClick}
+            className={`${CHIP} border-blue-200/90 bg-blue-100/90 text-blue-950 transition hover:brightness-95 active:scale-[0.99]`}
+          >
+            {assignedTaskCount} team question{assignedTaskCount === 1 ? "" : "s"}
+          </button>
+        ) : null}
         {pendingCount > 0 ? (
           <button
             type="button"
@@ -101,7 +114,7 @@ export function StaffDashboardGreeting({
             {assessmentsDueCount} assessment{assessmentsDueCount === 1 ? "" : "s"} due
           </button>
         ) : null}
-        {pendingCount + inProgressCount + assessmentsDueCount === 0 ? (
+        {pendingCount + assignedTaskCount + inProgressCount + assessmentsDueCount === 0 ? (
           <span
             className={`${CHIP} border-emerald-200/80 bg-emerald-100/80 text-emerald-900`}
             aria-hidden

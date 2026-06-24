@@ -35,8 +35,8 @@ Your WAiK demo now has:
 Create `.env.local` in project root:
 ```env
 OPENAI_API_KEY=sk-your-key-here
-OPENAI_LLM_MODEL=gpt-4o-mini
-OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
+LLM_MODEL=gpt-4o-mini
+TEXT_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
 ---
@@ -54,8 +54,8 @@ https://platform.openai.com/api-keys
 ```bash
 # In project root, create .env.local
 echo "OPENAI_API_KEY=sk-your-key-here" > .env.local
-echo "OPENAI_LLM_MODEL=gpt-4o-mini" >> .env.local
-echo "OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small" >> .env.local
+echo "LLM_MODEL=gpt-4o-mini" >> .env.local
+echo "TEXT_EMBEDDING_MODEL=text-embedding-3-small" >> .env.local
 ```
 
 ### **3. Restart Server** (30 seconds)

@@ -79,7 +79,7 @@ Dependencies: **4b-01** can overlap slightly with 4b-04 (push from questions). *
 ## When phase 4b is “done”
 
 - [ ] Task 09 success criteria in `task-09-phase2-intelligence.md` are met or explicitly superseded (see [task-4b-06-qa-and-docs-done.md](./task-4b-06-qa-and-docs-done.md) “Remaining vs spec” if not).
-- [x] **Redis + OpenAI**: `OPENAI_API_KEY`, `OPENAI_LLM_MODEL` / `lib/openai` `AI_CONFIG`, `REDIS_URL` (see 4b-06 appendix).
+- [x] **Redis + OpenAI**: `OPENAI_API_KEY`, `LLM_MODEL` / `lib/openai` `AI_CONFIG`, `REDIS_URL` (see 4b-06 appendix).
 - [ ] Staging: fill the QA matrix in `task-4b-06-qa-and-docs-done.md` after a full product pass.
 
 ---

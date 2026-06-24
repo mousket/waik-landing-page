@@ -3,18 +3,12 @@ import connectMongo from "@/backend/src/lib/mongodb"
 import FacilityModel from "@/backend/src/models/facility.model"
 import { inviteStaffMember } from "@/lib/admin-staff-invite"
 import { actorNameFromUser, logActivity } from "@/lib/activity-logger"
+import type { StaffImportPreviewRow } from "@/lib/import/staff-rows"
 import { authErrorResponse, getCurrentUser, unauthorizedResponse } from "@/lib/auth"
 import { requireCanInviteStaff } from "@/lib/permissions"
 import { isEffectiveAdminFacilityError, resolveEffectiveAdminFacility } from "@/lib/effective-admin-facility"
 
-type InputRow = {
-  first_name: string
-  last_name: string
-  email: string
-  role_slug: string
-  phone?: string
-  status: "valid" | "error" | "duplicate"
-}
+type InputRow = StaffImportPreviewRow
 
 export async function POST(request: Request) {
   try {
@@ -68,6 +62,9 @@ export async function POST(request: Request) {
         lastName: row.last_name,
         email: row.email,
         roleSlug: row.role_slug,
+        phone: row.phone,
+        deviceType: row.device_type,
+        selectedUnit: row.unit,
         inviterName,
         inviterRole,
         inviterRoleSlug: user.roleSlug,

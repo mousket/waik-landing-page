@@ -6,11 +6,25 @@ import type { ClinicalRecord } from "@/lib/agents/clinical-record-generator"
 import { generateClinicalRecord } from "@/lib/agents/clinical-record-generator"
 import { deleteReportSession, getReportSession, type ReportSession } from "@/lib/config/report-session"
 import { getCurrentUser } from "@/lib/auth"
+import { backfillAnswerVectorsFromSession } from "@/lib/agents/backfill-incident-answer-vectors"
 import { generateAndStoreEmbedding } from "@/lib/agents/embedding-service"
 import { generateCoachingTips } from "@/lib/agents/coaching-tips-generator"
 import { verifyClinicalRecord } from "@/lib/agents/verification-agent"
 import { builtinIncidentTypeLabel } from "@/lib/facility-builtin-incident-types"
-import { enqueueIncidentNotifications, fetchPhase2RecipientsForFacility } from "@/lib/notification-service"
+import {
+  enqueueIncidentNotifications,
+  fetchFacilityAdminRecipients,
+  fetchPhase2RecipientsForFacility,
+  persistOneNotification,
+} from "@/lib/notification-service"
+import { buildQuestionsFromReportSession } from "@/lib/report/sync-session-to-incident"
+import { generatePhase1Pdf } from "@/lib/report/generate-phase1-pdf"
+import {
+  applyEditedSections,
+  buildPhase1SignoffSnapshot,
+  phase1SignoffSnapshotForMongo,
+  resolvePreviewInsightsForSignoff,
+} from "@/lib/report/phase1-signoff-snapshot"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -22,27 +36,6 @@ function nonEmptyAnswerCount(rec: Record<string, string>): number {
 
 function closingQuestionsComplete(session: ReportSession): boolean {
   return session.closingQuestions.every((q) => (session.closingAnswers[q.id] ?? "").trim().length > 0)
-}
-
-function applyEditedSections(
-  record: ClinicalRecord,
-  edited: Partial<Record<keyof ClinicalRecord, string>> | undefined,
-): void {
-  if (!edited) return
-  const keys: (keyof ClinicalRecord)[] = [
-    "narrative",
-    "residentStatement",
-    "interventions",
-    "contributingFactors",
-    "recommendations",
-    "environmentalAssessment",
-  ]
-  for (const k of keys) {
-    const v = edited[k]
-    if (typeof v === "string" && v.trim()) {
-      record[k] = v.trim()
-    }
-  }
 }
 
 function buildEnhancedNarrative(record: ClinicalRecord): string {
@@ -78,12 +71,17 @@ export async function POST(request: Request) {
   const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : ""
   const editedSections = body.editedSections as Partial<Record<keyof ClinicalRecord, string>> | undefined
   const signature = body.signature as { declaration?: string; signedAt?: string } | undefined
+  const signatureImage = typeof body.signatureImage === "string" ? body.signatureImage.trim() : undefined
+  const preGeneratedRecord = body.clinicalRecord as ClinicalRecord | undefined
 
   if (!sessionId) {
     return NextResponse.json({ error: "sessionId required" }, { status: 400 })
   }
   if (!signature?.declaration?.trim() || !signature?.signedAt) {
     return NextResponse.json({ error: "Signature required" }, { status: 400 })
+  }
+  if (!signatureImage?.trim()) {
+    return NextResponse.json({ error: "Signature image required" }, { status: 400 })
   }
 
   const signedAtDate = new Date(signature.signedAt)
@@ -112,22 +110,35 @@ export async function POST(request: Request) {
   }
 
   try {
-    const clinicalRecord = await generateClinicalRecord({
-      fullNarrative: session.fullNarrative,
-      tier1Questions: session.tier1Questions,
-      tier1Answers: session.tier1Answers,
-      tier2Questions: session.tier2Questions,
-      tier2Answers: session.tier2Answers,
-      closingQuestions: session.closingQuestions,
-      closingAnswers: session.closingAnswers,
-      incidentType: session.incidentType,
-      residentName: session.residentName,
-      location: session.location,
-    })
+    let clinicalRecord: ClinicalRecord
 
-    applyEditedSections(clinicalRecord, editedSections)
+    if (preGeneratedRecord && typeof preGeneratedRecord.narrative === "string") {
+      clinicalRecord = { ...preGeneratedRecord }
+      applyEditedSections(clinicalRecord, editedSections)
+    } else {
+      clinicalRecord = await generateClinicalRecord({
+        fullNarrative: session.fullNarrative,
+        tier1Questions: session.tier1Questions,
+        tier1Answers: session.tier1Answers,
+        tier2Questions: session.tier2Questions,
+        tier2Answers: session.tier2Answers,
+        closingQuestions: session.closingQuestions,
+        closingAnswers: session.closingAnswers,
+        incidentType: session.incidentType,
+        residentName: session.residentName,
+        location: session.location,
+      })
+      applyEditedSections(clinicalRecord, editedSections)
+    }
 
     const enhancedNarrative = buildEnhancedNarrative(clinicalRecord)
+
+    const previewInsights = await resolvePreviewInsightsForSignoff(session, clinicalRecord)
+    const phase1SignoffSnapshot = buildPhase1SignoffSnapshot(
+      clinicalRecord,
+      previewInsights,
+      signedAtDate,
+    )
 
     const verification = await verifyClinicalRecord({
       originalNarrative: session.fullNarrative,
@@ -177,6 +188,7 @@ export async function POST(request: Request) {
 
     const setDoc: Record<string, unknown> = {
       phase: "phase_1_complete",
+      questions: buildQuestionsFromReportSession(session),
       completenessScore: session.completenessScore,
       completenessAtSignoff: session.completenessScore,
       completenessAtTier1Complete: session.completenessAtTier1,
@@ -205,7 +217,9 @@ export async function POST(request: Request) {
         signedAt: signedAtDate,
         role: session.userRole,
         declaration: signature.declaration.trim(),
+        ...(signatureImage ? { signatureImage } : {}),
       },
+      "initialReport.phase1SignoffSnapshot": phase1SignoffSnapshotForMongo(phase1SignoffSnapshot),
 
       "investigation.status": "not-started",
       "investigation.goldStandard": session.agentState?.global_standards ?? null,
@@ -238,6 +252,7 @@ export async function POST(request: Request) {
       { id: session.incidentId, facilityId: session.facilityId },
       {
         $set: setDoc,
+        $unset: { activeReportSessionId: "", activeReportPhase: "", activeReportAgentState: "" },
         $push: {
           auditTrail: {
             action: "signed",
@@ -262,6 +277,14 @@ export async function POST(request: Request) {
       },
     }).catch((err) => {
       console.warn("[report/complete] Embedding generation failed:", err)
+    })
+
+    void backfillAnswerVectorsFromSession(session).catch((err) => {
+      console.warn("[report/complete] Per-answer vector backfill failed:", err)
+    })
+
+    void generatePhase1Pdf(session.incidentId, session.facilityId).catch((err) => {
+      console.warn("[report/complete] PDF generation failed:", err)
     })
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -350,16 +373,47 @@ export async function POST(request: Request) {
       totalQuestionsAsked,
       totalActiveSeconds: Math.round(session.activeDataCollectionMs / 1000),
       dataPointsCaptured: totalDataPoints,
+      pdfStatus: "Your Phase 1 clinical report is being prepared for download.",
     }
 
     try {
+      const room = session.residentRoom.trim() || "—"
+      const resident = session.residentName.trim()
+      const incidentTypeLabel = builtinIncidentTypeLabel(session.incidentType)
+
+      if (injury && !existing?.redFlags?.notificationSentToAdmin) {
+        const adminIds = await fetchFacilityAdminRecipients(session.facilityId)
+        if (adminIds.length > 0) {
+          enqueueIncidentNotifications({
+            facilityId: session.facilityId,
+            incidentId: session.incidentId,
+            type: "injury-reported",
+            message: `Injury reported — Room ${room}. Phase 1 complete; review urgently.`,
+            actionUrl: `/admin/incidents/${session.incidentId}`,
+            actorName: session.userName,
+            priority: "urgent",
+            targetUserIds: adminIds,
+            push: {
+              titlePersonal: `Injury reported — Room ${room}`,
+              titleWork:
+                resident.length > 0
+                  ? `Injury reported — ${resident}, Room ${room}`
+                  : `Injury reported — Room ${room}`,
+              bodyPersonal: "Phase 1 signed with injury flag. Tap to open the investigation.",
+              bodyWork: "Phase 1 signed with injury flag. Tap to open the investigation.",
+              url: `/admin/incidents/${session.incidentId}`,
+            },
+          })
+          await IncidentModel.updateOne(
+            { id: session.incidentId, facilityId: session.facilityId },
+            { $set: { "redFlags.notificationSentToAdmin": true, updatedAt: new Date() } },
+          ).exec()
+        }
+      }
+
       const recipients = await fetchPhase2RecipientsForFacility(session.facilityId, session.incidentType)
       const targetUserIds = recipients.map((r) => r.userId).filter(Boolean)
       if (targetUserIds.length > 0) {
-        const incidentTypeLabel = builtinIncidentTypeLabel(session.incidentType)
-        const room = session.residentRoom.trim() || "—"
-        const resident = session.residentName.trim()
-
         enqueueIncidentNotifications({
           facilityId: session.facilityId,
           incidentId: session.incidentId,
@@ -381,6 +435,19 @@ export async function POST(request: Request) {
           },
         })
       }
+      void persistOneNotification({
+        incidentId: session.incidentId,
+        type: "report-completeness-scored",
+        message: `Your report scored ${session.completenessScore}%`,
+        targetUserId: session.userId,
+        facilityId: session.facilityId,
+        actionUrl: `/staff/incidents/${session.incidentId}`,
+        actorName: "WAiK",
+        priority: "low",
+        category: "system",
+      }).catch((err) => {
+        console.error("[report/complete] Completeness notification failed:", err)
+      })
     } catch (err) {
       console.error("[report/complete] Failed to create notifications:", err)
     }

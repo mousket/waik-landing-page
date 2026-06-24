@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { addHours, differenceInHours, differenceInMinutes, parseISO } from "date-fns"
@@ -16,11 +16,12 @@ import { PageHeader } from "@/components/ui/page-header"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, CheckCircle2, ChevronDown, Lock, LockOpen, Circle } from "lucide-react"
+import { ArrowLeft, CheckCircle2, ChevronDown, Download, FileText, Lock, LockOpen, Circle } from "lucide-react"
 import { toast } from "sonner"
 import type { Incident, IncidentPhase2Sections, Phase2SectionStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { Phase2IdtTab } from "@/components/admin/phase2-idt-tab"
+import { EmailPhase1ReportButton } from "@/components/staff/email-phase1-report-dialog"
 
 const Phase2ResidentContextTab = dynamic(
   () => import("@/components/admin/phase2-resident-context-tab").then((m) => m.Phase2ResidentContextTab),
@@ -61,6 +62,9 @@ type Props = {
   onRefresh: () => Promise<void>
   waikRole: string | null
   isWaikSuperAdmin: boolean
+  /** When set, back navigates here (e.g. admin incident overview) instead of the incidents list. */
+  backHref?: string
+  backLabel?: string
 }
 
 export function Phase2InvestigationShell({
@@ -70,15 +74,44 @@ export function Phase2InvestigationShell({
   onRefresh,
   waikRole,
   isWaikSuperAdmin,
+  backHref,
+  backLabel = "Incidents",
 }: Props) {
   const router = useRouter()
   const apiQ = useMemo(() => getAdminContextQueryString(searchParams), [searchParams])
   const canP2 = isWaikSuperAdmin || canAccessPhase2(waikRole ?? "")
+  const listBackHref =
+    backHref ?? buildAdminPathWithContext("/admin/incidents", searchParams)
   const [claiming, setClaiming] = useState(false)
   const [unlockText, setUnlockText] = useState("")
   const [unlocking, setUnlocking] = useState(false)
   const [p1view, setP1view] = useState<"raw" | "both">("both")
   const [auditOpen, setAuditOpen] = useState(false)
+  const [adminEmail, setAdminEmail] = useState("")
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const r = await fetch("/api/auth/user-flags")
+        if (r.ok) {
+          const j = (await r.json()) as { email?: string }
+          if (alive) setAdminEmail(typeof j.email === "string" ? j.email : "")
+        }
+      } catch {
+        if (alive) setAdminEmail("")
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const phase1ReportHref = buildAdminPathWithContext(
+    `/admin/incidents/${incidentId}/phase1-report`,
+    searchParams,
+  )
+  const phase1PdfHref = `/api/incidents/${encodeURIComponent(incidentId)}/report/pdf${apiQ}`
 
   const p2 = inc.phase2Sections
   const phase1Signed = inc.phaseTransitionTimestamps?.phase1Signed
@@ -187,8 +220,8 @@ export function Phase2InvestigationShell({
         <p className="text-sm text-muted-foreground">
           Your role does not have access to the Phase 2 investigation workspace.
         </p>
-        <Button variant="secondary" onClick={() => router.push(buildAdminPathWithContext("/admin/incidents", searchParams))}>
-          Back to incidents
+        <Button variant="secondary" onClick={() => router.push(listBackHref)}>
+          Back to {backLabel.toLowerCase()}
         </Button>
       </div>
     )
@@ -207,7 +240,7 @@ export function Phase2InvestigationShell({
         </Button>
         <Button
           variant="ghost"
-          onClick={() => router.push(buildAdminPathWithContext("/admin/incidents", searchParams))}
+          onClick={() => router.push(listBackHref)}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
@@ -225,10 +258,10 @@ export function Phase2InvestigationShell({
           <Button
             variant="ghost"
             className="w-fit"
-            onClick={() => router.push(buildAdminPathWithContext("/admin/incidents", searchParams))}
+            onClick={() => router.push(listBackHref)}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Incidents
+            {backLabel}
           </Button>
           {deadline && hoursLeft != null && (
             <p className={cn("text-sm tabular-nums", clockClass)} title="Hours remaining until 48h from Phase 1 sign-off">
@@ -376,6 +409,26 @@ export function Phase2InvestigationShell({
             </TabsTrigger>
           </TabsList>
           <TabsContent value="p1" className="space-y-3 pt-2">
+            <div className="flex flex-col gap-2 rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.04] via-background to-muted/20 p-3 sm:p-4">
+              <p className="text-xs text-muted-foreground">
+                Full signed record with WAiK summary, recommendations, and nurse signature.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" className="rounded-xl">
+                  <Link href={phase1ReportHref}>
+                    <FileText className="mr-1.5 h-4 w-4" />
+                    View signed Phase 1 report
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline" className="rounded-xl">
+                  <a href={phase1PdfHref} target="_blank" rel="noreferrer">
+                    <Download className="mr-1.5 h-4 w-4" />
+                    Download PDF
+                  </a>
+                </Button>
+                <EmailPhase1ReportButton incidentId={incidentId} defaultEmail={adminEmail} />
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button type="button" size="sm" variant={p1view === "both" ? "default" : "outline"} onClick={() => setP1view("both")}>
                 Both

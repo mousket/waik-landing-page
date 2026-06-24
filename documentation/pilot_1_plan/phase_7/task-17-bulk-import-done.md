@@ -119,6 +119,6 @@ Add "Import Residents (CSV/Excel)" button to app/admin/residents/page.tsx → /a
 ## Post-Task Documentation Update
 
 After passing all test cases:
-- Create `plan/pilot_1/phase_7/task-17-DONE.md`
+- Mark complete: `documentation/pilot_1_plan/phase_7/task-17-bulk-import-done.md`
 - Update `documentation/waik/01-SYSTEM-OVERVIEW.md` to reflect full feature set
 - Create final `plan/pilot_1/PILOT_READY.md` — the completion declaration

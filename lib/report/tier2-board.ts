@@ -36,7 +36,7 @@ export function supplementTier2Questions(
 
   while (result.length < cappedMin) {
     const generic =
-      "Is there any other detail we should capture—observations, interventions, or staff actions?"
+      "Is there anything else from your assessment we should document before you sign off?"
     if (!normalized.has(generic.toLowerCase())) {
       result.push(generic)
       normalized.add(generic.toLowerCase())
@@ -103,6 +103,16 @@ export function buildNextTier2Board(input: {
     }
   }
 
+  // Keep unanswered cards from the prior board unless they were just answered.
+  // Regenerated gap questions supplement — they must not silently drop remaining follow-ups.
+  for (const q of baseBoard) {
+    if (matchedOld.has(q.id)) continue
+    if (answersAfter[q.id]?.trim()) continue
+    if (session.tier2DeferredIds.includes(q.id)) continue
+    nextBoard.push(q)
+    matchedOld.add(q.id)
+  }
+
   const newBoardIds = new Set(nextBoard.map((q) => q.id))
   const questionsRemoved = oldUnansweredIds.filter(
     (id) => id !== answeredQuestionId && !newBoardIds.has(id),
@@ -111,6 +121,16 @@ export function buildNextTier2Board(input: {
   const newQuestions = nextBoard.filter((q) => !baseIds.has(q.id))
 
   return { nextBoard, questionsRemoved, newQuestions }
+}
+
+/** Unanswered Tier 2 on the live board (excludes deferred — matches `tier2Unanswered`). */
+export function countPendingTier2OnBoard(
+  board: PendingQuestion[],
+  answers: Record<string, string>,
+  deferredIds: string[],
+): number {
+  const deferred = new Set(deferredIds)
+  return board.filter((q) => !answers[q.id]?.trim() && !deferred.has(q.id)).length
 }
 
 export function goldFieldDisplayKeys(paths: string[]): string[] {

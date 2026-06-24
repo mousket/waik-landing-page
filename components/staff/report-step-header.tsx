@@ -17,6 +17,7 @@ export function ReportStepHeader({
   eyebrow = "Incident report",
   title,
   description,
+  contextLine,
   className,
   trailing,
   back,
@@ -24,6 +25,8 @@ export function ReportStepHeader({
   eyebrow?: string
   title: string
   description?: string
+  /** e.g. resident name + incident type */
+  contextLine?: string
   className?: string
   trailing?: ReactNode
   back?: { href: string; ariaLabel?: string } | { onClick: () => void; disabled?: boolean; ariaLabel?: string }
@@ -59,6 +62,9 @@ export function ReportStepHeader({
         <div className="min-w-0 flex-1">
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-primary/80 sm:text-xs">{eyebrow}</p>
           <h1 className="mt-1 text-lg font-semibold tracking-tight text-foreground sm:text-xl">{title}</h1>
+          {contextLine ? (
+            <p className="mt-1 text-sm font-medium leading-snug text-foreground/90">{contextLine}</p>
+          ) : null}
           {description ? <p className="mt-1 text-sm leading-snug text-muted-foreground">{description}</p> : null}
         </div>
         {trailing ? <div className="shrink-0">{trailing}</div> : null}

@@ -10,6 +10,8 @@ interface Signature {
   role: string          // "reporter", "don", "admin"
   ipAddress?: string    // For audit trail
   declaration: string   // "I certify this report is accurate..."
+  signatureImage?: string | null  // base64 PNG from canvas
+  reportPdfUrl?: string | null    // stored PDF URL after sign-off
 }
 
 const SignatureSchema = new Schema<Signature>({
@@ -18,7 +20,9 @@ const SignatureSchema = new Schema<Signature>({
   signedAt: { type: Date, required: true },
   role: { type: String, required: true },
   ipAddress: { type: String },
-  declaration: { type: String, required: true }
+  declaration: { type: String, required: true },
+  signatureImage: { type: String, default: null },
+  reportPdfUrl: { type: String, default: null },
 }, { _id: false })
 
 // --- Existing Interfaces (Kept for compatibility) ---
@@ -69,6 +73,20 @@ interface IncidentInitialReport {
     statementAudioUrl?: string
   }>
   signature?: Signature    // The Nurse's Sign-off
+  phase1SignoffSnapshot?: {
+    expertNurseSummary: string
+    nurseRecommendations: string
+    administratorRecommendations: string
+    clinicalRecord: {
+      narrative: string
+      residentStatement: string
+      interventions: string
+      contributingFactors: string
+      recommendations: string
+      environmentalAssessment: string
+    }
+    signedAt: Date
+  }
 }
 
 // --- 3. UPDATED: Phase 2 Investigation Interface ---
@@ -130,6 +148,7 @@ const AUDIT_ACTIONS = [
   "phase_transitioned",
   "signed",
   "idt_roster_changed",
+  "phase1_report_emailed",
 ] as const
 const DEPT_ENUM = ["nursing", "dietary", "therapy", "activities", "administration", "multiple"] as const
 const INTERVENTION_DEPT = DEPT_ENUM
@@ -189,6 +208,11 @@ export interface IncidentDocument extends Document {
   tier2Reminder4hSentAt?: Date
   tier2EscalationSentAt?: Date
   questionsMarkedUnknown?: number
+  /** Redis report session id while Phase 1 report is in progress. */
+  activeReportSessionId?: string
+  activeReportPhase?: string
+  /** Serialized gap-analysis AgentState while Phase 1 is in progress (resume fallback). */
+  activeReportAgentState?: unknown
   activeDataCollectionSeconds?: number
   completenessAtTier1Complete?: number
   completenessAtSignoff?: number
@@ -312,6 +336,29 @@ const AIReportSchema = new Schema<AIReport>(
   { _id: false },
 )
 
+const ClinicalRecordSnapshotSchema = new Schema(
+  {
+    narrative: { type: String, required: true },
+    residentStatement: { type: String, required: true },
+    interventions: { type: String, required: true },
+    contributingFactors: { type: String, required: true },
+    recommendations: { type: String, required: true },
+    environmentalAssessment: { type: String, required: true },
+  },
+  { _id: false },
+)
+
+const Phase1SignoffSnapshotSchema = new Schema(
+  {
+    expertNurseSummary: { type: String, required: true },
+    nurseRecommendations: { type: String, required: true },
+    administratorRecommendations: { type: String, required: true },
+    clinicalRecord: { type: ClinicalRecordSnapshotSchema, required: true },
+    signedAt: { type: Date, required: true },
+  },
+  { _id: false },
+)
+
 const InitialReportSchema = new Schema<IncidentInitialReport>(
   {
     capturedAt: { type: Date, required: true },
@@ -335,7 +382,8 @@ const InitialReportSchema = new Schema<IncidentInitialReport>(
       statement: { type: String },
       statementAudioUrl: { type: String }
     }],
-    signature: { type: SignatureSchema }
+    signature: { type: SignatureSchema },
+    phase1SignoffSnapshot: { type: Phase1SignoffSnapshotSchema },
   },
   { _id: false },
 )
@@ -565,6 +613,9 @@ const IncidentSchema = new Schema<IncidentDocument>(
     tier2Reminder4hSentAt: { type: Date },
     tier2EscalationSentAt: { type: Date },
     questionsMarkedUnknown: { type: Number, default: 0 },
+    activeReportSessionId: { type: String },
+    activeReportPhase: { type: String },
+    activeReportAgentState: { type: Schema.Types.Mixed },
     activeDataCollectionSeconds: { type: Number, default: 0 },
     completenessAtTier1Complete: { type: Number, default: 0 },
     completenessAtSignoff: { type: Number, default: 0 },

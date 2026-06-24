@@ -83,4 +83,4 @@ Task **19** may start after **18** is far enough along that shared patterns (car
 ## Related docs
 
 - Phase 3e admin facility alignment: `documentation/pilot_1_plan/phase_3e/README.md`
-- Phase 7 navigation / history spec (may overlap success criteria): `documentation/pilot_1_plan/phase_7/task-14-navigation-history.md`
+- Phase 7 navigation / history spec (may overlap success criteria): `documentation/pilot_1_plan/phase_7/task-14-navigation-history-done.md`

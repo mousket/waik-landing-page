@@ -1,6 +1,5 @@
 import { getRedis } from "@/lib/redis"
-import { generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
-import { AI_CONFIG } from "@/lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "@/lib/openai"
 
 const PREFIX = "waik:mds:"
 const TTL_SEC = 24 * 60 * 60
@@ -58,7 +57,7 @@ List actionable MDS follow-ups in short paragraphs.`
       { role: "system", content: sys },
       { role: "user", content: user },
     ],
-    { model: AI_CONFIG.model, maxTokens: 1200 },
+    { model: modelForTask("mdsRecommendations"), maxTokens: 1200 },
   )
   return res.choices[0]?.message?.content?.trim() ?? ""
 }

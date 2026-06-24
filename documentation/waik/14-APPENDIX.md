@@ -82,8 +82,8 @@ OPENAI_API_KEY=sk-your-openai-api-key
 
 ```env
 # Model Selection (defaults shown)
-OPENAI_LLM_MODEL=gpt-4o-mini
-OPENAI_TEXT_EMBEDDING_MODEL=text-embedding-3-small
+LLM_MODEL=gpt-4o-mini
+TEXT_EMBEDDING_MODEL=text-embedding-3-small
 
 # Server Configuration
 NODE_ENV=development

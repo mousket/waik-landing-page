@@ -2,7 +2,7 @@ import "dotenv/config"
 import mongoose from "mongoose"
 import connectMongo from "../backend/src/lib/mongodb"
 import IncidentModel from "../backend/src/models/incident.model"
-import { AI_CONFIG, generateChatCompletion, isOpenAIConfigured } from "../lib/openai"
+import { modelForTask, generateChatCompletion, isOpenAIConfigured } from "../lib/openai"
 
 function requireArg(name: string): string {
   const idx = process.argv.findIndex((a) => a === `--${name}`)
@@ -83,7 +83,7 @@ Environment: ${input.clinicalRecord.environmentalAssessment}
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    { model: AI_CONFIG.model, temperature: 0, maxTokens: 900, response_format: { type: "json_object" } },
+    { model: modelForTask("verify"), temperature: 0, maxTokens: 900, response_format: { type: "json_object" } },
   )
   const txt = res.choices[0]?.message?.content?.trim() ?? ""
   const parsed = JSON.parse(txt) as any

@@ -43,8 +43,11 @@ export function AdminHighRiskResidentsCard({
         aria-label="High-risk residents"
       >
         <Skeleton className="h-5 w-48 rounded-md" />
-        <Skeleton className="mt-4 h-20 w-full rounded-xl" />
-        <Skeleton className="mt-2 h-20 w-full rounded-xl" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+        </div>
       </section>
     )
   }
@@ -92,11 +95,11 @@ export function AdminHighRiskResidentsCard({
           resident pass.
         </p>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((r) => (
             <li
               key={r.key}
-              className="rounded-xl border border-border/50 bg-card/70 p-3 shadow-sm sm:flex sm:items-start sm:justify-between sm:gap-4 sm:p-3.5"
+              className="flex h-full flex-col rounded-xl border border-border/50 bg-card/70 p-3 shadow-sm sm:p-3.5"
             >
               <div className="min-w-0 flex-1 space-y-2">
                 <div>
@@ -125,7 +128,7 @@ export function AdminHighRiskResidentsCard({
                 size="sm"
                 variant="outline"
                 className={cn(
-                  "mt-3 h-9 w-full shrink-0 border-primary/25 bg-gradient-to-b from-primary/12 to-primary/5 font-semibold text-primary sm:mt-0 sm:h-8 sm:w-auto",
+                  "mt-3 h-9 w-full shrink-0 border-primary/25 bg-gradient-to-b from-primary/12 to-primary/5 font-semibold text-primary",
                 )}
               >
                 <Link href={r.bundleHref} className="inline-flex items-center justify-center gap-1">
